@@ -30,5 +30,6 @@
   "item.rustling_leaves.wind_staff": "Staff of Winds",
   "item.rustling_leaves.wind_staff.tooltip": "Right click: raise a leaf whirlwind where you look",
   "item.rustling_leaves.wind_staff.tooltip_squall": "Sneak + right click: send a squall ahead of you",
-  "entity.rustling_leaves.autumn_bomb": "Autumn Bomb"
+  "entity.rustling_leaves.autumn_bomb": "Autumn Bomb",
+  "rustling_leaves.configuration.litterDistance": "Litter View Distance"
 }

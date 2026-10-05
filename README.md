@@ -56,7 +56,9 @@
 - **Colors match the tree** in every biome (also modded trees), with a share of autumn yellows, oranges and reds;
   litter on the ground looks a bit more aged. Oak, birch, spruce and cherry trees drop different shapes.
 - **Built for huge numbers of leaves**: lying leaves are stored as stacks per quarter block and only the visible ones
-  are drawn from cached GPU meshes - a pile of thousands of leaves costs a few hundred quads; only moving leaves are
+  are drawn from cached GPU meshes - a pile of thousands of leaves costs a few hundred quads. Far away the litter
+  switches to a simplified layer (one mesh per chunk), so the forest floor stays visible out to the render distance
+  without leaves popping in; only moving leaves are
   simulated in full, and everything that pushes leaves finds them through a spatial grid. The F3 screen shows the
   current numbers.
 - **Works on any server**: the leaves, piles, wind and raking are client-side and work even on vanilla servers.
@@ -103,6 +105,7 @@ In creative mode the tools are in the **Pocky Mods** tab (and in Tools & Utiliti
 | `leaves.spawnRadius` | `32` | Radius around you in which trees drop leaves |
 | `leaves.carpetDepth` | `4` | Natural leaf carpet thickness (leaves per quarter block, 0 = none) |
 | `leaves.naturalPiles` | `true` | Drifts against walls and trunks and occasional piles in forests |
+| `leaves.litterDistance` | `128` | How far lying leaves are shown (capped by the render distance) |
 | `leaves.leafSize` | `1.0` | Size of the leaves |
 | `leaves.autumnColors` | `0.35` | Share of leaves in autumn colors |
 | `leaves.leavesPerBreak` | `14` | Leaves released by a broken or decayed leaves block |

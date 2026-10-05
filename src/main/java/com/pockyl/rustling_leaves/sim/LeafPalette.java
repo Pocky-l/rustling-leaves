@@ -4,7 +4,7 @@ import net.minecraft.util.Mth;
 
 /** Color helpers shared by falling leaves and the leaf litter. Colors are 0xRRGGBB. */
 public final class LeafPalette {
-    private static final int[] AUTUMN = {0xE8B53A, 0xDB8A2C, 0xC45A26, 0xA8392A, 0x8C5C2E, 0xC9A23F, 0x7A5530};
+    private static final int[] AUTUMN = {0xE8B53A, 0xDB8A2C, 0xCF6A2E, 0xBC4E34, 0xA87842, 0xD4AE4A, 0x9C7448};
 
     private LeafPalette() {
     }
@@ -20,7 +20,7 @@ public final class LeafPalette {
             int autumn = AUTUMN[(int) ((hash >>> 16) & 0xFF) % AUTUMN.length];
             color = lerp(color, autumn, 0.5F + ((hash >>> 24) & 0xFF) / 255.0F * 0.45F);
         }
-        float brightness = 0.86F + ((hash >>> 32) & 0xFF) / 255.0F * 0.22F;
+        float brightness = 0.93F + ((hash >>> 32) & 0xFF) / 255.0F * 0.17F;
         return scale(color, brightness);
     }
 

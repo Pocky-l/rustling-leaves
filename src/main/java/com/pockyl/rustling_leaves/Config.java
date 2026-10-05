@@ -42,6 +42,11 @@ public final class Config {
             .comment("Share of leaves that fall in autumn colors (yellow, orange, red, brown) instead of the tree's color.")
             .translation("rustling_leaves.configuration.autumnColors")
             .defineInRange("autumnColors", 0.35, 0.0, 1.0);
+    private static final ModConfigSpec.IntValue LITTER_DISTANCE = BUILDER
+            .comment("How far away lying leaves are shown, in blocks (also limited by the render distance).",
+                    "Beyond about 70 blocks they are drawn as a cheap simplified layer.")
+            .translation("rustling_leaves.configuration.litterDistance")
+            .defineInRange("litterDistance", 128, 48, 256);
     private static final ModConfigSpec.IntValue LEAVES_PER_BREAK = BUILDER
             .comment("Leaves released when a leaves block is broken or decays.")
             .translation("rustling_leaves.configuration.leavesPerBreak")
@@ -103,6 +108,7 @@ public final class Config {
         settings.leafSize = LEAF_SIZE.get().floatValue();
         settings.autumnColors = AUTUMN_COLORS.get().floatValue();
         settings.leavesPerBreak = LEAVES_PER_BREAK.get();
+        settings.litterDistance = LITTER_DISTANCE.get();
         settings.windStrength = WIND_STRENGTH.get().floatValue();
         settings.entityStrength = ENTITY_STRENGTH.get().floatValue();
         settings.explosionStrength = EXPLOSION_STRENGTH.get().floatValue();

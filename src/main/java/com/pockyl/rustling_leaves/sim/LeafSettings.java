@@ -30,8 +30,11 @@ public final class LeafSettings {
         return spawnRadius + 24;
     }
 
+    /** How far lying leaves are shown (the client caps it at the render distance). */
+    public int litterDistance = 128;
+
     /** Leaf litter is kept in memory (and drawn) within this horizontal distance from the camera. */
     public double litterRadius() {
-        return Math.max(48, spawnRadius + 16);
+        return Math.max(Math.max(48, spawnRadius + 16), litterDistance);
     }
 }

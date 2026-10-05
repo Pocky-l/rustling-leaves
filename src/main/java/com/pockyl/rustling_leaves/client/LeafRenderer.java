@@ -42,10 +42,11 @@ import java.util.List;
 /**
  * Draws the leaves in two parts:
  * <ul>
- *   <li>the litter, in tiles of 4x4 blocks, each one static GPU buffer rebuilt only when its cells change (within a
- *   time budget per frame, nearest tiles first). Of every stack only the leaves that can be seen are drawn: the top
- *   ones, plus the sides of a pile where it stands above its neighbors - a pile of thousands of leaves costs a few
- *   hundred quads;</li>
+ *   <li>the litter, in levels of detail. Near the camera in tiles of 4x4 blocks, each one static GPU buffer rebuilt
+ *   only when its cells change (within a time budget per frame, nearest first); of every stack only the leaves that
+ *   can be seen are drawn, so a pile of thousands of leaves costs a few hundred quads. Far away a whole chunk is one
+ *   buffer of block-sized quads with the leaf layer textures - cheap enough to show the litter out to the render
+ *   distance. A chunk switches between the two only once the other mesh is ready, so nothing pops in or out;</li>
  *   <li>moving leaves, written into one streaming buffer each frame and interpolated between ticks.</li>
  * </ul>
  * Both use the vanilla cutout terrain shader, so fog, lightmap and day/night match the world.
@@ -60,6 +61,12 @@ final class LeafRenderer implements AutoCloseable {
                     .createCompositeState(false));
     private static final long REBUILD_BUDGET_NANOS = 3_000_000L;
     private static final double DETAIL_DISTANCE = 40.0;
+    /** Beyond this distance (to the chunk center) a chunk is drawn as one coarse mesh; 8 blocks of hysteresis. */
+    private static final double FAR_DISTANCE = 72.0;
+    private static final double FAR_HYSTERESIS = 8.0;
+    /** Blocks whose cells hold fewer leaves than this in total are left out of the coarse mesh. */
+    private static final int FAR_MIN_LEAVES = 4;
+    private static final int BLOCK_RING = 18;
     private static final int TOP_LAYERS = 2;
     private static final int MAX_SIDE_LAYERS = 48;
     private static final int SURFACE_MIN = LitterField.SURFACE_MIN;
@@ -69,7 +76,7 @@ final class LeafRenderer implements AutoCloseable {
     private static final int SURFACE_TOP_LAYERS = 3;
     /** The pile body sits below the loose leaves and is darker: it reads as the depth of the pile. */
     private static final float BODY_SINK = 0.02F;
-    private static final float BODY_SHADE = 0.6F;
+    private static final float BODY_SHADE = 0.8F;
     /** Stacks this deep hide the ground completely: they get the solid body under their leaf layer. */
     private static final int BODY_MIN = 12;
     /** Stacks this deep get the denser leaf layer. */
@@ -85,8 +92,12 @@ final class LeafRenderer implements AutoCloseable {
     private final LeafSimulation simulation;
     private final LeafPool pool;
     private final LitterField field;
-    private final Long2ObjectOpenHashMap<Tile> tiles = new Long2ObjectOpenHashMap<>();
-    private final List<Tile> dirty = new ArrayList<>();
+    private final Long2ObjectOpenHashMap<ChunkView> views = new Long2ObjectOpenHashMap<>();
+    private final List<Mesh> dirty = new ArrayList<>();
+    private final float[] blockTop = new float[BLOCK_RING * BLOCK_RING];
+    private final float[] blockBase = new float[BLOCK_RING * BLOCK_RING];
+    private final int[] blockLeaves = new int[BLOCK_RING * BLOCK_RING];
+    private final int[] blockColor = new int[BLOCK_RING * BLOCK_RING];
     private final LitterField.Pose pose = new LitterField.Pose();
     private final ByteBufferBuilder bytes = new ByteBufferBuilder(1 << 18);
     private final VertexBuffer moving = new VertexBuffer(VertexBuffer.Usage.DYNAMIC);
@@ -104,6 +115,7 @@ final class LeafRenderer implements AutoCloseable {
     private final float[] layerU1 = new float[3];
     private final float[] layerV1 = new float[3];
     private double currentOriginY;
+    private double currentOriginYFar;
     private float currentSink;
     private int frame;
     private int lastTileQuads;
@@ -114,31 +126,25 @@ final class LeafRenderer implements AutoCloseable {
         this.field = simulation.field();
     }
 
-    private static final class Tile {
+    /** A static GPU mesh of litter with its origin, bounds and the chunk revision it was built from. */
+    private abstract static class Mesh {
         final LitterChunk chunk;
-        final int index;
-        final int cellX;
-        final int cellZ;
-        final double originX;
-        final double originZ;
+        double originX;
         double originY;
+        double originZ;
         AABB bounds;
         VertexBuffer buffer;
         boolean empty = true;
         int builtRevision = Integer.MIN_VALUE;
-        boolean builtDetailed;
-        boolean wantDetailed;
-        int seenFrame;
         double distanceSq;
         int quads;
 
-        Tile(LitterChunk chunk, int index) {
+        Mesh(LitterChunk chunk) {
             this.chunk = chunk;
-            this.index = index;
-            cellX = chunk.x * LitterChunk.SIZE + index % LitterChunk.TILES * LitterChunk.TILE;
-            cellZ = chunk.z * LitterChunk.SIZE + index / LitterChunk.TILES * LitterChunk.TILE;
-            originX = cellX * LitterField.CELL;
-            originZ = cellZ * LitterField.CELL;
+        }
+
+        boolean built() {
+            return builtRevision != Integer.MIN_VALUE;
         }
 
         void close() {
@@ -146,6 +152,70 @@ final class LeafRenderer implements AutoCloseable {
                 buffer.close();
                 buffer = null;
             }
+            builtRevision = Integer.MIN_VALUE;
+        }
+    }
+
+    /** 4x4 blocks of detailed litter. */
+    private static final class Tile extends Mesh {
+        final int index;
+        final int cellX;
+        final int cellZ;
+        boolean builtDetailed;
+        boolean wantDetailed;
+
+        Tile(LitterChunk chunk, int index) {
+            super(chunk);
+            this.index = index;
+            cellX = chunk.x * LitterChunk.SIZE + index % LitterChunk.TILES * LitterChunk.TILE;
+            cellZ = chunk.z * LitterChunk.SIZE + index / LitterChunk.TILES * LitterChunk.TILE;
+            originX = cellX * LitterField.CELL;
+            originZ = cellZ * LitterField.CELL;
+        }
+    }
+
+    /** A whole chunk of litter as block-sized quads, for the distance. */
+    private static final class FarMesh extends Mesh {
+        FarMesh(LitterChunk chunk) {
+            super(chunk);
+            originX = chunk.x * 16;
+            originZ = chunk.z * 16;
+        }
+    }
+
+    /** What is drawn for one litter chunk: its detailed tiles or its far mesh. */
+    private static final class ChunkView {
+        final LitterChunk chunk;
+        final Tile[] tiles = new Tile[LitterChunk.TILES * LitterChunk.TILES];
+        FarMesh far;
+        boolean farMode;
+        boolean tilesReady;
+        int seenFrame;
+
+        ChunkView(LitterChunk chunk) {
+            this.chunk = chunk;
+        }
+
+        void closeTiles() {
+            for (int t = 0; t < tiles.length; t++) {
+                if (tiles[t] != null) {
+                    tiles[t].close();
+                    tiles[t] = null;
+                }
+            }
+        }
+
+        void close() {
+            closeTiles();
+            if (far != null) {
+                far.close();
+                far = null;
+            }
+        }
+
+        /** Far mesh while far away (once built), and close up until every tile is built. */
+        boolean drawFar() {
+            return far != null && far.built() && (farMode || !tilesReady);
         }
     }
 
@@ -175,17 +245,16 @@ final class LeafRenderer implements AutoCloseable {
         shader.apply();
         Uniform offset = shader.CHUNK_OFFSET;
         int quads = 0;
-        for (Tile tile : tiles.values()) {
-            if (tile.buffer == null || tile.empty || tile.bounds == null || !frustum.isVisible(tile.bounds)) {
-                continue;
+        for (ChunkView view : views.values()) {
+            if (view.drawFar()) {
+                quads += draw(view.far, frustum, offset, cam);
+            } else {
+                for (Tile tile : view.tiles) {
+                    if (tile != null) {
+                        quads += draw(tile, frustum, offset, cam);
+                    }
+                }
             }
-            if (offset != null) {
-                offset.set((float) (tile.originX - cam.x), (float) (tile.originY - cam.y), (float) (tile.originZ - cam.z));
-                offset.upload();
-            }
-            tile.buffer.bind();
-            tile.buffer.draw();
-            quads += tile.quads;
         }
         lastTileQuads = quads;
         if (!movingEmpty) {
@@ -202,6 +271,19 @@ final class LeafRenderer implements AutoCloseable {
         VertexBuffer.unbind();
         shader.clear();
         LEAVES.clearRenderState();
+    }
+
+    private static int draw(Mesh mesh, Frustum frustum, Uniform offset, Vec3 cam) {
+        if (mesh.buffer == null || mesh.empty || mesh.bounds == null || !frustum.isVisible(mesh.bounds)) {
+            return 0;
+        }
+        if (offset != null) {
+            offset.set((float) (mesh.originX - cam.x), (float) (mesh.originY - cam.y), (float) (mesh.originZ - cam.z));
+            offset.upload();
+        }
+        mesh.buffer.bind();
+        mesh.buffer.draw();
+        return mesh.quads;
     }
 
     private void updateSprites() {
@@ -223,24 +305,53 @@ final class LeafRenderer implements AutoCloseable {
         }
     }
 
-    /** Finds tiles of loaded litter chunks, drops tiles of unloaded ones and lists those that need a rebuild. */
+    /**
+     * Decides for every litter chunk whether it is drawn near (tiles) or far (one coarse mesh), drops views of chunks
+     * that are gone and lists the meshes that need a rebuild.
+     */
     private void collectTiles(Vec3 cam) {
         dirty.clear();
+        double nearSq = (FAR_DISTANCE - FAR_HYSTERESIS) * (FAR_DISTANCE - FAR_HYSTERESIS);
+        double farSq = (FAR_DISTANCE + FAR_HYSTERESIS) * (FAR_DISTANCE + FAR_HYSTERESIS);
         for (LitterChunk chunk : field.chunks()) {
             if (chunk.total() == 0) {
                 continue;
             }
-            for (int t = 0; t < LitterChunk.TILES * LitterChunk.TILES; t++) {
-                long key = tileKey(chunk, t);
-                Tile tile = tiles.get(key);
-                if (tile == null || tile.chunk != chunk) {
-                    if (tile != null) {
-                        tile.close();
-                    }
-                    tile = new Tile(chunk, t);
-                    tiles.put(key, tile);
+            long key = ChunkPos.asLong(chunk.x, chunk.z);
+            ChunkView view = views.get(key);
+            if (view == null || view.chunk != chunk) {
+                if (view != null) {
+                    view.close();
                 }
-                tile.seenFrame = frame;
+                view = new ChunkView(chunk);
+                views.put(key, view);
+            }
+            view.seenFrame = frame;
+            double cx = chunk.x * 16 + 8 - cam.x;
+            double cz = chunk.z * 16 + 8 - cam.z;
+            double distanceSq = cx * cx + cz * cz;
+            view.farMode = view.farMode ? distanceSq > nearSq : distanceSq > farSq;
+            if (view.farMode) {
+                if (view.far == null) {
+                    view.far = new FarMesh(chunk);
+                }
+                view.far.distanceSq = distanceSq;
+                if (view.far.builtRevision != chunk.revision()) {
+                    dirty.add(view.far);
+                }
+                if (view.far.built()) {
+                    view.closeTiles();
+                    view.tilesReady = false;
+                }
+                continue;
+            }
+            boolean ready = true;
+            for (int t = 0; t < view.tiles.length; t++) {
+                Tile tile = view.tiles[t];
+                if (tile == null) {
+                    tile = new Tile(chunk, t);
+                    view.tiles[t] = tile;
+                }
                 double dx = tile.originX + TILE_BLOCKS * 0.5 - cam.x;
                 double dz = tile.originZ + TILE_BLOCKS * 0.5 - cam.z;
                 tile.distanceSq = dx * dx + dz * dz;
@@ -248,19 +359,21 @@ final class LeafRenderer implements AutoCloseable {
                 if (tile.builtRevision != chunk.tileRevision[t] || tile.builtDetailed != tile.wantDetailed) {
                     dirty.add(tile);
                 }
+                ready &= tile.built();
+            }
+            view.tilesReady = ready;
+            if (ready && view.far != null) {
+                view.far.close();
+                view.far = null;
             }
         }
-        for (Iterator<Long2ObjectMap.Entry<Tile>> it = tiles.long2ObjectEntrySet().iterator(); it.hasNext(); ) {
-            Tile tile = it.next().getValue();
-            if (tile.seenFrame != frame) {
-                tile.close();
+        for (Iterator<Long2ObjectMap.Entry<ChunkView>> it = views.long2ObjectEntrySet().iterator(); it.hasNext(); ) {
+            ChunkView view = it.next().getValue();
+            if (view.seenFrame != frame) {
+                view.close();
                 it.remove();
             }
         }
-    }
-
-    private static long tileKey(LitterChunk chunk, int tile) {
-        return ChunkPos.asLong(chunk.x * LitterChunk.TILES + tile % LitterChunk.TILES, chunk.z * LitterChunk.TILES + tile / LitterChunk.TILES);
     }
 
     private void rebuildTiles() {
@@ -269,13 +382,138 @@ final class LeafRenderer implements AutoCloseable {
         }
         dirty.sort((a, b) -> Double.compare(a.distanceSq, b.distanceSq));
         long deadline = System.nanoTime() + REBUILD_BUDGET_NANOS;
-        for (Tile tile : dirty) {
-            buildTile(tile);
+        for (Mesh mesh : dirty) {
+            if (mesh instanceof Tile tile) {
+                buildTile(tile);
+            } else {
+                buildFar((FarMesh) mesh);
+            }
             if (System.nanoTime() > deadline) {
                 break;
             }
         }
         VertexBuffer.unbind();
+    }
+
+    /**
+     * The coarse mesh of a far chunk: per block one quad at the average height of its leaves, smoothed with the
+     * neighboring blocks, with the leaf layer (and a body under deep piles) like the near tiles use.
+     */
+    private void buildFar(FarMesh mesh) {
+        LitterChunk chunk = mesh.chunk;
+        mesh.builtRevision = chunk.revision();
+        float aged = Math.min(1.0F, simulation.settings().autumnColors + 0.3F);
+        double minY = Double.MAX_VALUE;
+        double maxY = -Double.MAX_VALUE;
+        for (int bz = 0; bz < BLOCK_RING; bz++) {
+            for (int bx = 0; bx < BLOCK_RING; bx++) {
+                int b = bz * BLOCK_RING + bx;
+                int blockX = chunk.x * 16 + bx - 1;
+                int blockZ = chunk.z * 16 + bz - 1;
+                int leaves = 0;
+                double topSum = 0.0;
+                double base = 0.0;
+                int filled = 0;
+                int color = 0;
+                LitterChunk source = field.chunkAtCell(blockX * 4, blockZ * 4);
+                if (source != null) {
+                    for (int c = 0; c < 16; c++) {
+                        int i = LitterField.index(blockX * 4 + (c & 3), blockZ * 4 + (c >> 2));
+                        int n = source.count[i];
+                        if (n > 0) {
+                            leaves += n;
+                            topSum += source.base[i] + n * LitterField.LAYER;
+                            base = source.base[i];
+                            color = source.color[i];
+                            filled++;
+                        }
+                    }
+                }
+                blockLeaves[b] = leaves;
+                if (filled > 0) {
+                    blockTop[b] = (float) (topSum / filled);
+                    blockBase[b] = (float) base;
+                    blockColor[b] = LeafPalette.vary(color, LeafPalette.hash(blockX, blockZ, 0x7A), aged, LeafShape.BROAD);
+                    if (bx > 0 && bx < 17 && bz > 0 && bz < 17) {
+                        minY = Math.min(minY, base);
+                        maxY = Math.max(maxY, blockTop[b]);
+                    }
+                }
+            }
+        }
+        if (minY == Double.MAX_VALUE) {
+            mesh.empty = true;
+            mesh.quads = 0;
+            return;
+        }
+        mesh.originY = Math.floor(minY);
+        currentOriginYFar = mesh.originY;
+        mesh.bounds = new AABB(mesh.originX, minY - 0.2, mesh.originZ, mesh.originX + 16, maxY + 0.3, mesh.originZ + 16);
+        BufferBuilder builder = new BufferBuilder(bytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
+        int quads = 0;
+        for (int bz = 1; bz < 17; bz++) {
+            for (int bx = 1; bx < 17; bx++) {
+                int b = bz * BLOCK_RING + bx;
+                int leaves = blockLeaves[b];
+                if (leaves < FAR_MIN_LEAVES) {
+                    continue;
+                }
+                float base = blockBase[b];
+                float h00 = farCorner(bx, bz, base);
+                float h10 = farCorner(bx + 1, bz, base);
+                float h11 = farCorner(bx + 1, bz + 1, base);
+                float h01 = farCorner(bx, bz + 1, base);
+                float perCell = leaves / 16.0F;
+                int light = simulation.lightAt(mesh.originX + bx - 0.5, blockTop[b] + 0.1, mesh.originZ + bz - 0.5);
+                float x0 = bx - 1;
+                float z0 = bz - 1;
+                if (perCell >= BODY_MIN) {
+                    farQuad(builder, x0, z0, h00, h10, h11, h01, BODY_SINK, TEX_BODY, shade(blockColor[b], BODY_SHADE), light);
+                    quads++;
+                }
+                farQuad(builder, x0, z0, h00, h10, h11, h01, LAYER_SINK, perCell >= DENSE_MIN * 0.5F ? TEX_LAYER : TEX_SPARSE,
+                        blockColor[b], light);
+                quads++;
+            }
+        }
+        mesh.quads = quads;
+        MeshData data = builder.build();
+        if (data == null) {
+            mesh.empty = true;
+            return;
+        }
+        if (mesh.buffer == null) {
+            mesh.buffer = new VertexBuffer(VertexBuffer.Usage.STATIC);
+        }
+        mesh.buffer.bind();
+        mesh.buffer.upload(data);
+        mesh.empty = false;
+    }
+
+    /** Height of a block corner of the far mesh relative to its origin: the average of the four blocks around it. */
+    private float farCorner(int cornerX, int cornerZ, float base) {
+        float sum = 0.0F;
+        for (int dz = -1; dz <= 0; dz++) {
+            for (int dx = -1; dx <= 0; dx++) {
+                int b = (cornerZ + dz) * BLOCK_RING + cornerX + dx;
+                sum += blockLeaves[b] > 0 && Math.abs(blockBase[b] - base) < 0.6F ? blockTop[b] : base;
+            }
+        }
+        return (float) (sum * 0.25F - LitterField.SURFACE_DROP - currentOriginYFar);
+    }
+
+    private void farQuad(BufferBuilder builder, float x0, float z0, float h00, float h10, float h11, float h01, float sink, int texture,
+            int rgb, int light) {
+        int color = 0xFF000000 | rgb;
+        float u0t = layerU0[texture];
+        float v0t = layerV0[texture];
+        float u1t = layerU1[texture];
+        float v1t = layerV1[texture];
+        int overlay = OverlayTexture.NO_OVERLAY;
+        builder.addVertex(x0, h00 - sink, z0, color, u0t, v0t, overlay, light, 0.0F, 1.0F, 0.0F);
+        builder.addVertex(x0, h01 - sink, z0 + 1.0F, color, u0t, v1t, overlay, light, 0.0F, 1.0F, 0.0F);
+        builder.addVertex(x0 + 1.0F, h11 - sink, z0 + 1.0F, color, u1t, v1t, overlay, light, 0.0F, 1.0F, 0.0F);
+        builder.addVertex(x0 + 1.0F, h10 - sink, z0, color, u1t, v0t, overlay, light, 0.0F, 1.0F, 0.0F);
     }
 
     private void buildTile(Tile tile) {
@@ -337,7 +575,7 @@ final class LeafRenderer implements AutoCloseable {
                 for (int depth = 0; depth < visible; depth++) {
                     field.pose(chunk, cellX, cellZ, n - 1 - depth, pose);
                     // Leaves deeper in the pile are in its shadow.
-                    float shade = Math.max(0.68F, 1.0F - depth * 0.05F);
+                    float shade = Math.max(0.84F, 1.0F - depth * 0.04F);
                     emit(builder, (float) (pose.x - tile.originX), (float) (pose.y - tile.originY), (float) (pose.z - tile.originZ),
                             pose.yaw, pose.pitch, pose.roll, pose.size, shade(pose.color, shade), light, pose.sprite);
                     quads++;
@@ -556,10 +794,10 @@ final class LeafRenderer implements AutoCloseable {
 
     @Override
     public void close() {
-        for (Tile tile : tiles.values()) {
-            tile.close();
+        for (ChunkView view : views.values()) {
+            view.close();
         }
-        tiles.clear();
+        views.clear();
         moving.close();
         bytes.close();
     }

@@ -47,6 +47,15 @@ public final class LitterChunk {
         return (index >> 6 >> 4) * TILES + ((index & 63) >> 4);
     }
 
+    /** Changes whenever any cell of the chunk changes (the sum of the tile revisions). */
+    public int revision() {
+        int sum = 0;
+        for (int t = 0; t < tileRevision.length; t++) {
+            sum += tileRevision[t];
+        }
+        return sum;
+    }
+
     public int total() {
         return total;
     }

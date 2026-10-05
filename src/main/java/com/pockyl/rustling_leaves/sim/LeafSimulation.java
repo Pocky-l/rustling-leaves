@@ -48,7 +48,7 @@ public final class LeafSimulation {
     /** Strength of that pull, blocks per tick squared: a slow creep, not a rush. */
     private static final float MENISCUS_PULL = 0.0004F;
     /** Brightness of a soaked leaf. */
-    public static final float WET_SHADE = 0.66F;
+    public static final float WET_SHADE = 0.76F;
     /** Share of leaves that tumble instead of fluttering (in nature: long, stiff leaves). */
     private static final float TUMBLER_SHARE = 0.25F;
     private static final float GROUND_FRICTION = 0.86F;

@@ -30,5 +30,6 @@
   "item.rustling_leaves.wind_staff": "Посох ветров",
   "item.rustling_leaves.wind_staff.tooltip": "ПКМ: вызвать листовой вихрь туда, куда смотрите",
   "item.rustling_leaves.wind_staff.tooltip_squall": "Shift + ПКМ: пустить шквал перед собой",
-  "entity.rustling_leaves.autumn_bomb": "Осенняя бомба"
+  "entity.rustling_leaves.autumn_bomb": "Осенняя бомба",
+  "rustling_leaves.configuration.litterDistance": "Дальность отображения листвы"
 }

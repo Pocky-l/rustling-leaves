@@ -70,6 +70,7 @@ public final class LeafManager {
     private static final double TELEPORT_DISTANCE = 4.0;
     private static final int SAVE_INTERVAL = 20 * 30;
     private static final float RAKE_RADIUS = 2.0F;
+    private static final long SEED_BUDGET_NANOS = 4_000_000L;
 
     private static final LeafSettings SETTINGS = new LeafSettings();
     private static final LeafColors COLORS = new LeafColors();
@@ -301,7 +302,8 @@ public final class LeafManager {
 
     private static void updateLitterChunks(Vec3 camera) {
         LitterField field = simulation.field();
-        double radius = SETTINGS.litterRadius();
+        double renderDistance = Math.max(48.0, Minecraft.getInstance().options.getEffectiveRenderDistance() * 16.0);
+        double radius = Math.min(SETTINGS.litterRadius(), renderDistance);
         int camChunkX = Mth.floor(camera.x) >> 4;
         int camChunkZ = Mth.floor(camera.z) >> 4;
         int reach = Mth.ceil(radius / 16.0) + 1;
@@ -331,21 +333,25 @@ public final class LeafManager {
                 }
             }
         }
-        // Seed at most one new chunk per tick, nearest first, once its neighbors are there for the canopy around it.
-        LitterChunk nearest = null;
-        double nearestSq = Double.MAX_VALUE;
+        // Seed new ground nearest first, within a time budget per tick, once a chunk's neighbors are there for the
+        // canopy around it: fast enough to keep ahead of a player flying over a forest.
+        List<LitterChunk> unseeded = new ArrayList<>();
         for (LitterChunk chunk : field.chunks()) {
-            if (!chunk.seeded()) {
-                double distanceSq = chunkDistanceSq(chunk.x, chunk.z, camera);
-                if (distanceSq < nearestSq && neighborsLoaded(chunk.x, chunk.z)) {
-                    nearest = chunk;
-                    nearestSq = distanceSq;
-                }
+            if (!chunk.seeded() && neighborsLoaded(chunk.x, chunk.z)) {
+                unseeded.add(chunk);
             }
         }
-        if (nearest != null) {
-            SEEDER.seed(level, simulation, nearest);
-            nearest.markSeeded();
+        if (unseeded.isEmpty()) {
+            return;
+        }
+        unseeded.sort((a, b) -> Double.compare(chunkDistanceSq(a.x, a.z, camera), chunkDistanceSq(b.x, b.z, camera)));
+        long deadline = System.nanoTime() + SEED_BUDGET_NANOS;
+        for (LitterChunk chunk : unseeded) {
+            SEEDER.seed(level, simulation, chunk);
+            chunk.markSeeded();
+            if (System.nanoTime() > deadline) {
+                break;
+            }
         }
     }
 

@@ -43,7 +43,9 @@ Physically simulated leaves: falling leaves, leaf piles you can wade through, ra
 - **Colors match the tree** in every biome (also modded trees), with a share of autumn yellows, oranges and reds;
   litter on the ground looks a bit more aged. Oak, birch, spruce and cherry trees drop different shapes.
 - **Built for huge numbers of leaves**: lying leaves are stored as stacks per quarter block and only the visible ones
-  are drawn from cached GPU meshes - a pile of thousands of leaves costs a few hundred quads; only moving leaves are
+  are drawn from cached GPU meshes - a pile of thousands of leaves costs a few hundred quads. Far away the litter
+  switches to a simplified layer (one mesh per chunk), so the forest floor stays visible out to the render distance
+  without leaves popping in; only moving leaves are
   simulated in full, and everything that pushes leaves finds them through a spatial grid. The F3 screen shows the
   current numbers.
 - **Works on any server**: the leaves, piles, wind and raking are client-side and work even on vanilla servers.
