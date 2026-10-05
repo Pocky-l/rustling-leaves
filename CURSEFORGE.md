@@ -1,32 +1,41 @@
 # Rustling Leaves
 
-Thousands of physically simulated leaves that fall from trees, pile up and scatter when you walk, blast or throw wind charges.
+Physically simulated leaves: falling leaves, a forest floor of leaf piles you can wade through and rake, gusts and whirlwinds.
 
 ## Features
 
 - **Falling leaves**: trees around you shed leaves that flutter, sway and glide down like real leaves -
   broadside they drift, edge-on they slip, and each one spins and tilts in its own rhythm.
-- **Leaves pile up** on the ground, on slabs, stairs and paths, and slowly fade away after a few minutes.
-  They float and drift on water (rivers carry them along) and burn up in lava.
-- **Walk through them**: leaves are kicked up under your feet and fly in the direction you move; sprinting
-  throws them higher, landing from a jump scatters them around you, **sneaking leaves them undisturbed**.
-  Mobs, animals, minecarts, boats and arrows stir them up too. A soft rustle plays as you wade through piles.
-- **Wind charges** blow leaves away in a swirling ring; **explosions** (TNT, creepers, beds, ...) send a shock
-  front through the forest floor that throws leaves high into the air.
-- **Breaking or decaying leaves** releases a burst of leaves; when the block under a leaf disappears, the leaf falls.
-- **Wind**: gusts sweep visibly across the forest, picking up loose leaves; rain makes them wet and heavy,
-  thunderstorms tear them off the trees.
-- **Colors match the tree** in every biome (also modded trees), with a share of autumn yellows, oranges and reds.
-  Oak, birch, spruce and cherry trees drop different shapes: broad leaves, round leaves, needles and petals.
-- **Built for thousands of leaves**: leaves lying still cost almost nothing and are drawn from cached GPU meshes,
-  only moving leaves are simulated in full; everything that pushes leaves finds them through a spatial grid.
-  8000 leaves by default, up to 60000 on a strong PC. The F3 screen shows the current numbers.
+- **A real forest floor**: leaves pile up in layers - a carpet under the trees, drifts banked against walls and
+  trunks, and now and then a proper leaf pile. Piles slump to a natural angle of repose and leaves slide down their
+  sides. The ground cover is **saved with your world** (per server in multiplayer), so piles stay where they are.
+- **Wade through piles**: your body pushes the leaves aside - most are shoved to the sides and ahead, leaving a
+  trench with banks behind you; some skid over the ground, only a few from the top fly up (more when running).
+  **Sneaking** over a thin carpet leaves it untouched. **Jump into a pile** and it splashes up around you.
+  Mobs, animals, minecarts and arrows stir leaves too, with a soft rustle.
+- **Rake leaves into piles**: hold right click with a hoe or shovel on leaf litter to sweep the leaves around that
+  spot together (it does not till the ground or make a path while there are leaves).
+- **Wind you can see**: gust waves sweep across the forest and skitter loose leaves over the ground until they
+  pile up against obstacles; **squalls** - strong gust fronts - roll through and strip a band of trees at once;
+  **leaf whirlwinds** wander over open ground, suck up the litter and spin it up in a swirling column.
+  Rain makes leaves wet and heavy, thunderstorms tear them off the trees.
+- **Wind charges** blow leaves away in a swirling ring; **explosions** send a shock front through the forest floor
+  that clears the ground and throws leaves high into the air.
+- Breaking or decaying leaves releases a burst of leaves; when the block under litter disappears, the litter falls,
+  and a block placed on litter ends up with the leaves on top. Leaves float and drift on water and burn in lava.
+- **Colors match the tree** in every biome (also modded trees), with a share of autumn yellows, oranges and reds;
+  litter on the ground looks a bit more aged. Oak, birch, spruce and cherry trees drop different shapes.
+- **Built for huge numbers of leaves**: lying leaves are stored as stacks per quarter block and only the visible ones
+  are drawn from cached GPU meshes - a pile of thousands of leaves costs a few hundred quads; only moving leaves are
+  simulated in full, and everything that pushes leaves finds them through a spatial grid. The F3 screen shows the
+  current numbers.
 - **Client-side only**: works on any server, including vanilla ones; no items, nothing to install on the server.
 
 ## Configuration
 
 Everything can be tuned in the in-game config screen: number of leaves, fall rate, radius, time on the ground,
-leaf size, autumn colors, wind, footstep and explosion strength, rustle volume.
+carpet thickness, leaf size, autumn colors, wind, squalls and whirlwinds, footstep and explosion strength,
+raking, rustle volume.
 
 ## Requirements
 
