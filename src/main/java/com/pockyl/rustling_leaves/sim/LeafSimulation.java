@@ -45,6 +45,8 @@ public final class LeafSimulation {
     private static final float LIFT_SCALE = 8.0F;
     private static final int WIND_SAMPLES = 48;
     private static final int PARTICLES_PER_DISTURB = 24;
+    /** Leaves at the bottom of a stack that a foot presses down instead of moving. */
+    private static final int TRAMPLED = 2;
     private static final float LAYER = LitterField.LAYER;
     private static final float CELL = LitterField.CELL;
 
@@ -888,15 +890,18 @@ public final class LeafSimulation {
                 if (dist > reach) {
                     continue;
                 }
-                int keep = Math.max(0, Mth.ceil((y - base) / LAYER));
-                int movable = n - keep;
-                if (movable <= 0 || !landed && sneaking && n <= 3) {
+                // The bottom leaves are pressed into the ground under a foot and stay; of the rest only a share is
+                // moved per tick - more when running or landing hard. Walking through leaves thins them, it does not
+                // sweep the ground clean.
+                int keep = Math.max(Math.min(n, TRAMPLED), Mth.ceil((y - base) / LAYER));
+                int loose = n - keep;
+                if (loose <= 0 || !landed && sneaking && n <= 3) {
                     continue;
                 }
                 float falloff = 1.0F - dist / reach;
-                if (landed) {
-                    movable = Math.round(movable * Math.min(1.0F, falloff * 1.6F + 0.2F));
-                }
+                float share = landed ? Math.min(0.75F, landing * 1.2F * (0.4F + falloff))
+                        : Math.min(0.7F, 0.12F + speed * 1.6F) * (sneaking ? 0.3F : 1.0F);
+                int movable = stochasticRound(loose * share);
                 float outX = dist > 1.0E-3F ? dx / dist : dirX;
                 float outZ = dist > 1.0E-3F ? dz / dist : dirZ;
                 for (int k = 0; k < movable; k++) {
@@ -914,8 +919,9 @@ public final class LeafSimulation {
                         float push = landed ? landing * (0.2F + 0.3F * random.next()) : speed * (0.6F + 0.8F * random.next());
                         float up = landed ? landing * (0.35F + 0.55F * random.next()) * (0.5F + falloff)
                                 : speed * (0.15F + 0.45F * random.next()) + 0.02F;
-                        float hx = landed ? outX * push : (dirX * 0.75F + outX * 0.6F) * push;
-                        float hz = landed ? outZ * push : (dirZ * 0.75F + outZ * 0.6F) * push;
+                        // Kicked leaves follow the walker; splashed ones go up more than out and land close by.
+                        float hx = landed ? outX * push * random.next() : (dirX * 0.9F + outX * 0.3F) * push;
+                        float hz = landed ? outZ * push * random.next() : (dirZ * 0.9F + outZ * 0.3F) * push;
                         int i = release(cx, cz, LeafPool.FALLING, hx, up, hz);
                         if (i >= 0) {
                             budget--;
@@ -934,13 +940,13 @@ public final class LeafSimulation {
                             continue;
                         }
                     }
-                    // Shoved aside: to the rim of the body, a bit ahead in the direction of motion.
-                    float distance = reach + 0.15F + random.next() * 0.4F;
-                    float ahead = landed ? 0.0F : speed * 1.5F * Math.max(0.0F, outX * dirX + outZ * dirZ);
-                    float spread = (random.next() - 0.5F) * 0.6F;
+                    // Shoved a short way: mostly outwards and along the motion, often just into the next cell.
+                    float distance = 0.2F + random.next() * (landed ? 0.6F : 0.45F);
+                    float ahead = landed ? 0.0F : speed * 1.2F * Math.max(0.0F, outX * dirX + outZ * dirZ);
+                    float spread = (random.next() - 0.5F) * 0.4F;
                     float px = outX * distance + dirX * ahead - outZ * spread;
                     float pz = outZ * distance + dirZ * ahead + outX * spread;
-                    if (shove(cx, cz, LitterField.cell(x + px), LitterField.cell(z + pz))) {
+                    if (shove(cx, cz, LitterField.cell((cx + 0.5) * CELL + px), LitterField.cell((cz + 0.5) * CELL + pz))) {
                         moved++;
                     }
                 }
@@ -948,6 +954,12 @@ public final class LeafSimulation {
             }
         }
         return moved;
+    }
+
+    /** Rounds up with a probability equal to the fraction, so small shares still move a leaf now and then. */
+    private int stochasticRound(float value) {
+        int whole = (int) value;
+        return whole + (random.next() < value - whole ? 1 : 0);
     }
 
     private void spinUp(int i, float energy) {
@@ -1123,7 +1135,7 @@ public final class LeafSimulation {
                 }
                 float dist = (float) Math.sqrt(distSq);
                 float falloff = 1.0F - dist / wave.radius;
-                int removed = Math.min(n, Mth.ceil(n * Math.min(1.0F, Mth.sqrt(falloff) * 1.3F)));
+                int removed = Math.min(n, stochasticRound(n * Math.min(0.85F, Mth.sqrt(falloff) * 0.95F)));
                 float flat = (float) Math.sqrt(dx * dx + dz * dz);
                 float outX = flat > 1.0E-3F ? (float) dx / flat : 1.0F;
                 float outZ = flat > 1.0E-3F ? (float) dz / flat : 0.0F;
@@ -1133,10 +1145,14 @@ public final class LeafSimulation {
                         if (i >= 0) {
                             wave.budget--;
                             blast(wave, i, pool.x[i] - wave.x, pool.y[i] - wave.y, pool.z[i] - wave.z, Math.max(0.06F, dist));
+                            // Many leaves only hop: little sideways speed, so they come down near where they lay.
+                            float keepOut = random.next() < 0.35F ? 0.15F : 0.4F + 0.6F * random.next();
+                            pool.vx[i] *= keepOut;
+                            pool.vz[i] *= keepOut;
                             continue;
                         }
                     }
-                    float throwDistance = (wave.radius - dist) * (0.4F + 0.6F * random.next()) + 0.5F;
+                    float throwDistance = (wave.radius - dist) * (0.1F + 0.7F * random.next()) + 0.25F;
                     float spread = (random.next() - 0.5F) * 0.8F;
                     int tx = LitterField.cell((cx + 0.5) * CELL + outX * throwDistance - outZ * spread);
                     int tz = LitterField.cell((cz + 0.5) * CELL + outZ * throwDistance + outX * spread);

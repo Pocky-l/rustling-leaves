@@ -131,7 +131,7 @@ public final class ModGameTests {
     }
 
     @GameTest(template = "box")
-    public static void walkingThroughAPileLeavesATrench(GameTestHelper helper) {
+    public static void walkingThroughAPileThinsIt(GameTestHelper helper) {
         floor(helper);
         LeafSimulation sim = simulation(helper, 512, LeafListener.NONE);
         int total = carpet(sim, helper, 2.0, 16);
@@ -139,9 +139,10 @@ public final class ModGameTests {
         int[] cell = cellAt(helper, 3.5, 3.5);
         sim.beginTick(helper.getLevel(), center.getX(), center.getY(), center.getZ());
         int moved = sim.disturb(center.getX() + 0.5, center.getY(), center.getZ() + 0.5, 0.22, 0.0, 0.0, 0.6F, 1.8F, false, 0.0F);
-        helper.assertTrue(sim.field().count(cell[0], cell[1]) == 0, "leaves are left under the body");
+        int under = sim.field().count(cell[0], cell[1]);
+        helper.assertTrue(under > 0 && under < 16, "the cell under the feet holds " + under + " of 16 leaves");
         sim.finishTick();
-        helper.assertTrue(moved > 50, "only " + moved + " leaves were pushed");
+        helper.assertTrue(moved > 20, "only " + moved + " leaves were pushed");
         helper.assertTrue(sim.pool().count() < moved / 3, sim.pool().count() + " of " + moved + " leaves flew - most should be shoved aside");
         helper.assertTrue(sim.pool().count() > 0, "no leaf flew up at all");
         helper.assertTrue(sim.field().total() + sim.pool().count() == total, "leaves were lost");
@@ -198,7 +199,7 @@ public final class ModGameTests {
             }
         }
         helper.assertTrue(airborne > 40, "only " + airborne + " leaves flew up");
-        helper.assertTrue(sim.field().count(cell[0], cell[1]) == 0, "the center was not cleared");
+        helper.assertTrue(sim.field().count(cell[0], cell[1]) < 4, "the center was not disturbed");
         run(sim, helper, 600);
         helper.assertTrue(sim.field().total() + sim.pool().count() == total,
                 "leaves were lost: " + (sim.field().total() + sim.pool().count()) + " of " + total);

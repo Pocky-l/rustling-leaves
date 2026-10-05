@@ -21,6 +21,9 @@ final class LeafShapes {
             RustlingLeaves.id("block/leaf/petal"),
     };
 
+    /** Seamless texture of densely packed leaves for the body of piles. */
+    static final ResourceLocation LITTER = RustlingLeaves.id("block/leaf/litter");
+
     private static final Map<Block, LeafShape> BY_BLOCK = new IdentityHashMap<>();
 
     private LeafShapes() {

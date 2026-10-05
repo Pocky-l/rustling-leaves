@@ -27,6 +27,7 @@ import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
 import com.pockyl.rustling_leaves.RustlingLeaves;
+import com.pockyl.rustling_leaves.sim.LeafPalette;
 import com.pockyl.rustling_leaves.sim.LeafPool;
 import com.pockyl.rustling_leaves.sim.LeafShape;
 import com.pockyl.rustling_leaves.sim.LeafSimulation;
@@ -60,6 +61,11 @@ final class LeafRenderer implements AutoCloseable {
     private static final double DETAIL_DISTANCE = 40.0;
     private static final int TOP_LAYERS = 2;
     private static final int MAX_SIDE_LAYERS = 48;
+    /** Stacks of at least this many leaves get a solid leafy surface under their loose top leaves. */
+    private static final int SURFACE_MIN = 3;
+    /** With a surface, only a few loose leaves are added on the sides of a pile. */
+    private static final int SURFACE_SIDE_LAYERS = 3;
+    private static final int RING = LitterChunk.TILE + 2;
     private static final float TILE_BLOCKS = LitterChunk.TILE * LitterField.CELL;
 
     private final LeafSimulation simulation;
@@ -75,6 +81,15 @@ final class LeafRenderer implements AutoCloseable {
     private final float[] v0 = new float[LeafShape.SPRITE_COUNT];
     private final float[] u1 = new float[LeafShape.SPRITE_COUNT];
     private final float[] v1 = new float[LeafShape.SPRITE_COUNT];
+    private final int[] ringCount = new int[RING * RING];
+    private final double[] ringBase = new double[RING * RING];
+    private final double[] ringTop = new double[RING * RING];
+    private final int[] ringColor = new int[RING * RING];
+    private float litterU0;
+    private float litterV0;
+    private float litterU1;
+    private float litterV1;
+    private double currentOriginY;
     private int frame;
     private int lastTileQuads;
 
@@ -183,6 +198,11 @@ final class LeafRenderer implements AutoCloseable {
             u1[s] = sprite.getU1();
             v1[s] = sprite.getV1();
         }
+        TextureAtlasSprite litter = atlas.getSprite(LeafShapes.LITTER);
+        litterU0 = litter.getU0();
+        litterV0 = litter.getV0();
+        litterU1 = litter.getU1();
+        litterV1 = litter.getV1();
     }
 
     /** Finds tiles of loaded litter chunks, drops tiles of unloaded ones and lists those that need a rebuild. */
@@ -262,8 +282,10 @@ final class LeafRenderer implements AutoCloseable {
             return;
         }
         tile.originY = Math.floor(minY);
+        currentOriginY = tile.originY;
         tile.bounds = new AABB(tile.originX - 0.3, minY - 0.2, tile.originZ - 0.3, tile.originX + TILE_BLOCKS + 0.3, maxY + 0.3,
                 tile.originZ + TILE_BLOCKS + 0.3);
+        loadRing(tile);
         BufferBuilder builder = new BufferBuilder(bytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
         int quads = 0;
         for (int lz = 0; lz < LitterChunk.TILE; lz++) {
@@ -280,8 +302,13 @@ final class LeafRenderer implements AutoCloseable {
                 double lowest = Math.min(Math.min(neighborTop(cellX + 1, cellZ, base), neighborTop(cellX - 1, cellZ, base)),
                         Math.min(neighborTop(cellX, cellZ + 1, base), neighborTop(cellX, cellZ - 1, base)));
                 int side = Mth.clamp(Mth.ceil((top - lowest) / LitterField.LAYER), 0, MAX_SIDE_LAYERS);
-                int visible = Math.min(n, topLayers + (tile.wantDetailed ? side : side / 2));
                 int light = simulation.lightAt((cellX + 0.5) * LitterField.CELL, top + 0.05, (cellZ + 0.5) * LitterField.CELL);
+                if (n >= SURFACE_MIN) {
+                    emitSurface(builder, tile, lx, lz, base, light);
+                    quads++;
+                    side = Math.min(side, SURFACE_SIDE_LAYERS);
+                }
+                int visible = Math.min(n, topLayers + (tile.wantDetailed ? side : side / 2));
                 for (int depth = 0; depth < visible; depth++) {
                     field.pose(chunk, cellX, cellZ, n - 1 - depth, pose);
                     // Leaves deeper in the pile are in its shadow.
@@ -304,6 +331,102 @@ final class LeafRenderer implements AutoCloseable {
         tile.buffer.bind();
         tile.buffer.upload(mesh);
         tile.empty = false;
+    }
+
+    /** Counts, heights and colors of the tile's cells and the ring of cells around it. */
+    private void loadRing(Tile tile) {
+        float aged = Math.min(1.0F, simulation.settings().autumnColors + 0.3F);
+        for (int rz = 0; rz < RING; rz++) {
+            for (int rx = 0; rx < RING; rx++) {
+                int cellX = tile.cellX + rx - 1;
+                int cellZ = tile.cellZ + rz - 1;
+                int r = rz * RING + rx;
+                LitterChunk chunk = field.chunkAtCell(cellX, cellZ);
+                int i = LitterField.index(cellX, cellZ);
+                int n = chunk == null ? 0 : chunk.count[i];
+                ringCount[r] = n;
+                if (n > 0) {
+                    ringBase[r] = chunk.base[i];
+                    ringTop[r] = chunk.base[i] + n * LitterField.LAYER;
+                    ringColor[r] = LeafPalette.vary(chunk.color[i], LeafPalette.hash(cellX, cellZ, 0x5F), aged,
+                            LeafShape.byId(chunk.shape[i]));
+                }
+            }
+        }
+    }
+
+    /**
+     * The body of a pile: one quad per cell whose corners are the average heights of the four cells around them, so
+     * the pile is a smooth mound that runs down to the ground at its edges, covered with a seamless leaf texture.
+     */
+    private void emitSurface(BufferBuilder builder, Tile tile, int lx, int lz, double base, int light) {
+        float h00 = corner(lx, lz, base);
+        float h10 = corner(lx + 1, lz, base);
+        float h11 = corner(lx + 1, lz + 1, base);
+        float h01 = corner(lx, lz + 1, base);
+        int self = (lz + 1) * RING + lx + 1;
+        int c00 = cornerColor(lx, lz, self);
+        int c10 = cornerColor(lx + 1, lz, self);
+        int c11 = cornerColor(lx + 1, lz + 1, self);
+        int c01 = cornerColor(lx, lz + 1, self);
+        float slopeX = (h10 + h11 - h00 - h01) / (2 * LitterField.CELL);
+        float slopeZ = (h01 + h11 - h00 - h10) / (2 * LitterField.CELL);
+        float length = Mth.sqrt(slopeX * slopeX + 1.0F + slopeZ * slopeZ);
+        float nx = -slopeX / length;
+        float ny = 1.0F / length;
+        float nz = -slopeZ / length;
+        float shade = (nx * nx * 0.6F + ny * ny + nz * nz * 0.8F) * 0.82F;
+        int cellX = tile.cellX + lx;
+        int cellZ = tile.cellZ + lz;
+        float du = (litterU1 - litterU0) * 0.25F;
+        float dv = (litterV1 - litterV0) * 0.25F;
+        float u = litterU0 + du * (cellX & 3);
+        float v = litterV0 + dv * (cellZ & 3);
+        float x0 = lx * LitterField.CELL;
+        float z0 = lz * LitterField.CELL;
+        float x1 = x0 + LitterField.CELL;
+        float z1 = z0 + LitterField.CELL;
+        int overlay = OverlayTexture.NO_OVERLAY;
+        builder.addVertex(x0, h00, z0, opaque(c00, shade), u, v, overlay, light, nx, ny, nz);
+        builder.addVertex(x0, h01, z1, opaque(c01, shade), u, v + dv, overlay, light, nx, ny, nz);
+        builder.addVertex(x1, h11, z1, opaque(c11, shade), u + du, v + dv, overlay, light, nx, ny, nz);
+        builder.addVertex(x1, h10, z0, opaque(c10, shade), u + du, v, overlay, light, nx, ny, nz);
+    }
+
+    /**
+     * Height of a cell corner relative to the tile origin: the average of the four cells around it, where empty cells
+     * (or cells on another level) count as the ground. Slightly below the stacks, so the loose top leaves lie on it.
+     */
+    private float corner(int cornerX, int cornerZ, double base) {
+        double sum = 0.0;
+        for (int dz = 0; dz < 2; dz++) {
+            for (int dx = 0; dx < 2; dx++) {
+                int r = (cornerZ + dz) * RING + cornerX + dx;
+                sum += ringCount[r] > 0 && Math.abs(ringBase[r] - base) < 0.6 ? ringTop[r] : base;
+            }
+        }
+        return (float) (sum * 0.25 - 1.2 * LitterField.LAYER + 0.003 - currentOriginY);
+    }
+
+    /** Color of a cell corner: the average of the surrounding stacks, so colors blend smoothly across a pile. */
+    private int cornerColor(int cornerX, int cornerZ, int self) {
+        int r = 0;
+        int g = 0;
+        int b = 0;
+        for (int dz = 0; dz < 2; dz++) {
+            for (int dx = 0; dx < 2; dx++) {
+                int ring = (cornerZ + dz) * RING + cornerX + dx;
+                int color = ringCount[ring] > 0 ? ringColor[ring] : ringColor[self];
+                r += color >> 16 & 0xFF;
+                g += color >> 8 & 0xFF;
+                b += color & 0xFF;
+            }
+        }
+        return (r / 4) << 16 | (g / 4) << 8 | b / 4;
+    }
+
+    private static int opaque(int rgb, float factor) {
+        return 0xFF000000 | shade(rgb, factor);
     }
 
     /** Top of a neighboring stack for visibility; empty or unloaded neighbors show the ground at this cell's base. */
