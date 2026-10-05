@@ -118,13 +118,15 @@ public final class ModGameTests {
             fill(helper, 1, 1, 5, 5, y, Blocks.WATER.defaultBlockState());
         }
         LeafSimulation sim = simulation(helper, 64, LeafListener.NONE);
-        int a = spawn(sim, helper, 3.25, 2.95, 3.5);
-        int b = spawn(sim, helper, 3.75, 2.95, 3.5);
-        run(sim, helper, 240);
+        int a = spawn(sim, helper, 3.33, 2.88, 3.5);
+        int b = spawn(sim, helper, 3.67, 2.88, 3.5);
+        run(sim, helper, 300);
         LeafPool pool = sim.pool();
         helper.assertTrue(pool.state[a] == LeafPool.FLOATING && pool.state[b] == LeafPool.FLOATING, "leaves are not floating");
         double after = Math.hypot(pool.x[a] - pool.x[b], pool.z[a] - pool.z[b]);
-        helper.assertTrue(after < 0.25, "floating leaves 0.5 apart did not gather: now " + after);
+        // They meet (touching at 0.16 for these sizes) but do not slide over each other.
+        helper.assertTrue(after < 0.22, "floating leaves did not gather: now " + after + " apart");
+        helper.assertTrue(after > 0.12, "floating leaves overlap: " + after + " apart");
         helper.succeed();
     }
 

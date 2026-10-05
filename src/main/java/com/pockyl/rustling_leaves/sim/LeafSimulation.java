@@ -41,6 +41,12 @@ public final class LeafSimulation {
     private static final int MAX_AIR_TICKS = 20 * 120;
     private static final int MAX_SLIDE_TICKS = 20 * 30;
     private static final int SETTLE_TICKS = 6;
+    /** Floating leaves touch at this fraction of their half-size (their tips overlap a little). */
+    private static final float LEAF_RADIUS = 0.8F;
+    /** Gap over which floating leaves feel the meniscus pull towards each other and towards banks. */
+    private static final float MENISCUS_RANGE = 0.2F;
+    /** Strength of that pull, blocks per tick squared: a slow creep, not a rush. */
+    private static final float MENISCUS_PULL = 0.0004F;
     /** Brightness of a soaked leaf. */
     public static final float WET_SHADE = 0.66F;
     /** Share of leaves that tumble instead of fluttering (in nature: long, stiff leaves). */
@@ -774,7 +780,9 @@ public final class LeafSimulation {
         vx += (pool.auxA[i] + air[0] * 0.2F - vx) * 0.12F;
         vz += (pool.auxB[i] + air[2] * 0.2F - vz) * 0.12F;
 
-        // Meniscus attraction between floating leaves; close neighbors drift together, very close ones do not overlap.
+        // Leaves have a size: touching leaves push each other apart instead of overlapping, and they cling - once they
+        // meet they move as one raft. Within a short gap a weak meniscus pull draws them together.
+        float radius = pool.size[i] * LEAF_RADIUS;
         grid.query(x - 0.6, z - 0.6, x + 0.6, z + 0.6, nearby);
         for (int n = 0; n < nearby.size(); n++) {
             int j = nearby.getInt(n);
@@ -783,39 +791,52 @@ public final class LeafSimulation {
             }
             float dx = (float) (pool.x[j] - x);
             float dz = (float) (pool.z[j] - z);
-            float distSq = dx * dx + dz * dz;
-            if (distSq > 0.36F || distSq < 1.0E-6F) {
-                continue;
+            float dist = Mth.sqrt(dx * dx + dz * dz);
+            if (dist < 1.0E-4F) {
+                float angle = random.next() * Mth.TWO_PI;
+                dx = Mth.cos(angle) * 1.0E-3F;
+                dz = Mth.sin(angle) * 1.0E-3F;
+                dist = 1.0E-3F;
             }
-            float dist = Mth.sqrt(distSq);
-            float pull = dist < 0.09F ? -0.004F : 0.0025F * (1.0F - dist / 0.6F);
-            vx += dx / dist * pull;
-            vz += dz / dist * pull;
-            if (dist < 0.3F) {
-                vx += (pool.vx[j] - vx) * 0.06F;
-                vz += (pool.vz[j] - vz) * 0.06F;
+            float contact = radius + pool.size[j] * LEAF_RADIUS;
+            if (dist < contact) {
+                float push = (contact - dist) * 0.5F;
+                x -= dx / dist * push;
+                z -= dz / dist * push;
+                vx += (pool.vx[j] - vx) * 0.3F;
+                vz += (pool.vz[j] - vz) * 0.3F;
+            } else if (dist < contact + MENISCUS_RANGE) {
+                float pull = MENISCUS_PULL * (1.0F - (dist - contact) / MENISCUS_RANGE);
+                vx += dx / dist * pull;
+                vz += dz / dist * pull;
             }
         }
-        // ...and to banks: near a wall a leaf is drawn in and sticks.
-        double probeY = surface - 0.05;
-        boolean touching = false;
+        // Banks: a faint pull towards a block face close by; the leaf keeps its own size away from the face, so leaves
+        // line up along banks and fan out in corners.
+        double probeY = surface - 0.04;
         for (int side = 0; side < 4; side++) {
             float sx = side == 0 ? 1.0F : side == 1 ? -1.0F : 0.0F;
             float sz = side == 2 ? 1.0F : side == 3 ? -1.0F : 0.0F;
-            if (!Double.isNaN(terrain.solidTop(x + sx * 0.3, probeY + 0.1, z + sz * 0.3))) {
-                vx += sx * 0.002F;
-                vz += sz * 0.002F;
-                touching |= !Double.isNaN(terrain.solidTop(x + sx * 0.14, probeY + 0.1, z + sz * 0.14));
+            if (!Double.isNaN(terrain.solidTop(x + sx * radius, probeY, z + sz * radius))) {
+                x -= sx * 0.01;
+                z -= sz * 0.01;
+                if (vx * sx > 0.0F) {
+                    vx *= 0.3F;
+                }
+                if (vz * sz > 0.0F) {
+                    vz *= 0.3F;
+                }
+            } else if (!Double.isNaN(terrain.solidTop(x + sx * (radius + MENISCUS_RANGE), probeY, z + sz * (radius + MENISCUS_RANGE)))) {
+                vx += sx * MENISCUS_PULL;
+                vz += sz * MENISCUS_PULL;
             }
-        }
-        if (touching) {
-            vx *= 0.75F;
-            vz *= 0.75F;
         }
         pool.vx[i] = vx;
         pool.vz[i] = vz;
 
         double y = surface + 0.012;
+        pool.x[i] = x;
+        pool.z[i] = z;
         double nx = x + pool.vx[i];
         if (Double.isNaN(terrain.solidTop(nx, y, z))) {
             x = nx;
