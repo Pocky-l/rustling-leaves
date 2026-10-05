@@ -151,6 +151,28 @@ public final class ModGameTests {
     }
 
     @GameTest(template = "box")
+    public static void floatingLeavesStayOnTheWaterAndSettle(GameTestHelper helper) {
+        floor(helper);
+        // A pond with a low, open shore: the ground around it lies below the water surface.
+        fill(helper, 2, 2, 4, 4, 1, Blocks.WATER.defaultBlockState());
+        LeafSimulation sim = simulation(helper, 128, LeafListener.NONE);
+        int[] leaves = new int[40];
+        for (int n = 0; n < leaves.length; n++) {
+            leaves[n] = spawn(sim, helper, 2.1 + (n % 7) * 0.4, 1.88, 2.1 + (n / 7) * 0.45);
+        }
+        run(sim, helper, 600);
+        LeafPool pool = sim.pool();
+        double speed = 0.0;
+        for (int leaf : leaves) {
+            helper.assertTrue(pool.state[leaf] == LeafPool.FLOATING, "a leaf left the water (state " + pool.state[leaf] + ")");
+            speed += Math.hypot(pool.vx[leaf], pool.vz[leaf]);
+        }
+        helper.assertTrue(sim.field().total() == 0, "leaves climbed onto the shore");
+        helper.assertTrue(speed / leaves.length < 0.002, "the leaves did not settle down: mean speed " + speed / leaves.length);
+        helper.succeed();
+    }
+
+    @GameTest(template = "box")
     public static void leafBurnsInLava(GameTestHelper helper) {
         floor(helper);
         fill(helper, 0, 0, 6, 6, 1, Blocks.STONE.defaultBlockState());

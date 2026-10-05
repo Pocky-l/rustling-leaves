@@ -45,6 +45,8 @@ public final class LeafSimulation {
     private static final float LEAF_RADIUS = 0.8F;
     /** Gap over which floating leaves feel the meniscus pull towards each other and towards banks. */
     private static final float MENISCUS_RANGE = 0.2F;
+    /** Below this speed a floating leaf counts as at rest (it calms the leaves touching it). */
+    private static final float STILL_SPEED = 0.003F;
     /** Strength of that pull, blocks per tick squared: a slow creep, not a rush. */
     private static final float MENISCUS_PULL = 0.0004F;
     /** Brightness of a soaked leaf. */
@@ -786,8 +788,12 @@ public final class LeafSimulation {
         vz += (pool.auxB[i] + air[2] * 0.2F - vz) * 0.12F;
 
         // Leaves have a size: touching leaves push each other apart instead of overlapping, and they cling - once they
-        // meet they move as one raft. Within a short gap a weak meniscus pull draws them together.
+        // meet they move as one raft. Within a short gap a weak meniscus pull draws them together. A leaf touching a
+        // leaf that has come to rest calms down too, so a raft against a bank settles as a still layer.
         float radius = pool.size[i] * LEAF_RADIUS;
+        float pushX = 0.0F;
+        float pushZ = 0.0F;
+        boolean calm = false;
         grid.query(x - 0.6, z - 0.6, x + 0.6, z + 0.6, nearby);
         for (int n = 0; n < nearby.size(); n++) {
             int j = nearby.getInt(n);
@@ -806,50 +812,56 @@ public final class LeafSimulation {
             float contact = radius + pool.size[j] * LEAF_RADIUS;
             if (dist < contact) {
                 float push = (contact - dist) * 0.5F;
-                x -= dx / dist * push;
-                z -= dz / dist * push;
+                pushX -= dx / dist * push;
+                pushZ -= dz / dist * push;
                 vx += (pool.vx[j] - vx) * 0.3F;
                 vz += (pool.vz[j] - vz) * 0.3F;
+                calm |= pool.vx[j] * pool.vx[j] + pool.vz[j] * pool.vz[j] < STILL_SPEED * STILL_SPEED;
             } else if (dist < contact + MENISCUS_RANGE) {
                 float pull = MENISCUS_PULL * (1.0F - (dist - contact) / MENISCUS_RANGE);
                 vx += dx / dist * pull;
                 vz += dz / dist * pull;
             }
         }
-        // Banks: a faint pull towards a block face close by; the leaf keeps its own size away from the face, so leaves
-        // line up along banks and fan out in corners.
-        double probeY = surface - 0.04;
+        // Banks: anything that is not open water at this level - a block face or the edge of the water. A faint pull
+        // draws the leaf in; once it touches, it stops there (it never climbs out) and keeps its own size off the
+        // edge, so leaves line up along banks and fan out in corners.
+        double y = surface + 0.012;
         for (int side = 0; side < 4; side++) {
             float sx = side == 0 ? 1.0F : side == 1 ? -1.0F : 0.0F;
             float sz = side == 2 ? 1.0F : side == 3 ? -1.0F : 0.0F;
-            if (!Double.isNaN(terrain.solidTop(x + sx * radius, probeY, z + sz * radius))) {
-                x -= sx * 0.01;
-                z -= sz * 0.01;
+            if (!openWater(x + sx * radius, y, z + sz * radius, surfaceBlock)) {
+                calm = true;
+                pushX -= sx * 0.01F;
+                pushZ -= sz * 0.01F;
                 if (vx * sx > 0.0F) {
-                    vx *= 0.3F;
+                    vx = 0.0F;
                 }
                 if (vz * sz > 0.0F) {
-                    vz *= 0.3F;
+                    vz = 0.0F;
                 }
-            } else if (!Double.isNaN(terrain.solidTop(x + sx * (radius + MENISCUS_RANGE), probeY, z + sz * (radius + MENISCUS_RANGE)))) {
+            } else if (!openWater(x + sx * (radius + MENISCUS_RANGE), y, z + sz * (radius + MENISCUS_RANGE), surfaceBlock)) {
                 vx += sx * MENISCUS_PULL;
                 vz += sz * MENISCUS_PULL;
             }
         }
+        if (calm) {
+            vx *= 0.6F;
+            vz *= 0.6F;
+            pool.spinYaw[i] *= 0.5F;
+        }
         pool.vx[i] = vx;
         pool.vz[i] = vz;
 
-        double y = surface + 0.012;
-        pool.x[i] = x;
-        pool.z[i] = z;
-        double nx = x + pool.vx[i];
-        if (Double.isNaN(terrain.solidTop(nx, y, z))) {
+        // Move along each axis only while the leaf stays on open water.
+        double nx = x + pushX + vx;
+        if (openWater(nx, y, z, surfaceBlock)) {
             x = nx;
         } else {
             pool.vx[i] = 0.0F;
         }
-        double nz = z + pool.vz[i];
-        if (Double.isNaN(terrain.solidTop(x, y, nz))) {
+        double nz = z + pushZ + vz;
+        if (openWater(x, y, nz, surfaceBlock)) {
             z = nz;
         } else {
             pool.vz[i] = 0.0F;
@@ -869,13 +881,21 @@ public final class LeafSimulation {
             float along = (float) Mth.atan2(pool.auxB[i], pool.auxA[i]);
             vane = wrapHalfTurn(along - pool.yaw[i]) * 0.02F * Math.min(1.0F, flowSpeed / 0.05F);
         }
-        pool.spinYaw[i] = pool.spinYaw[i] * 0.9F + pool.swirl[i] * 0.04F + vane + (random.next() - 0.5F) * 0.003F;
+        float jitter = calm ? 0.0F : (random.next() - 0.5F) * 0.003F;
+        pool.spinYaw[i] = pool.spinYaw[i] * 0.9F + (calm ? 0.0F : pool.swirl[i] * 0.04F + vane) + jitter;
         pool.yaw[i] += pool.spinYaw[i];
         // Flat on the water, following only the gentle slope of the ripples.
         float sin = Mth.sin(pool.yaw[i]);
         float cos = Mth.cos(pool.yaw[i]);
         pool.roll[i] += ((float) Math.atan(slopeX * cos - slopeZ * sin) * 1.5F - pool.roll[i]) * 0.4F;
         pool.pitch[i] += ((float) -Math.atan(slopeX * sin + slopeZ * cos) * 1.5F - pool.pitch[i]) * 0.4F;
+    }
+
+    /** Whether a floating leaf can be at (x, z): the water reaches up to this surface block there and nothing solid. */
+    private boolean openWater(double x, double y, double z, int surfaceBlock) {
+        BlockPos.MutableBlockPos cursor = terrain.cursor();
+        cursor.set(Mth.floor(x), surfaceBlock, Mth.floor(z));
+        return level.getFluidState(cursor).is(FluidTags.WATER) && Double.isNaN(terrain.solidTop(x, y, z));
     }
 
     private Vec3 flowAt(int x, int y, int z) {
