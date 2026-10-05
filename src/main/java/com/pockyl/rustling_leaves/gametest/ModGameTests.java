@@ -3,7 +3,6 @@ package com.pockyl.rustling_leaves.gametest;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.util.Mth;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.SlabBlock;
 import net.minecraft.world.level.block.state.BlockState;
@@ -15,17 +14,28 @@ import com.pockyl.rustling_leaves.RustlingLeaves;
 import com.pockyl.rustling_leaves.sim.LeafListener;
 import com.pockyl.rustling_leaves.sim.LeafPool;
 import com.pockyl.rustling_leaves.sim.LeafSettings;
+import com.pockyl.rustling_leaves.sim.LeafShape;
 import com.pockyl.rustling_leaves.sim.LeafSimulation;
+import com.pockyl.rustling_leaves.sim.LitterChunk;
+import com.pockyl.rustling_leaves.sim.LitterField;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.util.Arrays;
 
 /**
  * In-game tests, run headless by {@code gradlew runGameTestServer}. The simulation only needs a {@code Level}, so it
  * runs here against real blocks; each test steps it synchronously. Tests use the 7x6x7 {@code box} structure with a
- * stone floor placed at y = 0.
+ * stone floor placed at y = 0, so the litter lies at relative height 1.
  */
 @GameTestHolder(RustlingLeaves.MOD_ID)
 @PrefixGameTestTemplate(false)
 public final class ModGameTests {
     private static final double EPSILON = 0.05;
+    private static final float LAYER = LitterField.LAYER;
 
     private ModGameTests() {
     }
@@ -36,14 +46,15 @@ public final class ModGameTests {
     }
 
     @GameTest(template = "box")
-    public static void leafSettlesOnFloor(GameTestHelper helper) {
+    public static void fallingLeafJoinsTheLitter(GameTestHelper helper) {
         floor(helper);
-        LeafSimulation sim = simulation(64, LeafListener.NONE);
-        int leaf = spawn(sim, helper, 3.5, 4.5, 3.5);
+        LeafSimulation sim = simulation(helper, 64, LeafListener.NONE);
+        spawn(sim, helper, 3.5, 4.5, 3.5);
         run(sim, helper, 400);
-        LeafPool pool = sim.pool();
-        helper.assertTrue(pool.state[leaf] == LeafPool.RESTING, "leaf did not come to rest");
-        helper.assertTrue(Math.abs(relativeY(helper, pool.y[leaf]) - 1.0) < EPSILON, "leaf rests at y " + relativeY(helper, pool.y[leaf]));
+        helper.assertTrue(sim.pool().count() == 0, "leaf is still moving");
+        helper.assertTrue(sim.field().total() == 1, "litter has " + sim.field().total() + " leaves");
+        double base = baseOfOnlyCell(sim, helper);
+        helper.assertTrue(Math.abs(base - 1.0) < EPSILON, "leaf lies at y " + base);
         helper.succeed();
     }
 
@@ -52,12 +63,11 @@ public final class ModGameTests {
         floor(helper);
         BlockState slab = Blocks.STONE_SLAB.defaultBlockState().setValue(SlabBlock.TYPE, SlabType.BOTTOM);
         fill(helper, 1, 1, 5, 5, 1, slab);
-        LeafSimulation sim = simulation(64, LeafListener.NONE);
-        int leaf = spawn(sim, helper, 3.5, 4.5, 3.5);
+        LeafSimulation sim = simulation(helper, 64, LeafListener.NONE);
+        spawn(sim, helper, 3.5, 4.5, 3.5);
         run(sim, helper, 400);
-        LeafPool pool = sim.pool();
-        helper.assertTrue(pool.state[leaf] == LeafPool.RESTING, "leaf did not come to rest");
-        helper.assertTrue(Math.abs(relativeY(helper, pool.y[leaf]) - 1.5) < EPSILON, "leaf rests at y " + relativeY(helper, pool.y[leaf]));
+        double base = baseOfOnlyCell(sim, helper);
+        helper.assertTrue(Math.abs(base - 1.5) < EPSILON, "leaf lies at y " + base);
         helper.succeed();
     }
 
@@ -66,7 +76,7 @@ public final class ModGameTests {
         floor(helper);
         fill(helper, 0, 0, 6, 6, 1, Blocks.STONE.defaultBlockState());
         fill(helper, 1, 1, 5, 5, 1, Blocks.WATER.defaultBlockState());
-        LeafSimulation sim = simulation(64, LeafListener.NONE);
+        LeafSimulation sim = simulation(helper, 64, LeafListener.NONE);
         int leaf = spawn(sim, helper, 3.5, 4.5, 3.5);
         run(sim, helper, 300);
         LeafPool pool = sim.pool();
@@ -82,7 +92,7 @@ public final class ModGameTests {
         fill(helper, 0, 0, 6, 6, 1, Blocks.STONE.defaultBlockState());
         fill(helper, 1, 1, 5, 5, 1, Blocks.LAVA.defaultBlockState());
         int[] burned = new int[1];
-        LeafSimulation sim = simulation(64, new LeafListener() {
+        LeafSimulation sim = simulation(helper, 64, new LeafListener() {
             @Override
             public void onBurn(double x, double y, double z) {
                 burned[0]++;
@@ -90,167 +100,314 @@ public final class ModGameTests {
         });
         spawn(sim, helper, 3.5, 4.5, 3.5);
         run(sim, helper, 300);
-        helper.assertTrue(burned[0] == 1 && sim.pool().count() == 0, "leaf did not burn");
+        helper.assertTrue(burned[0] == 1 && sim.pool().count() == 0 && sim.field().total() == 0, "leaf did not burn");
         helper.succeed();
     }
 
     @GameTest(template = "box")
-    public static void windChargeScattersLeaves(GameTestHelper helper) {
+    public static void pileSlumpsToItsAngleOfRepose(GameTestHelper helper) {
         floor(helper);
-        LeafSimulation sim = simulation(64, LeafListener.NONE);
-        int[] leaves = restingCarpet(sim, helper);
+        LeafSimulation sim = simulation(helper, 512, LeafListener.NONE);
+        int[] center = cellAt(helper, 3.5, 3.5);
+        double ground = absoluteY(helper, 1.0);
+        for (int n = 0; n < 150; n++) {
+            sim.field().add(center[0], center[1], ground, 0x6A8F3A, 0, 0L, 0);
+        }
+        sim.field().queueRelax(center[0], center[1]);
+        run(sim, helper, 200);
+        helper.assertTrue(sim.field().total() + sim.pool().count() == 150, "leaves were lost: " + sim.field().total());
+        helper.assertTrue(sim.field().count(center[0], center[1]) < 150, "the pile did not slump");
+        double steepest = 0.0;
+        for (int dx = -12; dx <= 12; dx++) {
+            for (int dz = -12; dz <= 12; dz++) {
+                double self = surface(sim, center[0] + dx, center[1] + dz, ground);
+                steepest = Math.max(steepest, self - surface(sim, center[0] + dx + 1, center[1] + dz, ground));
+                steepest = Math.max(steepest, self - surface(sim, center[0] + dx, center[1] + dz + 1, ground));
+                steepest = Math.max(steepest, self - surface(sim, center[0] + dx - 1, center[1] + dz, ground));
+            }
+        }
+        helper.assertTrue(steepest <= LitterField.REPOSE + 2 * LAYER, "pile is too steep: " + steepest);
+        helper.succeed();
+    }
+
+    @GameTest(template = "box")
+    public static void walkingThroughAPileLeavesATrench(GameTestHelper helper) {
+        floor(helper);
+        LeafSimulation sim = simulation(helper, 512, LeafListener.NONE);
+        int total = carpet(sim, helper, 2.0, 16);
         BlockPos center = helper.absolutePos(new BlockPos(3, 1, 3));
-        double spreadBefore = spread(sim, leaves, center);
+        int[] cell = cellAt(helper, 3.5, 3.5);
+        sim.beginTick(helper.getLevel(), center.getX(), center.getY(), center.getZ());
+        int moved = sim.disturb(center.getX() + 0.5, center.getY(), center.getZ() + 0.5, 0.22, 0.0, 0.0, 0.6F, 1.8F, false, 0.0F);
+        helper.assertTrue(sim.field().count(cell[0], cell[1]) == 0, "leaves are left under the body");
+        sim.finishTick();
+        helper.assertTrue(moved > 50, "only " + moved + " leaves were pushed");
+        helper.assertTrue(sim.pool().count() < moved / 3, sim.pool().count() + " of " + moved + " leaves flew - most should be shoved aside");
+        helper.assertTrue(sim.pool().count() > 0, "no leaf flew up at all");
+        helper.assertTrue(sim.field().total() + sim.pool().count() == total, "leaves were lost");
+        helper.succeed();
+    }
+
+    @GameTest(template = "box")
+    public static void sneakingLeavesThinCarpetAlone(GameTestHelper helper) {
+        floor(helper);
+        LeafSimulation sim = simulation(helper, 64, LeafListener.NONE);
+        carpet(sim, helper, 2.0, 3);
+        BlockPos center = helper.absolutePos(new BlockPos(3, 1, 3));
+        sim.beginTick(helper.getLevel(), center.getX(), center.getY(), center.getZ());
+        int moved = sim.disturb(center.getX() + 0.5, center.getY(), center.getZ() + 0.5, 0.065, 0.0, 0.0, 0.6F, 1.5F, true, 0.0F);
+        sim.finishTick();
+        helper.assertTrue(moved == 0 && sim.pool().count() == 0, "sneaking moved " + moved + " leaves");
+        helper.succeed();
+    }
+
+    @GameTest(template = "box")
+    public static void jumpingIntoAPileSplashes(GameTestHelper helper) {
+        floor(helper);
+        LeafSimulation sim = simulation(helper, 512, LeafListener.NONE);
+        int total = carpet(sim, helper, 2.0, 20);
+        BlockPos center = helper.absolutePos(new BlockPos(3, 1, 3));
+        sim.beginTick(helper.getLevel(), center.getX(), center.getY(), center.getZ());
+        sim.disturb(center.getX() + 0.5, center.getY(), center.getZ() + 0.5, 0.0, -0.5, 0.0, 0.6F, 1.8F, false, 0.5F);
+        sim.finishTick();
+        int up = 0;
+        for (int i = 0; i < sim.pool().highWater(); i++) {
+            if (sim.pool().state[i] == LeafPool.FALLING && sim.pool().vy[i] > 0.05F) {
+                up++;
+            }
+        }
+        helper.assertTrue(up >= 15, "only " + up + " leaves splashed up");
+        run(sim, helper, 400);
+        helper.assertTrue(sim.field().total() + sim.pool().count() == total, "leaves were lost");
+        helper.succeed();
+    }
+
+    @GameTest(template = "box")
+    public static void windChargeBlowsLitterAway(GameTestHelper helper) {
+        floor(helper);
+        LeafSimulation sim = simulation(helper, 1024, LeafListener.NONE);
+        int total = carpet(sim, helper, 2.5, 4);
+        BlockPos center = helper.absolutePos(new BlockPos(3, 1, 3));
+        int[] cell = cellAt(helper, 3.5, 3.5);
         sim.explode(center.getX() + 0.5, center.getY() + 0.3, center.getZ() + 0.5, 1.2F, true);
         run(sim, helper, 3);
         int airborne = 0;
-        for (int leaf : leaves) {
-            if (sim.pool().state[leaf] == LeafPool.FALLING && sim.pool().vy[leaf] > 0.0F) {
+        for (int i = 0; i < sim.pool().highWater(); i++) {
+            if (sim.pool().state[i] == LeafPool.FALLING && sim.pool().vy[i] > 0.0F) {
                 airborne++;
             }
         }
-        helper.assertTrue(airborne >= leaves.length * 3 / 4, "only " + airborne + " of " + leaves.length + " leaves flew up");
-        run(sim, helper, 30);
-        double spreadAfter = spread(sim, leaves, center);
-        helper.assertTrue(spreadAfter > spreadBefore + 0.5, "leaves did not scatter: " + spreadBefore + " -> " + spreadAfter);
+        helper.assertTrue(airborne > 40, "only " + airborne + " leaves flew up");
+        helper.assertTrue(sim.field().count(cell[0], cell[1]) == 0, "the center was not cleared");
+        run(sim, helper, 600);
+        helper.assertTrue(sim.field().total() + sim.pool().count() == total,
+                "leaves were lost: " + (sim.field().total() + sim.pool().count()) + " of " + total);
         helper.succeed();
     }
 
     @GameTest(template = "box")
-    public static void walkingKicksUpLeaves(GameTestHelper helper) {
-        floor(helper);
-        int[] rustles = new int[1];
-        LeafSimulation sim = simulation(64, new LeafListener() {
-            @Override
-            public void onRustle(double x, double y, double z, int count, boolean wet) {
-                rustles[0] += count;
-            }
-        });
-        int[] leaves = restingCarpet(sim, helper);
-        BlockPos center = helper.absolutePos(new BlockPos(3, 1, 3));
-        sim.beginTick(helper.getLevel());
-        int kicked = sim.disturb(center.getX() + 0.5, center.getY(), center.getZ() + 0.5, 0.22, 0.0, 0.0, 0.6F, 1.8F, false, 0.0F);
-        sim.finishTick(center.getX(), center.getZ());
-        helper.assertTrue(kicked >= 3, "walking kicked only " + kicked + " leaves");
-        helper.assertTrue(rustles[0] == kicked, "rustle was not reported");
-        int moving = 0;
-        for (int leaf : leaves) {
-            if (sim.pool().state[leaf] == LeafPool.FALLING) {
-                moving++;
-            }
-        }
-        helper.assertTrue(moving == kicked, "kicked leaves are not airborne");
-        helper.succeed();
-    }
-
-    @GameTest(template = "box")
-    public static void sneakingLeavesLeavesAlone(GameTestHelper helper) {
-        floor(helper);
-        LeafSimulation sim = simulation(64, LeafListener.NONE);
-        restingCarpet(sim, helper);
-        BlockPos center = helper.absolutePos(new BlockPos(3, 1, 3));
-        sim.beginTick(helper.getLevel());
-        int kicked = sim.disturb(center.getX() + 0.5, center.getY(), center.getZ() + 0.5, 0.065, 0.0, 0.0, 0.6F, 1.5F, true, 0.0F);
-        sim.finishTick(center.getX(), center.getZ());
-        helper.assertTrue(kicked == 0, "sneaking kicked " + kicked + " leaves");
-        helper.succeed();
-    }
-
-    @GameTest(template = "box")
-    public static void leavesFallWhenSupportIsRemoved(GameTestHelper helper) {
+    public static void litterFallsWhenSupportIsRemoved(GameTestHelper helper) {
         floor(helper);
         fill(helper, 2, 2, 4, 4, 1, Blocks.OAK_PLANKS.defaultBlockState());
-        LeafSimulation sim = simulation(64, LeafListener.NONE);
-        int leaf = spawn(sim, helper, 3.5, 3.5, 3.5);
-        run(sim, helper, 300);
-        helper.assertTrue(Math.abs(relativeY(helper, sim.pool().y[leaf]) - 2.0) < EPSILON, "leaf did not land on the planks");
+        LeafSimulation sim = simulation(helper, 256, LeafListener.NONE);
+        int[] cell = cellAt(helper, 3.5, 3.5);
+        for (int n = 0; n < 5; n++) {
+            sim.field().add(cell[0], cell[1], absoluteY(helper, 2.0), 0x6A8F3A, 0, 0L, 0);
+        }
         fill(helper, 2, 2, 4, 4, 1, Blocks.AIR.defaultBlockState());
+        sim.setLevel(helper.getLevel());
         for (int x = 2; x <= 4; x++) {
             for (int z = 2; z <= 4; z++) {
                 sim.blockChanged(helper.absolutePos(new BlockPos(x, 1, z)));
             }
         }
         run(sim, helper, 300);
-        helper.assertTrue(sim.pool().state[leaf] == LeafPool.RESTING, "leaf did not settle again");
-        helper.assertTrue(Math.abs(relativeY(helper, sim.pool().y[leaf]) - 1.0) < EPSILON, "leaf did not fall to the floor");
+        helper.assertTrue(sim.field().total() + sim.pool().count() == 5, "leaves were lost");
+        assertAllBases(sim, helper, 1.0);
         helper.succeed();
     }
 
     @GameTest(template = "box")
-    public static void placedBlockLiftsLeaf(GameTestHelper helper) {
+    public static void placedBlockLiftsLitter(GameTestHelper helper) {
         floor(helper);
-        LeafSimulation sim = simulation(64, LeafListener.NONE);
-        int leaf = spawn(sim, helper, 3.5, 1.2, 3.5);
-        run(sim, helper, 100);
-        BlockPos origin = helper.absolutePos(BlockPos.ZERO);
-        BlockPos at = new BlockPos(Mth.floor(sim.pool().x[leaf]), origin.getY() + 1, Mth.floor(sim.pool().z[leaf]));
+        LeafSimulation sim = simulation(helper, 64, LeafListener.NONE);
+        int[] cell = cellAt(helper, 3.5, 3.5);
+        for (int n = 0; n < 4; n++) {
+            sim.field().add(cell[0], cell[1], absoluteY(helper, 1.0), 0x6A8F3A, 0, 0L, 0);
+        }
+        BlockPos at = helper.absolutePos(new BlockPos(3, 1, 3));
         helper.getLevel().setBlockAndUpdate(at, Blocks.STONE.defaultBlockState());
+        sim.setLevel(helper.getLevel());
         sim.blockChanged(at);
-        run(sim, helper, 60);
-        helper.assertTrue(Math.abs(relativeY(helper, sim.pool().y[leaf]) - 2.0) < EPSILON, "leaf was not lifted onto the new block");
+        helper.assertTrue(Math.abs(baseOfOnlyCell(sim, helper) - 2.0) < EPSILON, "litter was not lifted onto the new block");
         helper.succeed();
     }
 
     @GameTest(template = "box")
-    public static void fullPoolRecyclesOldestLeaves(GameTestHelper helper) {
+    public static void rakingGathersAPile(GameTestHelper helper) {
         floor(helper);
-        LeafSimulation sim = simulation(16, LeafListener.NONE);
-        for (int n = 0; n < 16; n++) {
-            spawn(sim, helper, 1.5 + n % 4, 1.2, 1.5 + n / 4);
+        LeafSimulation sim = simulation(helper, 256, LeafListener.NONE);
+        int total = carpet(sim, helper, 2.5, 4);
+        int[] cell = cellAt(helper, 3.5, 3.5);
+        double y = absoluteY(helper, 1.0);
+        BlockPos origin = helper.absolutePos(BlockPos.ZERO);
+        int before = pileAround(sim, cell, 2);
+        for (int stroke = 0; stroke < 30; stroke++) {
+            sim.rake(origin.getX() + 3.5, y, origin.getZ() + 3.5, 2.0F);
+            run(sim, helper, 4);
         }
-        helper.assertTrue(spawn(sim, helper, 3.5, 3.0, 3.5) == -1, "a full pool of airborne leaves accepted another one");
-        run(sim, helper, 100);
-        helper.assertTrue(sim.pool().count() < 16, "resting leaves did not make room under pressure");
-        for (int n = 0; n < 8; n++) {
-            helper.assertTrue(spawn(sim, helper, 3.5, 3.0, 3.5) >= 0, "no room for a new leaf");
+        run(sim, helper, 200);
+        int after = pileAround(sim, cell, 2);
+        helper.assertTrue(after > before * 2, "raking did not gather leaves: " + before + " -> " + after);
+        helper.assertTrue(sim.field().total() + sim.pool().count() == total, "leaves were lost");
+        helper.succeed();
+    }
+
+    @GameTest(template = "box")
+    public static void whirlwindLiftsLeavesUp(GameTestHelper helper) {
+        floor(helper);
+        LeafSimulation sim = simulation(helper, 512, LeafListener.NONE);
+        carpet(sim, helper, 2.5, 4);
+        BlockPos center = helper.absolutePos(new BlockPos(3, 1, 3));
+        sim.wind().addWhirlwind(center.getX() + 0.5, center.getY(), center.getZ() + 0.5, 1.5F, 6.0F, 0.3F, 600);
+        run(sim, helper, 60);
+        double highest = 0.0;
+        for (int i = 0; i < sim.pool().highWater(); i++) {
+            if (sim.pool().state[i] != LeafPool.FREE) {
+                highest = Math.max(highest, sim.pool().y[i] - center.getY());
+            }
         }
-        helper.assertTrue(sim.pool().count() <= 16, "pool overflowed");
+        helper.assertTrue(highest > 1.5, "whirlwind lifted leaves only to " + highest);
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void litterSurvivesSaving(GameTestHelper helper) throws IOException {
+        LitterChunk chunk = new LitterChunk(5, -3);
+        chunk.seedCell(17, 12, 64.5F, 0x123456, LeafShape.NEEDLE.ordinal());
+        chunk.seedCell(4000, 3, 70.0F, 0x654321, LeafShape.BROAD.ordinal());
+        chunk.top[17] = LitterField.encodeTop(0.3F, 0.7F, 1.0F, 0.12F, 4);
+        chunk.topColor[17] = 0xABCDEF;
+        chunk.markSeeded();
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        chunk.write(new DataOutputStream(bytes));
+        LitterChunk read = LitterChunk.read(new DataInputStream(new ByteArrayInputStream(bytes.toByteArray())));
+        helper.assertTrue(read.x == 5 && read.z == -3 && read.seeded() && read.total() == 15, "header differs");
+        helper.assertTrue(Arrays.equals(read.count, chunk.count) && Arrays.equals(read.base, chunk.base)
+                && Arrays.equals(read.color, chunk.color) && Arrays.equals(read.shape, chunk.shape)
+                && Arrays.equals(read.top, chunk.top) && Arrays.equals(read.topColor, chunk.topColor), "cells differ");
         helper.succeed();
     }
 
     // ------------------------------------------------------------------------------------------------------------
 
-    private static LeafSimulation simulation(int capacity, LeafListener listener) {
+    /** A simulation without wind and with the litter chunks around the test loaded. */
+    private static LeafSimulation simulation(GameTestHelper helper, int capacity, LeafListener listener) {
         LeafSettings settings = new LeafSettings();
         settings.windStrength = 0.0F;
-        return new LeafSimulation(settings, capacity, listener);
+        settings.windEvents = 0.0F;
+        LeafSimulation sim = new LeafSimulation(settings, capacity, listener);
+        BlockPos origin = helper.absolutePos(BlockPos.ZERO);
+        for (int cx = (origin.getX() >> 4) - 2; cx <= (origin.getX() >> 4) + 2; cx++) {
+            for (int cz = (origin.getZ() >> 4) - 2; cz <= (origin.getZ() >> 4) + 2; cz++) {
+                sim.field().put(new LitterChunk(cx, cz));
+            }
+        }
+        return sim;
     }
 
     private static int spawn(LeafSimulation sim, GameTestHelper helper, double x, double y, double z) {
         BlockPos origin = helper.absolutePos(BlockPos.ZERO);
-        return sim.spawn(origin.getX() + x, origin.getY() + y, origin.getZ() + z, 0.0F, 0.0F, 0.0F, 0x6A8F3A, 0, 0.1F);
+        return sim.spawn(origin.getX() + x, origin.getY() + y, origin.getZ() + z, 0.0F, 0.0F, 0.0F, 0x6A8F3A, 0x6A8F3A, LeafShape.BROAD, 0,
+                0.1F, false);
     }
 
     private static void run(LeafSimulation sim, GameTestHelper helper, int ticks) {
-        BlockPos center = helper.absolutePos(new BlockPos(3, 0, 3));
+        BlockPos center = helper.absolutePos(new BlockPos(3, 1, 3));
         for (int t = 0; t < ticks; t++) {
-            sim.tick(helper.getLevel(), center.getX(), center.getZ());
+            sim.tick(helper.getLevel(), center.getX(), center.getY(), center.getZ());
         }
     }
 
-    /** A ring of leaves resting on the floor around the center of the box. */
-    private static int[] restingCarpet(LeafSimulation sim, GameTestHelper helper) {
-        int[] leaves = new int[24];
-        for (int n = 0; n < leaves.length; n++) {
-            double angle = n * 2.4;
-            double radius = 0.2 + 0.07 * n;
-            leaves[n] = spawn(sim, helper, 3.5 + Math.cos(angle) * radius, 1.1, 3.5 + Math.sin(angle) * radius);
+    /** Puts {@code leaves} leaves in every cell within {@code radius} blocks of the box center; returns the total. */
+    private static int carpet(LeafSimulation sim, GameTestHelper helper, double radius, int leaves) {
+        int[] center = cellAt(helper, 3.5, 3.5);
+        int reach = (int) Math.ceil(radius * 4);
+        double ground = absoluteY(helper, 1.0);
+        int total = 0;
+        for (int dx = -reach; dx <= reach; dx++) {
+            for (int dz = -reach; dz <= reach; dz++) {
+                if ((dx + 0.5) * (dx + 0.5) + (dz + 0.5) * (dz + 0.5) > reach * reach) {
+                    continue;
+                }
+                for (int n = 0; n < leaves; n++) {
+                    sim.field().add(center[0] + dx, center[1] + dz, ground, 0x6A8F3A, 0, 0L, 0);
+                    total++;
+                }
+            }
         }
-        run(sim, helper, 60);
-        for (int leaf : leaves) {
-            helper.assertTrue(sim.pool().state[leaf] == LeafPool.RESTING, "carpet leaf did not settle");
-        }
-        return leaves;
+        return total;
     }
 
-    private static double spread(LeafSimulation sim, int[] leaves, BlockPos center) {
-        double sum = 0.0;
-        for (int leaf : leaves) {
-            double dx = sim.pool().x[leaf] - (center.getX() + 0.5);
-            double dz = sim.pool().z[leaf] - (center.getZ() + 0.5);
-            sum += Math.sqrt(dx * dx + dz * dz);
+    private static int pileAround(LeafSimulation sim, int[] cell, int reach) {
+        int sum = 0;
+        for (int dx = -reach; dx <= reach; dx++) {
+            for (int dz = -reach; dz <= reach; dz++) {
+                sum += sim.field().count(cell[0] + dx, cell[1] + dz);
+            }
         }
-        return sum / leaves.length;
+        return sum;
+    }
+
+    private static double surface(LeafSimulation sim, int cellX, int cellZ, double ground) {
+        double top = sim.field().top(cellX, cellZ);
+        return Double.isNaN(top) ? ground : top;
+    }
+
+    /** Base height (relative to the test) of the only non-empty litter cell in the box. */
+    private static double baseOfOnlyCell(LeafSimulation sim, GameTestHelper helper) {
+        int[] corner = cellAt(helper, -1.0, -1.0);
+        double base = Double.NaN;
+        for (int dx = 0; dx < 9 * 4; dx++) {
+            for (int dz = 0; dz < 9 * 4; dz++) {
+                int cx = corner[0] + dx;
+                int cz = corner[1] + dz;
+                LitterChunk chunk = sim.field().chunkAtCell(cx, cz);
+                int i = LitterField.index(cx, cz);
+                if (chunk != null && chunk.count[i] > 0) {
+                    helper.assertTrue(Double.isNaN(base), "more than one litter cell");
+                    base = relativeY(helper, chunk.base[i]);
+                }
+            }
+        }
+        helper.assertTrue(!Double.isNaN(base), "no litter cell");
+        return base;
+    }
+
+    /** Every non-empty litter cell in the box lies at this relative height. */
+    private static void assertAllBases(LeafSimulation sim, GameTestHelper helper, double expected) {
+        int[] corner = cellAt(helper, -1.0, -1.0);
+        for (int dx = 0; dx < 9 * 4; dx++) {
+            for (int dz = 0; dz < 9 * 4; dz++) {
+                int cx = corner[0] + dx;
+                int cz = corner[1] + dz;
+                LitterChunk chunk = sim.field().chunkAtCell(cx, cz);
+                int i = LitterField.index(cx, cz);
+                if (chunk != null && chunk.count[i] > 0) {
+                    double base = relativeY(helper, chunk.base[i]);
+                    helper.assertTrue(Math.abs(base - expected) < EPSILON, "litter lies at y " + base + ", expected " + expected);
+                }
+            }
+        }
+    }
+
+    private static int[] cellAt(GameTestHelper helper, double x, double z) {
+        BlockPos origin = helper.absolutePos(BlockPos.ZERO);
+        return new int[] {LitterField.cell(origin.getX() + x), LitterField.cell(origin.getZ() + z)};
+    }
+
+    private static double absoluteY(GameTestHelper helper, double y) {
+        return helper.absolutePos(BlockPos.ZERO).getY() + y;
     }
 
     private static double relativeY(GameTestHelper helper, double y) {

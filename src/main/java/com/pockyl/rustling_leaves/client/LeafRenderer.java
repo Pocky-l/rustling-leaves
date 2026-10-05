@@ -8,7 +8,7 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.VertexBuffer;
 import com.mojang.blaze3d.vertex.VertexFormat;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
@@ -19,9 +19,8 @@ import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.SectionPos;
 import net.minecraft.util.Mth;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
@@ -29,15 +28,23 @@ import org.joml.Vector3f;
 
 import com.pockyl.rustling_leaves.RustlingLeaves;
 import com.pockyl.rustling_leaves.sim.LeafPool;
+import com.pockyl.rustling_leaves.sim.LeafShape;
 import com.pockyl.rustling_leaves.sim.LeafSimulation;
+import com.pockyl.rustling_leaves.sim.LitterChunk;
+import com.pockyl.rustling_leaves.sim.LitterField;
+
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 
 /**
  * Draws the leaves in two parts:
  * <ul>
- *   <li>resting leaves are baked into one static GPU buffer per 16x16x16 section, rebuilt only when a leaf lands in or
- *   leaves that section (a few per frame at most) - so tens of thousands of lying leaves cost a handful of draw calls;</li>
- *   <li>moving leaves (falling, floating, fading) are written into one streaming buffer each frame, interpolated
- *   between ticks for smooth motion at any frame rate.</li>
+ *   <li>the litter, in tiles of 4x4 blocks, each one static GPU buffer rebuilt only when its cells change (within a
+ *   time budget per frame, nearest tiles first). Of every stack only the leaves that can be seen are drawn: the top
+ *   ones, plus the sides of a pile where it stands above its neighbors - a pile of thousands of leaves costs a few
+ *   hundred quads;</li>
+ *   <li>moving leaves, written into one streaming buffer each frame and interpolated between ticks.</li>
  * </ul>
  * Both use the vanilla cutout terrain shader, so fog, lightmap and day/night match the world.
  */
@@ -49,100 +56,71 @@ final class LeafRenderer implements AutoCloseable {
                     .setTextureState(RenderStateShard.BLOCK_SHEET_MIPPED)
                     .setCullState(RenderStateShard.NO_CULL)
                     .createCompositeState(false));
-    private static final int REBUILDS_PER_FRAME = 8;
+    private static final long REBUILD_BUDGET_NANOS = 3_000_000L;
+    private static final double DETAIL_DISTANCE = 40.0;
+    private static final int TOP_LAYERS = 2;
+    private static final int MAX_SIDE_LAYERS = 48;
+    private static final float TILE_BLOCKS = LitterChunk.TILE * LitterField.CELL;
 
     private final LeafSimulation simulation;
     private final LeafPool pool;
-    private final long[] sectionOf;
-    private final int[] slotInSection;
-    private final Long2ObjectOpenHashMap<Section> sections = new Long2ObjectOpenHashMap<>();
+    private final LitterField field;
+    private final Long2ObjectOpenHashMap<Tile> tiles = new Long2ObjectOpenHashMap<>();
+    private final List<Tile> dirty = new ArrayList<>();
+    private final LitterField.Pose pose = new LitterField.Pose();
     private final ByteBufferBuilder bytes = new ByteBufferBuilder(1 << 18);
     private final VertexBuffer moving = new VertexBuffer(VertexBuffer.Usage.DYNAMIC);
     private boolean movingEmpty = true;
-    private final float[] u0 = new float[LeafKind.SPRITES.length];
-    private final float[] v0 = new float[LeafKind.SPRITES.length];
-    private final float[] u1 = new float[LeafKind.SPRITES.length];
-    private final float[] v1 = new float[LeafKind.SPRITES.length];
-    private int relightCursor;
+    private final float[] u0 = new float[LeafShape.SPRITE_COUNT];
+    private final float[] v0 = new float[LeafShape.SPRITE_COUNT];
+    private final float[] u1 = new float[LeafShape.SPRITE_COUNT];
+    private final float[] v1 = new float[LeafShape.SPRITE_COUNT];
+    private int frame;
+    private int lastTileQuads;
 
     LeafRenderer(LeafSimulation simulation) {
         this.simulation = simulation;
         this.pool = simulation.pool();
-        sectionOf = new long[pool.capacity];
-        slotInSection = new int[pool.capacity];
+        this.field = simulation.field();
     }
 
-    // ------------------------------------------------------------------------------------------------------------
-    // Section bookkeeping (called by the simulation)
-    // ------------------------------------------------------------------------------------------------------------
+    private static final class Tile {
+        final LitterChunk chunk;
+        final int index;
+        final int cellX;
+        final int cellZ;
+        final double originX;
+        final double originZ;
+        double originY;
+        AABB bounds;
+        VertexBuffer buffer;
+        boolean empty = true;
+        int builtRevision = Integer.MIN_VALUE;
+        boolean builtDetailed;
+        boolean wantDetailed;
+        int seenFrame;
+        double distanceSq;
+        int quads;
 
-    void onRest(int leaf) {
-        long key = SectionPos.asLong(SectionPos.blockToSectionCoord(Mth.floor(pool.x[leaf])),
-                SectionPos.blockToSectionCoord(Mth.floor(pool.y[leaf])), SectionPos.blockToSectionCoord(Mth.floor(pool.z[leaf])));
-        Section section = sections.get(key);
-        if (section == null) {
-            section = new Section(key);
-            sections.put(key, section);
+        Tile(LitterChunk chunk, int index) {
+            this.chunk = chunk;
+            this.index = index;
+            cellX = chunk.x * LitterChunk.SIZE + index % LitterChunk.TILES * LitterChunk.TILE;
+            cellZ = chunk.z * LitterChunk.SIZE + index / LitterChunk.TILES * LitterChunk.TILE;
+            originX = cellX * LitterField.CELL;
+            originZ = cellZ * LitterField.CELL;
         }
-        sectionOf[leaf] = key;
-        slotInSection[leaf] = section.leaves.size();
-        section.leaves.add(leaf);
-        section.dirty = true;
-    }
 
-    void onUnrest(int leaf) {
-        Section section = sections.get(sectionOf[leaf]);
-        if (section == null) {
-            return;
-        }
-        IntArrayList leaves = section.leaves;
-        int slot = slotInSection[leaf];
-        int last = leaves.getInt(leaves.size() - 1);
-        leaves.set(slot, last);
-        slotInSection[last] = slot;
-        leaves.removeInt(leaves.size() - 1);
-        if (leaves.isEmpty()) {
-            section.close();
-            sections.remove(section.key);
-        } else {
-            section.dirty = true;
-        }
-    }
-
-    /** A block changed: rebuild nearby sections so resting leaves pick up the new light. */
-    void onBlockChanged(BlockPos pos) {
-        int sx = SectionPos.blockToSectionCoord(pos.getX());
-        int sy = SectionPos.blockToSectionCoord(pos.getY());
-        int sz = SectionPos.blockToSectionCoord(pos.getZ());
-        for (int dx = -1; dx <= 1; dx++) {
-            for (int dy = -1; dy <= 1; dy++) {
-                for (int dz = -1; dz <= 1; dz++) {
-                    Section section = sections.get(SectionPos.asLong(sx + dx, sy + dy, sz + dz));
-                    if (section != null) {
-                        section.dirty = true;
-                    }
-                }
+        void close() {
+            if (buffer != null) {
+                buffer.close();
+                buffer = null;
             }
         }
     }
 
-    /** Re-lights one section per tick, so light changes far from any block update (sky light) still arrive. */
-    void tick() {
-        if (sections.isEmpty()) {
-            return;
-        }
-        int target = relightCursor++ % sections.size();
-        int n = 0;
-        for (Section section : sections.values()) {
-            if (n++ == target) {
-                section.dirty = true;
-                break;
-            }
-        }
-    }
-
-    int sectionCount() {
-        return sections.size();
+    int tileQuads() {
+        return lastTileQuads;
     }
 
     // ------------------------------------------------------------------------------------------------------------
@@ -152,7 +130,9 @@ final class LeafRenderer implements AutoCloseable {
     void render(Camera camera, Frustum frustum, Matrix4f modelView, Matrix4f projection, float partialTick) {
         updateSprites();
         Vec3 cam = camera.getPosition();
-        rebuildDirtySections();
+        frame++;
+        collectTiles(cam);
+        rebuildTiles();
         buildMoving(cam, camera.getLookVector(), partialTick);
 
         LEAVES.setupRenderState();
@@ -164,17 +144,20 @@ final class LeafRenderer implements AutoCloseable {
         shader.setDefaultUniforms(VertexFormat.Mode.QUADS, modelView, projection, Minecraft.getInstance().getWindow());
         shader.apply();
         Uniform offset = shader.CHUNK_OFFSET;
-        for (Section section : sections.values()) {
-            if (section.buffer == null || section.empty || !frustum.isVisible(section.bounds)) {
+        int quads = 0;
+        for (Tile tile : tiles.values()) {
+            if (tile.buffer == null || tile.empty || tile.bounds == null || !frustum.isVisible(tile.bounds)) {
                 continue;
             }
             if (offset != null) {
-                offset.set((float) (section.originX - cam.x), (float) (section.originY - cam.y), (float) (section.originZ - cam.z));
+                offset.set((float) (tile.originX - cam.x), (float) (tile.originY - cam.y), (float) (tile.originZ - cam.z));
                 offset.upload();
             }
-            section.buffer.bind();
-            section.buffer.draw();
+            tile.buffer.bind();
+            tile.buffer.draw();
+            quads += tile.quads;
         }
+        lastTileQuads = quads;
         if (!movingEmpty) {
             if (offset != null) {
                 offset.set(0.0F, 0.0F, 0.0F);
@@ -193,8 +176,8 @@ final class LeafRenderer implements AutoCloseable {
 
     private void updateSprites() {
         TextureAtlas atlas = Minecraft.getInstance().getModelManager().getAtlas(TextureAtlas.LOCATION_BLOCKS);
-        for (int s = 0; s < LeafKind.SPRITES.length; s++) {
-            TextureAtlasSprite sprite = atlas.getSprite(LeafKind.SPRITES[s]);
+        for (int s = 0; s < LeafShape.SPRITE_COUNT; s++) {
+            TextureAtlasSprite sprite = atlas.getSprite(LeafShapes.SPRITES[s]);
             u0[s] = sprite.getU0();
             v0[s] = sprite.getV0();
             u1[s] = sprite.getU1();
@@ -202,46 +185,146 @@ final class LeafRenderer implements AutoCloseable {
         }
     }
 
-    private void rebuildDirtySections() {
-        int budget = REBUILDS_PER_FRAME;
-        for (Section section : sections.values()) {
-            if (!section.dirty) {
+    /** Finds tiles of loaded litter chunks, drops tiles of unloaded ones and lists those that need a rebuild. */
+    private void collectTiles(Vec3 cam) {
+        dirty.clear();
+        for (LitterChunk chunk : field.chunks()) {
+            if (chunk.total() == 0) {
                 continue;
             }
-            if (budget-- == 0) {
+            for (int t = 0; t < LitterChunk.TILES * LitterChunk.TILES; t++) {
+                long key = tileKey(chunk, t);
+                Tile tile = tiles.get(key);
+                if (tile == null || tile.chunk != chunk) {
+                    if (tile != null) {
+                        tile.close();
+                    }
+                    tile = new Tile(chunk, t);
+                    tiles.put(key, tile);
+                }
+                tile.seenFrame = frame;
+                double dx = tile.originX + TILE_BLOCKS * 0.5 - cam.x;
+                double dz = tile.originZ + TILE_BLOCKS * 0.5 - cam.z;
+                tile.distanceSq = dx * dx + dz * dz;
+                tile.wantDetailed = tile.distanceSq < DETAIL_DISTANCE * DETAIL_DISTANCE;
+                if (tile.builtRevision != chunk.tileRevision[t] || tile.builtDetailed != tile.wantDetailed) {
+                    dirty.add(tile);
+                }
+            }
+        }
+        for (Iterator<Long2ObjectMap.Entry<Tile>> it = tiles.long2ObjectEntrySet().iterator(); it.hasNext(); ) {
+            Tile tile = it.next().getValue();
+            if (tile.seenFrame != frame) {
+                tile.close();
+                it.remove();
+            }
+        }
+    }
+
+    private static long tileKey(LitterChunk chunk, int tile) {
+        return ChunkPos.asLong(chunk.x * LitterChunk.TILES + tile % LitterChunk.TILES, chunk.z * LitterChunk.TILES + tile / LitterChunk.TILES);
+    }
+
+    private void rebuildTiles() {
+        if (dirty.isEmpty()) {
+            return;
+        }
+        dirty.sort((a, b) -> Double.compare(a.distanceSq, b.distanceSq));
+        long deadline = System.nanoTime() + REBUILD_BUDGET_NANOS;
+        for (Tile tile : dirty) {
+            buildTile(tile);
+            if (System.nanoTime() > deadline) {
                 break;
             }
-            section.dirty = false;
-            BufferBuilder builder = new BufferBuilder(bytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
-            IntArrayList leaves = section.leaves;
-            for (int n = 0; n < leaves.size(); n++) {
-                int i = leaves.getInt(n);
-                int light = simulation.lightAt(pool.x[i], pool.y[i] + 0.1, pool.z[i]);
-                pool.light[i] = light;
-                emit(builder, (float) (pool.x[i] - section.originX), (float) (pool.y[i] - section.originY),
-                        (float) (pool.z[i] - section.originZ), pool.yaw[i], pool.pitch[i], pool.roll[i], pool.size[i], pool.color[i],
-                        light, pool.sprite[i]);
-            }
-            MeshData mesh = builder.build();
-            if (mesh == null) {
-                section.empty = true;
-                continue;
-            }
-            if (section.buffer == null) {
-                section.buffer = new VertexBuffer(VertexBuffer.Usage.STATIC);
-            }
-            section.buffer.bind();
-            section.buffer.upload(mesh);
-            section.empty = false;
         }
         VertexBuffer.unbind();
+    }
+
+    private void buildTile(Tile tile) {
+        LitterChunk chunk = tile.chunk;
+        tile.builtRevision = chunk.tileRevision[tile.index];
+        tile.builtDetailed = tile.wantDetailed;
+        int topLayers = tile.wantDetailed ? TOP_LAYERS : 1;
+        double minY = Double.MAX_VALUE;
+        double maxY = -Double.MAX_VALUE;
+        for (int lz = 0; lz < LitterChunk.TILE; lz++) {
+            for (int lx = 0; lx < LitterChunk.TILE; lx++) {
+                int i = LitterField.index(tile.cellX + lx, tile.cellZ + lz);
+                if (chunk.count[i] > 0) {
+                    minY = Math.min(minY, chunk.base[i]);
+                    maxY = Math.max(maxY, chunk.base[i] + chunk.count[i] * LitterField.LAYER);
+                }
+            }
+        }
+        if (minY == Double.MAX_VALUE) {
+            tile.empty = true;
+            tile.quads = 0;
+            return;
+        }
+        tile.originY = Math.floor(minY);
+        tile.bounds = new AABB(tile.originX - 0.3, minY - 0.2, tile.originZ - 0.3, tile.originX + TILE_BLOCKS + 0.3, maxY + 0.3,
+                tile.originZ + TILE_BLOCKS + 0.3);
+        BufferBuilder builder = new BufferBuilder(bytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
+        int quads = 0;
+        for (int lz = 0; lz < LitterChunk.TILE; lz++) {
+            for (int lx = 0; lx < LitterChunk.TILE; lx++) {
+                int cellX = tile.cellX + lx;
+                int cellZ = tile.cellZ + lz;
+                int i = LitterField.index(cellX, cellZ);
+                int n = chunk.count[i];
+                if (n == 0) {
+                    continue;
+                }
+                double base = chunk.base[i];
+                double top = base + n * LitterField.LAYER;
+                double lowest = Math.min(Math.min(neighborTop(cellX + 1, cellZ, base), neighborTop(cellX - 1, cellZ, base)),
+                        Math.min(neighborTop(cellX, cellZ + 1, base), neighborTop(cellX, cellZ - 1, base)));
+                int side = Mth.clamp(Mth.ceil((top - lowest) / LitterField.LAYER), 0, MAX_SIDE_LAYERS);
+                int visible = Math.min(n, topLayers + (tile.wantDetailed ? side : side / 2));
+                int light = simulation.lightAt((cellX + 0.5) * LitterField.CELL, top + 0.05, (cellZ + 0.5) * LitterField.CELL);
+                for (int depth = 0; depth < visible; depth++) {
+                    field.pose(chunk, cellX, cellZ, n - 1 - depth, pose);
+                    // Leaves deeper in the pile are in its shadow.
+                    float shade = Math.max(0.68F, 1.0F - depth * 0.05F);
+                    emit(builder, (float) (pose.x - tile.originX), (float) (pose.y - tile.originY), (float) (pose.z - tile.originZ),
+                            pose.yaw, pose.pitch, pose.roll, pose.size, shade(pose.color, shade), light, pose.sprite);
+                    quads++;
+                }
+            }
+        }
+        tile.quads = quads;
+        MeshData mesh = builder.build();
+        if (mesh == null) {
+            tile.empty = true;
+            return;
+        }
+        if (tile.buffer == null) {
+            tile.buffer = new VertexBuffer(VertexBuffer.Usage.STATIC);
+        }
+        tile.buffer.bind();
+        tile.buffer.upload(mesh);
+        tile.empty = false;
+    }
+
+    /** Top of a neighboring stack for visibility; empty or unloaded neighbors show the ground at this cell's base. */
+    private double neighborTop(int cellX, int cellZ, double base) {
+        LitterChunk chunk = field.chunkAtCell(cellX, cellZ);
+        if (chunk == null) {
+            return base;
+        }
+        int i = LitterField.index(cellX, cellZ);
+        int n = chunk.count[i];
+        if (n == 0 || Math.abs(chunk.base[i] - base) > 0.6) {
+            return base;
+        }
+        return chunk.base[i] + n * LitterField.LAYER;
     }
 
     private void buildMoving(Vec3 cam, Vector3f look, float partialTick) {
         BufferBuilder builder = new BufferBuilder(bytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
         for (int i = 0, highWater = pool.highWater(); i < highWater; i++) {
             byte state = pool.state[i];
-            if (state == LeafPool.FREE || state == LeafPool.RESTING) {
+            if (state == LeafPool.FREE) {
                 continue;
             }
             float x = (float) (Mth.lerp(partialTick, pool.prevX[i], pool.x[i]) - cam.x);
@@ -265,6 +348,13 @@ final class LeafRenderer implements AutoCloseable {
             moving.upload(mesh);
             VertexBuffer.unbind();
         }
+    }
+
+    private static int shade(int rgb, float factor) {
+        int r = (int) ((rgb >> 16 & 0xFF) * factor);
+        int g = (int) ((rgb >> 8 & 0xFF) * factor);
+        int b = (int) ((rgb & 0xFF) * factor);
+        return r << 16 | g << 8 | b;
     }
 
     /**
@@ -302,38 +392,11 @@ final class LeafRenderer implements AutoCloseable {
 
     @Override
     public void close() {
-        for (Section section : sections.values()) {
-            section.close();
+        for (Tile tile : tiles.values()) {
+            tile.close();
         }
-        sections.clear();
+        tiles.clear();
         moving.close();
         bytes.close();
-    }
-
-    private static final class Section {
-        final long key;
-        final int originX;
-        final int originY;
-        final int originZ;
-        final AABB bounds;
-        final IntArrayList leaves = new IntArrayList();
-        VertexBuffer buffer;
-        boolean dirty = true;
-        boolean empty = true;
-
-        Section(long key) {
-            this.key = key;
-            originX = SectionPos.sectionToBlockCoord(SectionPos.x(key));
-            originY = SectionPos.sectionToBlockCoord(SectionPos.y(key));
-            originZ = SectionPos.sectionToBlockCoord(SectionPos.z(key));
-            bounds = new AABB(originX, originY, originZ, originX + 16, originY + 16, originZ + 16).inflate(0.5);
-        }
-
-        void close() {
-            if (buffer != null) {
-                buffer.close();
-                buffer = null;
-            }
-        }
     }
 }

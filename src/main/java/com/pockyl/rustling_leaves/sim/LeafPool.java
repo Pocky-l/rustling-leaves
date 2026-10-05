@@ -1,22 +1,26 @@
 package com.pockyl.rustling_leaves.sim;
 
 /**
- * Structure-of-arrays storage for leaves. A leaf is an index into the arrays; indices are stable for the lifetime of a
- * leaf (freed slots are reused), so the renderer can keep its own per-leaf bookkeeping in parallel arrays.
+ * Structure-of-arrays storage for moving leaves (the ones lying still live in the {@link LitterField}). A leaf is an
+ * index into the arrays; indices are stable for the lifetime of a leaf and freed slots are reused.
  */
 public final class LeafPool {
     public static final byte FREE = 0;
     /** In the air: full aerodynamics and collisions. */
     public static final byte FALLING = 1;
-    /** Lying on a block; costs almost nothing until disturbed and is drawn from a cached mesh. */
-    public static final byte RESTING = 2;
+    /** Skidding and tumbling over the ground or a pile. */
+    public static final byte SLIDING = 2;
     /** Drifting on a water surface. */
     public static final byte FLOATING = 3;
-    /** Shrinking away at the end of its life; {@link #life} counts the remaining ticks. */
+    /** Shrinking away; {@link #life} counts the remaining ticks. */
     public static final byte DYING = 4;
 
-    public static final byte FLAG_EXPOSED = 1;
-    public static final byte FLAG_WET = 2;
+    /** The leaf just fell off a tree; it only thickens the litter up to the natural carpet depth. */
+    public static final byte FLAG_NATURAL = 1;
+    /** Touched down and turning flat before it joins the litter. */
+    public static final byte FLAG_SETTLING = 2;
+    /** Under the open sky, so the wind can push it along the ground. */
+    public static final byte FLAG_EXPOSED = 4;
 
     public final int capacity;
 
@@ -47,16 +51,21 @@ public final class LeafPool {
     public final float[] sway;
     public final float[] swayDir;
     public final float[] size;
-    public final float[] flowX;
-    public final float[] flowZ;
+    /** Water flow for floating leaves; target tilt while settling. */
+    public final float[] auxA;
+    public final float[] auxB;
+    /** Surface the leaf touched down on. */
+    public final double[] ground;
 
+    /** Color as drawn, and the color of the tree it came from (what the litter remembers). */
     public final int[] color;
+    public final int[] baseColor;
     public final int[] light;
     public final int[] age;
     public final int[] life;
-    public final int[] restTick;
     public final byte[] state;
     public final byte[] sprite;
+    public final byte[] shape;
     public final byte[] flags;
 
     private final int[] free;
@@ -89,15 +98,17 @@ public final class LeafPool {
         sway = new float[capacity];
         swayDir = new float[capacity];
         size = new float[capacity];
-        flowX = new float[capacity];
-        flowZ = new float[capacity];
+        auxA = new float[capacity];
+        auxB = new float[capacity];
+        ground = new double[capacity];
         color = new int[capacity];
+        baseColor = new int[capacity];
         light = new int[capacity];
         age = new int[capacity];
         life = new int[capacity];
-        restTick = new int[capacity];
         state = new byte[capacity];
         sprite = new byte[capacity];
+        shape = new byte[capacity];
         flags = new byte[capacity];
         free = new int[capacity];
     }
@@ -129,6 +140,10 @@ public final class LeafPool {
 
     public int count() {
         return count;
+    }
+
+    public int free() {
+        return capacity - count;
     }
 
     public void savePrevious(int leaf) {
