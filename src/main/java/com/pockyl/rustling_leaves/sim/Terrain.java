@@ -90,11 +90,57 @@ final class Terrain {
         return level.canSeeSky(cursor);
     }
 
-    /** Packed light coordinates (block light in bits 4..7, sky light in bits 20..23) at a position. */
+    /**
+     * Packed light coordinates (block light in bits 4..7, sky light in bits 20..23) at a position. Inside a block
+     * (a leaf touching a slab, a step or a wall) the stored light is 0 or too low, which would draw the leaf black,
+     * so where the position is not in open air the brighter of it and the block above counts.
+     */
     int lightAt(double x, double y, double z) {
         lightCursor.set(Mth.floor(x), Mth.floor(y), Mth.floor(z));
         int sky = level.getBrightness(LightLayer.SKY, lightCursor);
         int block = level.getBrightness(LightLayer.BLOCK, lightCursor);
+        BlockState state = level.getBlockState(lightCursor);
+        if (!state.isAir() && !state.is(BlockTags.LEAVES)) {
+            lightCursor.move(0, 1, 0);
+            if (state.isSolidRender(level, lightCursor.below())) {
+                sky = level.getBrightness(LightLayer.SKY, lightCursor);
+                block = level.getBrightness(LightLayer.BLOCK, lightCursor);
+            } else {
+                sky = Math.max(sky, level.getBrightness(LightLayer.SKY, lightCursor));
+                block = Math.max(block, level.getBrightness(LightLayer.BLOCK, lightCursor));
+            }
+        }
         return block << 4 | sky << 20;
+    }
+
+    /**
+     * Moves a leaf of half-size {@code half} lying at (x, y, z) out of the blocks around it: away from walls next to
+     * it so its edges do not stick into them, and up onto the floor if it sank into it. Returns the corrected position
+     * in {@code out[0..2]}.
+     */
+    void keepClear(double x, double y, double z, float half, double[] out) {
+        double reach = half * 0.9;
+        int bx = Mth.floor(x);
+        int bz = Mth.floor(z);
+        double probeY = y + 0.02;
+        double fx = x - bx;
+        if (fx < reach && !Double.isNaN(solidTop(bx - 0.01, probeY, z))) {
+            x = bx + reach;
+        } else if (fx > 1.0 - reach && !Double.isNaN(solidTop(bx + 1.01, probeY, z))) {
+            x = bx + 1.0 - reach;
+        }
+        double fz = z - bz;
+        if (fz < reach && !Double.isNaN(solidTop(x, probeY, bz - 0.01))) {
+            z = bz + reach;
+        } else if (fz > 1.0 - reach && !Double.isNaN(solidTop(x, probeY, bz + 1.01))) {
+            z = bz + 1.0 - reach;
+        }
+        double floor = solidTop(x, y, z);
+        if (!Double.isNaN(floor)) {
+            y = floor + 0.004;
+        }
+        out[0] = x;
+        out[1] = y;
+        out[2] = z;
     }
 }

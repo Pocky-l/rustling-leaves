@@ -39,6 +39,7 @@ public final class LitterField {
     private final Terrain terrain;
     private final Long2ObjectOpenHashMap<LitterChunk> chunks = new Long2ObjectOpenHashMap<>();
     private final LongArrayFIFOQueue relaxQueue = new LongArrayFIFOQueue();
+    private final double[] clear = new double[3];
     private final double[] slideTop = new double[8];
     private final double[] slideExcess = new double[8];
     private LitterChunk last;
@@ -416,10 +417,23 @@ public final class LitterField {
         out.shape = shape.ordinal();
         if (n >= SURFACE_MIN) {
             onSurface(chunk, cellX, cellZ, n - 1 - layer, offX, offZ, hash, layer == n - 1 && top != 0L, out);
+            keepClear(out);
             return;
         }
         out.y = chunk.base[i] + (layer + 0.5F + (unit(hash, 50) - 0.5F) * 0.5F) * LAYER + 0.004;
         restTilt(chunk, cellX, cellZ, layer, out.yaw, out);
+        keepClear(out);
+    }
+
+    /** Keeps a leaf of the litter out of walls next to it and out of the floor under it. */
+    private void keepClear(Pose out) {
+        if (terrain.level == null) {
+            return;
+        }
+        terrain.keepClear(out.x, out.y, out.z, out.size, clear);
+        out.x = clear[0];
+        out.y = clear[1];
+        out.z = clear[2];
     }
 
     /**

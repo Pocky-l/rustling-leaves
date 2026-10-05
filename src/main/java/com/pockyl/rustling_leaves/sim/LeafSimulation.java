@@ -77,6 +77,7 @@ public final class LeafSimulation {
     private final FastRandom random = new FastRandom(System.nanoTime());
     private final LitterField.Pose pose = new LitterField.Pose();
     private final float[] air = new float[3];
+    private final double[] clear = new double[3];
     private final int[] direction = new int[1];
     private final LitterField.Spill spill = this::spill;
     private int tick;
@@ -488,7 +489,10 @@ public final class LeafSimulation {
         pool.vy[i] = 0.0F;
         pool.vz[i] = 0.0F;
         pool.ground[i] = surface;
-        pool.y[i] = surface + 0.006;
+        terrain.keepClear(pool.x[i], surface + 0.006, pool.z[i], pool.size[i], clear);
+        pool.x[i] = clear[0];
+        pool.y[i] = clear[1];
+        pool.z[i] = clear[2];
         pool.flags[i] |= LeafPool.FLAG_SETTLING;
         pool.life[i] = SETTLE_TICKS;
         pool.auxA[i] = 0.0F;
@@ -657,9 +661,10 @@ public final class LeafSimulation {
             pool.vz[i] *= -0.2F;
             ground = pool.ground[i];
         }
-        pool.x[i] = x;
-        pool.y[i] = ground + 0.006;
-        pool.z[i] = z;
+        terrain.keepClear(x, ground + 0.006, z, pool.size[i], clear);
+        pool.x[i] = clear[0];
+        pool.y[i] = clear[1];
+        pool.z[i] = clear[2];
         pool.ground[i] = ground;
 
         float speed = Mth.sqrt(pool.vx[i] * pool.vx[i] + pool.vz[i] * pool.vz[i]);
