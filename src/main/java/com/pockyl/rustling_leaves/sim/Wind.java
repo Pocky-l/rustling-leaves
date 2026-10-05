@@ -253,7 +253,7 @@ public final class Wind {
         float height = Mth.clamp(h, 0.0F, 1.0F);
         // Inflow near the ground, outflow near the top.
         float radial = tangential * (0.6F * height - 0.35F);
-        float updraft = r < radius * 1.3F ? 0.14F * intensity * (1.0F - r / (radius * 1.3F)) * (1.0F - height * height) : 0.0F;
+        float updraft = r < radius * 1.3F ? 0.24F * intensity * (1.0F - r / (radius * 1.3F)) * (1.0F - height * height) : 0.0F;
         out[0] += -nz * tangential * whirlwind.spin + nx * radial;
         out[1] += updraft;
         out[2] += nx * tangential * whirlwind.spin + nz * radial;

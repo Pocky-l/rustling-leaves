@@ -19,5 +19,7 @@
   "rustling_leaves.configuration.carpetDepth": "Толщина ковра листвы",
   "rustling_leaves.configuration.naturalPiles": "Естественные наносы и кучи",
   "rustling_leaves.configuration.windEvents": "Шквалы и вихри",
-  "rustling_leaves.configuration.raking": "Грабли (мотыга или лопата)"
+  "rustling_leaves.configuration.raking": "Грабли (мотыга или лопата)",
+  "rustling_leaves.hud.armful": "Листьев: %s",
+  "rustling_leaves.configuration.armful": "Набирать и сыпать листья"
 }

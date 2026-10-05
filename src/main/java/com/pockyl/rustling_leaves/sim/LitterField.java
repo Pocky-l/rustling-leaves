@@ -25,12 +25,15 @@ public final class LitterField {
     private static final int RELAX_BUDGET = 6000;
     private static final int[] DX = {1, -1, 0, 0};
     private static final int[] DZ = {0, 0, 1, -1};
+    private static final int[] DX8 = {1, -1, 0, 0, 1, 1, -1, -1};
+    private static final int[] DZ8 = {0, 0, 1, -1, 1, -1, 1, -1};
 
     private final LeafSettings settings;
     private final Terrain terrain;
     private final Long2ObjectOpenHashMap<LitterChunk> chunks = new Long2ObjectOpenHashMap<>();
     private final LongArrayFIFOQueue relaxQueue = new LongArrayFIFOQueue();
-    private final int[] direction = new int[1];
+    private final double[] slideTop = new double[8];
+    private final double[] slideExcess = new double[8];
     private LitterChunk last;
 
     LitterField(LeafSettings settings, Terrain terrain) {
@@ -38,9 +41,13 @@ public final class LitterField {
         this.terrain = terrain;
     }
 
-    /** Called when leaves would slide over an edge; returns false if the leaf could not be released. */
+    /** Gets a say in every leaf that slides down a pile. */
     interface Spill {
-        boolean spill(int fromX, int fromZ, int toX, int toZ);
+        /**
+         * A leaf slides from one cell towards another. Returns true if it was released as a particle (to be seen
+         * tumbling down); over a drop-off ({@code edge}) it must become one, otherwise it stays.
+         */
+        boolean slide(int fromX, int fromZ, int toX, int toZ, boolean edge);
     }
 
     /** One leaf of the litter, as drawn and as released into the air. */
@@ -287,8 +294,10 @@ public final class LitterField {
     }
 
     /**
-     * Lets queued cells slide down until no cell stands more than {@link #REPOSE} above a neighbor: leaves move to the
-     * lowest neighbor, over drop-off edges they are handed to {@code spill}.
+     * Granular relaxation: a queued cell that stands higher above any of its eight neighbors than the angle of repose
+     * allows sheds leaves to all of them, in proportion to how much each slope is too steep - piles settle into round
+     * cones, fill hollows and bowls up to their rim and run over it. Over drop-offs leaves are handed to {@code spill}
+     * as particles.
      */
     void relax(Spill spill) {
         int budget = RELAX_BUDGET;
@@ -307,30 +316,44 @@ public final class LitterField {
                 continue;
             }
             double top = chunk.base[i] + n * LAYER;
-            double lowest = lowestNeighbor(cx, cz, top, direction);
-            double drop = Math.min(top - lowest, n * LAYER);
-            if (drop <= REPOSE + LAYER) {
+            double total = 0.0;
+            double worst = 0.0;
+            for (int d = 0; d < 8; d++) {
+                double neighbor = neighborTop(cx + DX8[d], cz + DZ8[d], top);
+                double limit = REPOSE * (d < 4 ? 1.0 : Mth.SQRT_OF_TWO);
+                double excess = Math.min(top - neighbor, n * LAYER) - limit;
+                slideTop[d] = neighbor;
+                slideExcess[d] = excess > LAYER ? excess : 0.0;
+                total += slideExcess[d];
+                worst = Math.max(worst, slideExcess[d]);
+            }
+            if (total == 0.0) {
                 continue;
             }
-            int tx = cx + DX[direction[0]];
-            int tz = cz + DZ[direction[0]];
-            if (lowest == Double.NEGATIVE_INFINITY) {
-                int released = 0;
-                while (released < 4 && chunk.count[i] > 0 && spill.spill(cx, cz, tx, tz)) {
-                    released++;
+            int moves = Mth.clamp((int) (worst / (2 * LAYER)), 1, n);
+            boolean moved = false;
+            for (int d = 0; d < 8; d++) {
+                if (slideExcess[d] == 0.0) {
+                    continue;
                 }
-                if (released > 0) {
-                    relaxQueue.enqueue(key);
+                int tx = cx + DX8[d];
+                int tz = cz + DZ8[d];
+                boolean edge = slideTop[d] == Double.NEGATIVE_INFINITY;
+                int share = Math.max(1, (int) Math.round(moves * slideExcess[d] / total));
+                for (int m = 0; m < share && chunk.count[i] > 0; m++) {
+                    if (spill.slide(cx, cz, tx, tz, edge)) {
+                        moved = true;
+                    } else if (edge || !move(cx, cz, tx, tz, slideTop[d])) {
+                        break;
+                    } else {
+                        moved = true;
+                    }
                 }
-                continue;
+                relaxQueue.enqueue(ChunkPos.asLong(tx, tz));
             }
-            int moves = Mth.clamp((int) ((drop - REPOSE) / (2 * LAYER)), 1, n);
-            for (int m = 0; m < moves; m++) {
-                if (!move(cx, cz, tx, tz, lowest)) {
-                    break;
-                }
+            if (moved) {
+                relaxQueue.enqueue(key);
             }
-            relaxQueue.enqueue(key);
         }
         if (budget <= 0) {
             relaxQueue.clear();

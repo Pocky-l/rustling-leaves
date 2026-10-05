@@ -19,5 +19,7 @@
   "rustling_leaves.configuration.carpetDepth": "Leaf Carpet Thickness",
   "rustling_leaves.configuration.naturalPiles": "Natural Drifts and Piles",
   "rustling_leaves.configuration.windEvents": "Squalls and Whirlwinds",
-  "rustling_leaves.configuration.raking": "Raking with Hoe or Shovel"
+  "rustling_leaves.configuration.raking": "Raking with Hoe or Shovel",
+  "rustling_leaves.hud.armful": "%s leaves",
+  "rustling_leaves.configuration.armful": "Scoop and Pour Leaves"
 }

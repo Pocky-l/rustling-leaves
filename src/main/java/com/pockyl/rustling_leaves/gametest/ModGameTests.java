@@ -11,6 +11,7 @@ import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 import com.pockyl.rustling_leaves.RustlingLeaves;
+import com.pockyl.rustling_leaves.sim.Armful;
 import com.pockyl.rustling_leaves.sim.LeafListener;
 import com.pockyl.rustling_leaves.sim.LeafPool;
 import com.pockyl.rustling_leaves.sim.LeafSettings;
@@ -271,14 +272,101 @@ public final class ModGameTests {
         carpet(sim, helper, 2.5, 4);
         BlockPos center = helper.absolutePos(new BlockPos(3, 1, 3));
         sim.wind().addWhirlwind(center.getX() + 0.5, center.getY(), center.getZ() + 0.5, 1.5F, 6.0F, 0.3F, 600);
-        run(sim, helper, 60);
         double highest = 0.0;
-        for (int i = 0; i < sim.pool().highWater(); i++) {
-            if (sim.pool().state[i] != LeafPool.FREE) {
-                highest = Math.max(highest, sim.pool().y[i] - center.getY());
+        for (int t = 0; t < 120; t++) {
+            run(sim, helper, 1);
+            for (int i = 0; i < sim.pool().highWater(); i++) {
+                if (sim.pool().state[i] != LeafPool.FREE) {
+                    highest = Math.max(highest, sim.pool().y[i] - center.getY());
+                }
             }
         }
-        helper.assertTrue(highest > 1.5, "whirlwind lifted leaves only to " + highest);
+        helper.assertTrue(highest > 2.5, "whirlwind lifted leaves only to " + highest);
+        helper.succeed();
+    }
+
+    @GameTest(template = "box")
+    public static void scoopedLeavesPourBackOut(GameTestHelper helper) {
+        floor(helper);
+        LeafSimulation sim = simulation(helper, 1024, LeafListener.NONE);
+        int total = carpet(sim, helper, 2.0, 8);
+        BlockPos origin = helper.absolutePos(BlockPos.ZERO);
+        double y = absoluteY(helper, 1.0);
+        Armful armful = new Armful();
+        int taken = 0;
+        for (int stroke = 0; stroke < 5; stroke++) {
+            taken += sim.scoop(origin.getX() + 3.5, y, origin.getZ() + 3.5, 0.9F, 40, origin.getX() + 3.5, y + 1.2, origin.getZ() + 2.5, armful);
+            run(sim, helper, 4);
+        }
+        helper.assertTrue(taken >= 100 && armful.count() == taken, "scooped " + taken + ", carrying " + armful.count());
+        helper.assertTrue(sim.field().total() == total - taken, "litter does not match the scoop");
+        run(sim, helper, 20);
+        while (armful.count() > 0) {
+            sim.pour(origin.getX() + 1.5, y + 1.5, origin.getZ() + 1.5, 0.3F, 0.0F, 0.3F, 6, armful);
+            run(sim, helper, 1);
+        }
+        run(sim, helper, 500);
+        helper.assertTrue(sim.field().total() + sim.pool().count() == total, "leaves were lost while pouring");
+        helper.succeed();
+    }
+
+    @GameTest(template = "box")
+    public static void pouredLeavesFillABowl(GameTestHelper helper) {
+        floor(helper);
+        // A one block deep hollow in the middle of a raised floor.
+        fill(helper, 0, 0, 6, 6, 1, Blocks.STONE.defaultBlockState());
+        helper.setBlock(3, 1, 3, Blocks.AIR.defaultBlockState());
+        LeafSimulation sim = simulation(helper, 2048, LeafListener.NONE);
+        BlockPos origin = helper.absolutePos(BlockPos.ZERO);
+        Armful armful = filledArmful(sim, helper, 500);
+        while (armful.count() > 0) {
+            sim.pour(origin.getX() + 3.5, absoluteY(helper, 2.6), origin.getZ() + 3.5, 0.0F, -1.0F, 0.0F, 4, armful);
+            run(sim, helper, 1);
+        }
+        run(sim, helper, 600);
+        int[] hole = cellAt(helper, 3.0, 3.0);
+        int inside = 0;
+        for (int dx = 0; dx < 4; dx++) {
+            for (int dz = 0; dz < 4; dz++) {
+                inside += sim.field().count(hole[0] + dx, hole[1] + dz);
+            }
+        }
+        helper.assertTrue(sim.field().total() + sim.pool().count() == 500, "leaves were lost");
+        helper.assertTrue(inside > 300, "the hollow holds only " + inside + " of 500 leaves");
+        helper.succeed();
+    }
+
+    @GameTest(template = "box")
+    public static void fullBowlRunsOver(GameTestHelper helper) {
+        floor(helper);
+        fill(helper, 0, 0, 6, 6, 1, Blocks.STONE.defaultBlockState());
+        helper.setBlock(3, 1, 3, Blocks.AIR.defaultBlockState());
+        LeafSimulation sim = simulation(helper, 4096, LeafListener.NONE);
+        int[] hole = cellAt(helper, 3.0, 3.0);
+        double floorY = absoluteY(helper, 1.0);
+        // Fill the hollow to the rim and heap a tall stack in its middle.
+        for (int dx = 0; dx < 4; dx++) {
+            for (int dz = 0; dz < 4; dz++) {
+                for (int n = 0; n < 83; n++) {
+                    sim.field().add(hole[0] + dx, hole[1] + dz, floorY, 0x6A8F3A, 0, 0L, 0);
+                }
+            }
+        }
+        for (int n = 0; n < 60; n++) {
+            sim.field().add(hole[0] + 1, hole[1] + 1, floorY, 0x6A8F3A, 0, 0L, 0);
+        }
+        sim.field().queueRelax(hole[0] + 1, hole[1] + 1);
+        run(sim, helper, 300);
+        int outside = 0;
+        for (int dx = -4; dx < 8; dx++) {
+            for (int dz = -4; dz < 8; dz++) {
+                if (dx < 0 || dx > 3 || dz < 0 || dz > 3) {
+                    outside += sim.field().count(hole[0] + dx, hole[1] + dz);
+                }
+            }
+        }
+        helper.assertTrue(outside > 0, "nothing ran over the rim");
+        helper.assertTrue(sim.field().total() + sim.pool().count() == 16 * 83 + 60, "leaves were lost");
         helper.succeed();
     }
 
@@ -301,6 +389,23 @@ public final class ModGameTests {
     }
 
     // ------------------------------------------------------------------------------------------------------------
+
+    /** An armful of {@code leaves} leaves, scooped from a carpet laid and removed again outside the test box. */
+    private static Armful filledArmful(LeafSimulation sim, GameTestHelper helper, int leaves) {
+        Armful armful = new Armful();
+        int[] corner = cellAt(helper, 3.5, 3.5);
+        double y = absoluteY(helper, 1.0);
+        LitterChunk chunk = sim.field().chunkAtCell(corner[0], corner[1]);
+        int index = LitterField.index(corner[0], corner[1]);
+        while (armful.count() < leaves) {
+            sim.field().add(corner[0], corner[1], y, 0x6A8F3A, 0, 0L, 0);
+            BlockPos origin = helper.absolutePos(BlockPos.ZERO);
+            sim.scoop(origin.getX() + 3.5, y, origin.getZ() + 3.5, 0.1F, 1, origin.getX() + 3.5, y + 1.0, origin.getZ() + 3.5, armful);
+        }
+        helper.assertTrue(chunk.count[index] == 0, "scoop left leaves behind");
+        run(sim, helper, 20);
+        return armful;
+    }
 
     /** A simulation without wind and with the litter chunks around the test loaded. */
     private static LeafSimulation simulation(GameTestHelper helper, int capacity, LeafListener listener) {

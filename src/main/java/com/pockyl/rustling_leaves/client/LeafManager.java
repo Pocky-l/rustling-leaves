@@ -35,6 +35,7 @@ import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 
 import com.pockyl.rustling_leaves.Config;
 import com.pockyl.rustling_leaves.RustlingLeaves;
+import com.pockyl.rustling_leaves.sim.Armful;
 import com.pockyl.rustling_leaves.sim.LeafListener;
 import com.pockyl.rustling_leaves.sim.LeafPool;
 import com.pockyl.rustling_leaves.sim.LeafSettings;
@@ -59,6 +60,9 @@ public final class LeafManager {
     private static final double TELEPORT_DISTANCE = 4.0;
     private static final int SAVE_INTERVAL = 20 * 30;
     private static final float RAKE_RADIUS = 2.0F;
+    private static final float SCOOP_RADIUS = 0.9F;
+    private static final int SCOOP_PER_STROKE = 40;
+    private static final int POUR_PER_TICK = 6;
 
     private static final LeafSettings SETTINGS = new LeafSettings();
     private static final LeafColors COLORS = new LeafColors();
@@ -77,6 +81,8 @@ public final class LeafManager {
     private static int burstsThisTick;
     private static int soundsThisTick;
     private static int disturbingEntity;
+    private static final Armful ARMFUL = new Armful();
+    private static int pourTicks;
 
     private LeafManager() {
     }
@@ -119,6 +125,7 @@ public final class LeafManager {
         disturbByEntities(camera);
         simulation.finishTick();
         SPAWNER.tick(level, simulation, camera.x, camera.z);
+        pour(minecraft);
         if (ticks % SAVE_INTERVAL == 0) {
             save(camera);
         }
@@ -149,15 +156,23 @@ public final class LeafManager {
                 renderer.tileQuads(), simulation.wind().whirlwinds().size()));
     }
 
-    /** Right click with a hoe or shovel on leaf litter rakes it together instead of tilling or making a path. */
+    /**
+     * Right click with a hoe or shovel on leaf litter rakes it together instead of tilling or making a path. With an
+     * empty hand, sneak + right click scoops leaves into the arms and right click pours them out again.
+     */
     @SubscribeEvent
     public static void onUseKey(InputEvent.InteractionKeyMappingTriggered event) {
         Minecraft minecraft = Minecraft.getInstance();
-        if (!event.isUseItem() || event.getHand() != InteractionHand.MAIN_HAND || simulation == null || !SETTINGS.raking
-                || minecraft.player == null || !(minecraft.hitResult instanceof BlockHitResult hit) || hit.getType() != HitResult.Type.BLOCK) {
+        if (!event.isUseItem() || event.getHand() != InteractionHand.MAIN_HAND || simulation == null || minecraft.player == null) {
             return;
         }
         ItemStack stack = minecraft.player.getMainHandItem();
+        if (stack.isEmpty() && SETTINGS.armful && handleArmful(minecraft, event)) {
+            return;
+        }
+        if (!SETTINGS.raking || !(minecraft.hitResult instanceof BlockHitResult hit) || hit.getType() != HitResult.Type.BLOCK) {
+            return;
+        }
         if (!stack.is(ItemTags.HOES) && !stack.is(ItemTags.SHOVELS)) {
             return;
         }
@@ -175,6 +190,64 @@ public final class LeafManager {
             level.playLocalSound(at.x, at.y, at.z, SoundEvents.BRUSH_GENERIC, SoundSource.PLAYERS, volume * 0.5F,
                     0.7F + level.random.nextFloat() * 0.2F, false);
         }
+    }
+
+    private static boolean handleArmful(Minecraft minecraft, InputEvent.InteractionKeyMappingTriggered event) {
+        if (minecraft.player.isShiftKeyDown()) {
+            if (!(minecraft.hitResult instanceof BlockHitResult hit) || hit.getType() != HitResult.Type.BLOCK || ARMFUL.room() == 0) {
+                return false;
+            }
+            Vec3 at = hit.getLocation();
+            if (simulation.litterAround(at.x, at.y, at.z, SCOOP_RADIUS) == 0) {
+                return false;
+            }
+            Vec3 hand = handPosition(minecraft);
+            int taken = simulation.scoop(at.x, at.y, at.z, SCOOP_RADIUS, SCOOP_PER_STROKE, hand.x, hand.y, hand.z, ARMFUL);
+            if (taken > 0) {
+                event.setCanceled(true);
+                event.setSwingHand(true);
+                level.playLocalSound(at.x, at.y, at.z, SoundEvents.AZALEA_LEAVES_STEP, SoundSource.PLAYERS,
+                        Math.max(0.3F, SETTINGS.rustleVolume), 0.9F + level.random.nextFloat() * 0.2F, false);
+            }
+            return taken > 0;
+        }
+        if (ARMFUL.count() == 0) {
+            return false;
+        }
+        // The use key repeats every 4 ticks while held; keep pouring until it stops.
+        pourTicks = 5;
+        event.setCanceled(true);
+        event.setSwingHand(true);
+        return true;
+    }
+
+    private static void pour(Minecraft minecraft) {
+        if (pourTicks <= 0) {
+            return;
+        }
+        pourTicks--;
+        if (minecraft.player == null || ARMFUL.count() == 0 || !minecraft.options.keyUse.isDown()) {
+            pourTicks = 0;
+            return;
+        }
+        Vec3 hand = handPosition(minecraft);
+        Vec3 look = minecraft.player.getLookAngle();
+        int poured = simulation.pour(hand.x, hand.y, hand.z, (float) look.x, (float) look.y, (float) look.z, POUR_PER_TICK, ARMFUL);
+        if (poured > 0 && ticks % 4 == 0 && SETTINGS.rustleVolume > 0.0F) {
+            level.playLocalSound(hand.x, hand.y, hand.z, SoundEvents.AZALEA_LEAVES_STEP, SoundSource.PLAYERS,
+                    0.5F * SETTINGS.rustleVolume, 1.1F + level.random.nextFloat() * 0.3F, false);
+        }
+    }
+
+    /** Where the arms hold leaves: in front of the eyes, a bit down. */
+    private static Vec3 handPosition(Minecraft minecraft) {
+        Vec3 look = minecraft.player.getLookAngle();
+        return minecraft.player.getEyePosition().add(look.scale(0.6)).add(0.0, -0.35, 0.0);
+    }
+
+    /** Leaves carried in the arms (shown next to the crosshair). */
+    static int armfulCount() {
+        return ARMFUL.count();
     }
 
     /** Hooked into block updates of the client level. */
@@ -360,6 +433,8 @@ public final class LeafManager {
         LAST_FALL.clear();
         SOUND_READY.clear();
         COLORS.clear();
+        ARMFUL.clear();
+        pourTicks = 0;
     }
 
     private static final class Listener implements LeafListener {

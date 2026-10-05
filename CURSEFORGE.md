@@ -9,10 +9,16 @@ Physically simulated leaves: falling leaves, a forest floor of leaf piles you ca
 - **A real forest floor**: leaves pile up in layers - a carpet under the trees, drifts banked against walls and
   trunks, and now and then a proper leaf pile. Piles slump to a natural angle of repose and leaves slide down their
   sides. The ground cover is **saved with your world** (per server in multiplayer), so piles stay where they are.
-- **Wade through piles**: your body pushes the leaves aside - most are shoved to the sides and ahead, leaving a
-  trench with banks behind you; some skid over the ground, only a few from the top fly up (more when running).
+- **Wade through piles**: the leaves under your feet are pressed down and stay, part of the pile is pushed aside
+  with every step and leaves a trail, some leaves skid over the ground and a few fly up after you (more when
+  running).
   **Sneaking** over a thin carpet leaves it untouched. **Jump into a pile** and it splashes up around you.
   Mobs, animals, minecarts and arrows stir leaves too, with a soft rustle.
+- **Leaves behave like a granular material**: piles settle into round cones, leaves trickle down slopes, fill
+  hollows, ditches and cauldrons up to the rim and run over the edge.
+- **Carry leaves around**: sneak + right click leaf litter with an empty hand to scoop up an armful (up to 600
+  leaves, shown next to the crosshair), right click to pour them out in a stream wherever you look - fill a hole,
+  heap a pile, shower a friend.
 - **Rake leaves into piles**: hold right click with a hoe or shovel on leaf litter to sweep the leaves around that
   spot together (it does not till the ground or make a path while there are leaves).
 - **Wind you can see**: gust waves sweep across the forest and skitter loose leaves over the ground until they

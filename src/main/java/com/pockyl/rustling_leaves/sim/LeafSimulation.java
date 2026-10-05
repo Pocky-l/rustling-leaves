@@ -45,6 +45,8 @@ public final class LeafSimulation {
     private static final float LIFT_SCALE = 8.0F;
     private static final int WIND_SAMPLES = 48;
     private static final int PARTICLES_PER_DISTURB = 24;
+    /** Leaves per tick that visibly tumble down slumping piles. */
+    private static final int CASCADE_PARTICLES = 12;
     /** Leaves at the bottom of a stack that a foot presses down instead of moving. */
     private static final int TRAMPLED = 2;
     private static final float LAYER = LitterField.LAYER;
@@ -65,6 +67,7 @@ public final class LeafSimulation {
     private final int[] direction = new int[1];
     private final LitterField.Spill spill = this::spill;
     private int tick;
+    private int cascadeBudget;
     private double cameraX;
     private double cameraY;
     private double cameraZ;
@@ -137,6 +140,10 @@ public final class LeafSimulation {
                 case LeafPool.SLIDING -> tickSliding(i);
                 case LeafPool.FLOATING -> tickFloating(i);
                 case LeafPool.DYING -> {
+                    pool.x[i] += pool.vx[i];
+                    pool.y[i] += pool.vy[i];
+                    pool.z[i] += pool.vz[i];
+                    pool.yaw[i] += pool.spinYaw[i];
                     if (--pool.life[i] <= 0) {
                         pool.release(i);
                     }
@@ -145,6 +152,7 @@ public final class LeafSimulation {
                 }
             }
         }
+        cascadeBudget = CASCADE_PARTICLES;
         field.relax(spill);
     }
 
@@ -259,6 +267,9 @@ public final class LeafSimulation {
     private void startDying(int i) {
         pool.state[i] = LeafPool.DYING;
         pool.life[i] = DYING_TICKS;
+        pool.vx[i] = 0.0F;
+        pool.vy[i] = 0.0F;
+        pool.vz[i] = 0.0F;
     }
 
     // ------------------------------------------------------------------------------------------------------------
@@ -726,7 +737,7 @@ public final class LeafSimulation {
                     continue;
                 }
                 float tangential = whirlwind.strength * 0.4F * whirlwind.spin;
-                int i = release(cx, cz, LeafPool.FALLING, -Mth.sin(angle) * tangential, 0.06F + random.next() * 0.06F,
+                int i = release(cx, cz, LeafPool.FALLING, -Mth.sin(angle) * tangential, 0.08F + random.next() * 0.08F,
                         Mth.cos(angle) * tangential);
                 if (i < 0) {
                     break;
@@ -737,9 +748,22 @@ public final class LeafSimulation {
         }
     }
 
-    /** Leaves at the edge of a pile slide over a drop-off as particles. */
-    private boolean spill(int fromX, int fromZ, int toX, int toZ) {
-        return release(fromX, fromZ, LeafPool.SLIDING, (toX - fromX) * 0.05F, 0.0F, (toZ - fromZ) * 0.05F) >= 0;
+    /**
+     * A leaf sliding down a pile: over a drop-off it always tumbles off as a particle; on a slope some leaves are
+     * released too, so a slumping pile is seen trickling down instead of just changing shape.
+     */
+    private boolean spill(int fromX, int fromZ, int toX, int toZ, boolean edge) {
+        if (!edge && (cascadeBudget <= 0 || random.next() > 0.12F)) {
+            return false;
+        }
+        float speed = 0.04F + random.next() * 0.04F;
+        int i = release(fromX, fromZ, LeafPool.SLIDING, (toX - fromX) * speed, 0.0F, (toZ - fromZ) * speed);
+        if (i < 0) {
+            return false;
+        }
+        cascadeBudget--;
+        pool.spinRoll[i] = (random.next() - 0.5F) * 1.2F;
+        return true;
     }
 
     /**
@@ -1023,6 +1047,92 @@ public final class LeafSimulation {
             }
         }
         return moved;
+    }
+
+    /**
+     * Scoops leaves from the litter around a point into the arms: the top leaves of the nearest stacks, a few of
+     * them seen flying to {@code hand}.
+     *
+     * @return how many leaves were picked up
+     */
+    public int scoop(double x, double y, double z, float radius, int max, double handX, double handY, double handZ, Armful armful) {
+        int taken = 0;
+        int flying = Math.min(8, pool.free());
+        int centerX = LitterField.cell(x);
+        int centerZ = LitterField.cell(z);
+        int reach = Mth.ceil(radius / CELL);
+        // Rings from the center outwards, so the scoop digs a hollow where you reach in.
+        for (int ring = 0; ring <= reach && taken < max && armful.room() > 0; ring++) {
+            for (int dx = -ring; dx <= ring; dx++) {
+                for (int dz = -ring; dz <= ring; dz++) {
+                    if (Math.max(Math.abs(dx), Math.abs(dz)) != ring) {
+                        continue;
+                    }
+                    int cx = centerX + dx;
+                    int cz = centerZ + dz;
+                    LitterChunk chunk = field.chunkAtCell(cx, cz);
+                    if (chunk == null) {
+                        continue;
+                    }
+                    int c = LitterField.index(cx, cz);
+                    if (chunk.count[c] == 0 || chunk.base[c] < y - 1.5 || chunk.base[c] > y + 1.0) {
+                        continue;
+                    }
+                    int grab = Math.min(Math.min(chunk.count[c], Math.max(1, (max - taken) / 4)), armful.room());
+                    for (int k = 0; k < grab; k++) {
+                        if (flying > 0) {
+                            int i = release(cx, cz, LeafPool.DYING, 0.0F, 0.0F, 0.0F);
+                            if (i >= 0) {
+                                flying--;
+                                int ticks = 7;
+                                pool.life[i] = ticks;
+                                pool.vx[i] = (float) (handX - pool.x[i]) / ticks;
+                                pool.vy[i] = (float) (handY - pool.y[i]) / ticks;
+                                pool.vz[i] = (float) (handZ - pool.z[i]) / ticks;
+                                pool.spinYaw[i] = (random.next() - 0.5F) * 0.8F;
+                                armful.add(pool.baseColor[i], pool.shape[i]);
+                                taken++;
+                                continue;
+                            }
+                        }
+                        field.take(cx, cz, pose);
+                        armful.add(pose.baseColor, pose.shape);
+                        taken++;
+                    }
+                    queueNeighbors(cx, cz);
+                    if (taken >= max || armful.room() == 0) {
+                        return taken;
+                    }
+                }
+            }
+        }
+        return taken;
+    }
+
+    /**
+     * Pours leaves from the arms: they leave {@code (x, y, z)} with a velocity along {@code (dirX, dirY, dirZ)} and a
+     * little scatter, then fall, flutter, land and pile up like any other leaf.
+     *
+     * @return how many leaves were poured
+     */
+    public int pour(double x, double y, double z, float dirX, float dirY, float dirZ, int count, Armful armful) {
+        int poured = 0;
+        while (poured < count && armful.count() > 0 && pool.free() > 0) {
+            int sample = armful.take(random.next());
+            LeafShape shape = LeafShape.byId(armful.shape(sample));
+            int base = armful.color(sample);
+            long hash = (long) (random.next() * Integer.MAX_VALUE) << 20 ^ (long) (random.next() * Integer.MAX_VALUE);
+            int color = LeafPalette.vary(base, hash, Math.min(1.0F, settings.autumnColors + 0.3F), shape);
+            int sprite = shape.firstSprite + Math.min(shape.variants - 1, (int) (random.next() * shape.variants));
+            float size = LeafShape.BASE_SIZE * shape.size * settings.leafSize * (0.8F + random.next() * 0.45F);
+            float speed = 0.16F + random.next() * 0.08F;
+            float jitter = 0.05F;
+            spawn(x + (random.next() - 0.5F) * 0.2, y + (random.next() - 0.5F) * 0.1, z + (random.next() - 0.5F) * 0.2,
+                    dirX * speed + (random.next() - 0.5F) * jitter, dirY * speed + (random.next() - 0.5F) * jitter,
+                    dirZ * speed + (random.next() - 0.5F) * jitter, color, base, shape, sprite, size, false);
+            poured++;
+        }
+        return poured;
     }
 
     /** Leaves of the litter in a radius around a point, at about that height. */
