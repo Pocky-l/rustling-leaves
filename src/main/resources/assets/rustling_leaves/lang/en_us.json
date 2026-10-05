@@ -1,3 +1,20 @@
 {
-  "itemGroup.pockymods.pocky_mods": "Pocky Mods"
+  "itemGroup.pockymods.pocky_mods": "Pocky Mods",
+  "rustling_leaves.configuration.title": "Rustling Leaves Configuration",
+  "rustling_leaves.configuration.section.rustling.leaves.client.toml": "Leaves",
+  "rustling_leaves.configuration.section.rustling.leaves.client.toml.title": "Leaves",
+  "rustling_leaves.configuration.leaves": "Leaves",
+  "rustling_leaves.configuration.maxLeaves": "Maximum Leaves",
+  "rustling_leaves.configuration.fallRate": "Fall Rate",
+  "rustling_leaves.configuration.spawnRadius": "Falling Radius (blocks)",
+  "rustling_leaves.configuration.groundLifetime": "Time on the Ground (seconds)",
+  "rustling_leaves.configuration.leafSize": "Leaf Size",
+  "rustling_leaves.configuration.autumnColors": "Autumn Colors",
+  "rustling_leaves.configuration.leavesPerBreak": "Leaves per Broken Block",
+  "rustling_leaves.configuration.physics": "Physics",
+  "rustling_leaves.configuration.windStrength": "Wind Strength",
+  "rustling_leaves.configuration.entityStrength": "Footstep Strength",
+  "rustling_leaves.configuration.explosionStrength": "Explosion Strength",
+  "rustling_leaves.configuration.sound": "Sound",
+  "rustling_leaves.configuration.rustleVolume": "Rustle Volume"
 }

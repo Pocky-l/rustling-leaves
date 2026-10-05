@@ -1,3 +1,20 @@
 {
-  "itemGroup.pockymods.pocky_mods": "Pocky Mods"
+  "itemGroup.pockymods.pocky_mods": "Pocky Mods",
+  "rustling_leaves.configuration.title": "Настройки Rustling Leaves",
+  "rustling_leaves.configuration.section.rustling.leaves.client.toml": "Листья",
+  "rustling_leaves.configuration.section.rustling.leaves.client.toml.title": "Листья",
+  "rustling_leaves.configuration.leaves": "Листья",
+  "rustling_leaves.configuration.maxLeaves": "Максимум листьев",
+  "rustling_leaves.configuration.fallRate": "Частота листопада",
+  "rustling_leaves.configuration.spawnRadius": "Радиус листопада (блоков)",
+  "rustling_leaves.configuration.groundLifetime": "Время на земле (секунд)",
+  "rustling_leaves.configuration.leafSize": "Размер листьев",
+  "rustling_leaves.configuration.autumnColors": "Осенние цвета",
+  "rustling_leaves.configuration.leavesPerBreak": "Листьев с разбитого блока",
+  "rustling_leaves.configuration.physics": "Физика",
+  "rustling_leaves.configuration.windStrength": "Сила ветра",
+  "rustling_leaves.configuration.entityStrength": "Сила шагов",
+  "rustling_leaves.configuration.explosionStrength": "Сила взрывов",
+  "rustling_leaves.configuration.sound": "Звук",
+  "rustling_leaves.configuration.rustleVolume": "Громкость шороха"
 }
