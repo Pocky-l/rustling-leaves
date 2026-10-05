@@ -61,10 +61,14 @@ final class LeafRenderer implements AutoCloseable {
     private static final double DETAIL_DISTANCE = 40.0;
     private static final int TOP_LAYERS = 2;
     private static final int MAX_SIDE_LAYERS = 48;
-    /** Stacks of at least this many leaves get a solid leafy surface under their loose top leaves. */
-    private static final int SURFACE_MIN = 3;
-    /** With a surface, only a few loose leaves are added on the sides of a pile. */
-    private static final int SURFACE_SIDE_LAYERS = 3;
+    private static final int SURFACE_MIN = LitterField.SURFACE_MIN;
+    /** With a pile body, only a few loose leaves are added on the sides of a pile. */
+    private static final int SURFACE_SIDE_LAYERS = 2;
+    /** Loose leaves drawn on top of a pile body: enough to hide it, the body only shows as shadow between them. */
+    private static final int SURFACE_TOP_LAYERS = 3;
+    /** The pile body sits below the loose leaves and is darker: it reads as the depth of the pile. */
+    private static final float BODY_SINK = 0.02F;
+    private static final float BODY_SHADE = 0.6F;
     private static final int RING = LitterChunk.TILE + 2;
     private static final float TILE_BLOCKS = LitterChunk.TILE * LitterField.CELL;
 
@@ -303,12 +307,14 @@ final class LeafRenderer implements AutoCloseable {
                         Math.min(neighborTop(cellX, cellZ + 1, base), neighborTop(cellX, cellZ - 1, base)));
                 int side = Mth.clamp(Mth.ceil((top - lowest) / LitterField.LAYER), 0, MAX_SIDE_LAYERS);
                 int light = simulation.lightAt((cellX + 0.5) * LitterField.CELL, top + 0.05, (cellZ + 0.5) * LitterField.CELL);
+                int layers = topLayers;
                 if (n >= SURFACE_MIN) {
                     emitSurface(builder, tile, lx, lz, base, light);
                     quads++;
                     side = Math.min(side, SURFACE_SIDE_LAYERS);
+                    layers = tile.wantDetailed ? SURFACE_TOP_LAYERS : 1;
                 }
-                int visible = Math.min(n, topLayers + (tile.wantDetailed ? side : side / 2));
+                int visible = Math.min(n, layers + (tile.wantDetailed ? side : side / 2));
                 for (int depth = 0; depth < visible; depth++) {
                     field.pose(chunk, cellX, cellZ, n - 1 - depth, pose);
                     // Leaves deeper in the pile are in its shadow.
@@ -369,13 +375,6 @@ final class LeafRenderer implements AutoCloseable {
         int c10 = cornerColor(lx + 1, lz, self);
         int c11 = cornerColor(lx + 1, lz + 1, self);
         int c01 = cornerColor(lx, lz + 1, self);
-        float slopeX = (h10 + h11 - h00 - h01) / (2 * LitterField.CELL);
-        float slopeZ = (h01 + h11 - h00 - h10) / (2 * LitterField.CELL);
-        float length = Mth.sqrt(slopeX * slopeX + 1.0F + slopeZ * slopeZ);
-        float nx = -slopeX / length;
-        float ny = 1.0F / length;
-        float nz = -slopeZ / length;
-        float shade = (nx * nx * 0.6F + ny * ny + nz * nz * 0.8F) * 0.82F;
         int cellX = tile.cellX + lx;
         int cellZ = tile.cellZ + lz;
         float du = (litterU1 - litterU0) * 0.25F;
@@ -386,11 +385,29 @@ final class LeafRenderer implements AutoCloseable {
         float z0 = lz * LitterField.CELL;
         float x1 = x0 + LitterField.CELL;
         float z1 = z0 + LitterField.CELL;
-        int overlay = OverlayTexture.NO_OVERLAY;
-        builder.addVertex(x0, h00, z0, opaque(c00, shade), u, v, overlay, light, nx, ny, nz);
-        builder.addVertex(x0, h01, z1, opaque(c01, shade), u, v + dv, overlay, light, nx, ny, nz);
-        builder.addVertex(x1, h11, z1, opaque(c11, shade), u + du, v + dv, overlay, light, nx, ny, nz);
-        builder.addVertex(x1, h10, z0, opaque(c10, shade), u + du, v, overlay, light, nx, ny, nz);
+        bodyVertex(builder, lx, lz, base, x0, h00, z0, c00, u, v, light);
+        bodyVertex(builder, lx, lz + 1, base, x0, h01, z1, c01, u, v + dv, light);
+        bodyVertex(builder, lx + 1, lz + 1, base, x1, h11, z1, c11, u + du, v + dv, light);
+        bodyVertex(builder, lx + 1, lz, base, x1, h10, z0, c10, u + du, v, light);
+    }
+
+    /** One corner of the pile body, shaded with a normal smoothed over the neighboring corners (no facets). */
+    private void bodyVertex(BufferBuilder builder, int cornerX, int cornerZ, double base, float x, float y, float z, int color, float u,
+            float v, int light) {
+        float east = corner(Math.min(LitterChunk.TILE, cornerX + 1), cornerZ, base);
+        float west = corner(Math.max(0, cornerX - 1), cornerZ, base);
+        float south = corner(cornerX, Math.min(LitterChunk.TILE, cornerZ + 1), base);
+        float north = corner(cornerX, Math.max(0, cornerZ - 1), base);
+        float spanX = (Math.min(LitterChunk.TILE, cornerX + 1) - Math.max(0, cornerX - 1)) * LitterField.CELL;
+        float spanZ = (Math.min(LitterChunk.TILE, cornerZ + 1) - Math.max(0, cornerZ - 1)) * LitterField.CELL;
+        float slopeX = (east - west) / spanX;
+        float slopeZ = (south - north) / spanZ;
+        float length = Mth.sqrt(slopeX * slopeX + 1.0F + slopeZ * slopeZ);
+        float nx = -slopeX / length;
+        float ny = 1.0F / length;
+        float nz = -slopeZ / length;
+        float shade = (nx * nx * 0.6F + ny * ny + nz * nz * 0.8F) * BODY_SHADE;
+        builder.addVertex(x, y, z, opaque(color, shade), u, v, OverlayTexture.NO_OVERLAY, light, nx, ny, nz);
     }
 
     /**
@@ -405,7 +422,7 @@ final class LeafRenderer implements AutoCloseable {
                 sum += ringCount[r] > 0 && Math.abs(ringBase[r] - base) < 0.6 ? ringTop[r] : base;
             }
         }
-        return (float) (sum * 0.25 - 1.2 * LitterField.LAYER + 0.003 - currentOriginY);
+        return (float) (sum * 0.25 - LitterField.SURFACE_DROP - BODY_SINK - currentOriginY);
     }
 
     /** Color of a cell corner: the average of the surrounding stacks, so colors blend smoothly across a pile. */

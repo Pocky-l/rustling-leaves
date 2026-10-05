@@ -22,6 +22,13 @@ public final class LitterField {
     /** Maximum height difference between neighboring cells (about 38 degrees). */
     public static final float REPOSE = 0.2F;
     public static final int MAX_LAYERS = 160;
+    /**
+     * Stacks of at least this many leaves are part of a pile body: their visible leaves lie on the smooth pile
+     * surface (see {@link #cornerHeight}) instead of exactly on their own stack.
+     */
+    public static final int SURFACE_MIN = 3;
+    /** The pile surface lies this much below the averaged stack tops, so the loose leaves rest on it. */
+    public static final float SURFACE_DROP = 1.2F * LAYER - 0.003F;
     private static final int RELAX_BUDGET = 6000;
     private static final int[] DX = {1, -1, 0, 0};
     private static final int[] DZ = {0, 0, 1, -1};
@@ -405,10 +412,71 @@ public final class LitterField {
         }
         out.x = (cellX + offX) * CELL;
         out.z = (cellZ + offZ) * CELL;
-        out.y = chunk.base[i] + (layer + 0.5F + (unit(hash, 50) - 0.5F) * 0.5F) * LAYER + 0.004;
         out.baseColor = chunk.color[i];
         out.shape = shape.ordinal();
+        if (n >= SURFACE_MIN) {
+            onSurface(chunk, cellX, cellZ, n - 1 - layer, offX, offZ, hash, layer == n - 1 && top != 0L, out);
+            return;
+        }
+        out.y = chunk.base[i] + (layer + 0.5F + (unit(hash, 50) - 0.5F) * 0.5F) * LAYER + 0.004;
         restTilt(chunk, cellX, cellZ, layer, out.yaw, out);
+    }
+
+    /**
+     * Places a visible leaf of a pile on the pile's smooth surface: height and slope come from the corner heights
+     * around its spot, so leaves flow across cell borders and no grid shows. The leaves are tilted loosely and some
+     * curl up, which gives the pile its fluffy outline.
+     */
+    private void onSurface(LitterChunk chunk, int cellX, int cellZ, int depth, float offX, float offZ, long hash, boolean exact, Pose out) {
+        double base = chunk.base[index(cellX, cellZ)];
+        float fx = Mth.clamp(offX, 0.0F, 1.0F);
+        float fz = Mth.clamp(offZ, 0.0F, 1.0F);
+        double h00 = cornerHeight(cellX, cellZ, base);
+        double h10 = cornerHeight(cellX + 1, cellZ, base);
+        double h01 = cornerHeight(cellX, cellZ + 1, base);
+        double h11 = cornerHeight(cellX + 1, cellZ + 1, base);
+        double surface = Mth.lerp(fz, Mth.lerp(fx, h00, h10), Mth.lerp(fx, h01, h11)) - SURFACE_DROP;
+        out.y = surface + 0.006 - depth * 0.009 + (unit(hash, 50) - 0.5F) * 0.006;
+        float gradX = (float) Mth.clamp(((h10 - h00) * (1.0F - fz) + (h11 - h01) * fz) / CELL, -1.5, 1.5);
+        float gradZ = (float) Mth.clamp(((h01 - h00) * (1.0F - fx) + (h11 - h10) * fx) / CELL, -1.5, 1.5);
+        float sin = Mth.sin(out.yaw);
+        float cos = Mth.cos(out.yaw);
+        long tilt = LeafPalette.hash(cellZ, depth, cellX);
+        float loose = 0.35F;
+        out.roll = (float) Math.atan(gradX * cos - gradZ * sin) + (unit(tilt, 0) - 0.5F) * 2.0F * loose;
+        out.pitch = (float) -Math.atan(gradX * sin + gradZ * cos) + (unit(tilt, 10) - 0.5F) * 2.0F * loose;
+        if (unit(tilt, 20) < 0.2F) {
+            // A curled leaf standing up from the pile.
+            float curl = (0.5F + unit(tilt, 30) * 0.4F) * (unit(tilt, 40) < 0.5F ? -1.0F : 1.0F);
+            if (unit(tilt, 50) < 0.5F) {
+                out.pitch += curl;
+            } else {
+                out.roll += curl;
+            }
+        }
+        if (!exact) {
+            out.size *= 1.12F;
+        }
+    }
+
+    /**
+     * Height of the pile surface at a cell corner: the average of the four stacks around it, where empty cells (or
+     * cells on another level) count as the ground at {@code base}. Shared with the renderer's pile body.
+     */
+    public double cornerHeight(int cornerX, int cornerZ, double base) {
+        double sum = 0.0;
+        for (int dz = -1; dz <= 0; dz++) {
+            for (int dx = -1; dx <= 0; dx++) {
+                LitterChunk chunk = chunkAtCell(cornerX + dx, cornerZ + dz);
+                int i = index(cornerX + dx, cornerZ + dz);
+                if (chunk != null && chunk.count[i] > 0 && Math.abs(chunk.base[i] - base) < 0.6) {
+                    sum += chunk.base[i] + chunk.count[i] * LAYER;
+                } else {
+                    sum += base;
+                }
+            }
+        }
+        return sum * 0.25;
     }
 
     /** Sets {@code pitch} and {@code roll} of a leaf lying in a cell so it follows the slope of the pile. */
