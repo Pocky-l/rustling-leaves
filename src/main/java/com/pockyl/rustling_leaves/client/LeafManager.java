@@ -19,7 +19,10 @@ import net.minecraft.tags.ItemTags;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.world.phys.BlockHitResult;
@@ -31,10 +34,17 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.CustomizeGuiOverlayEvent;
 import net.neoforged.neoforge.client.event.InputEvent;
+import net.neoforged.neoforge.client.event.MovementInputUpdateEvent;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 import com.pockyl.rustling_leaves.Config;
 import com.pockyl.rustling_leaves.RustlingLeaves;
+import com.pockyl.rustling_leaves.item.BagContents;
+import com.pockyl.rustling_leaves.item.LeafBagItem;
+import com.pockyl.rustling_leaves.item.LeafBlowerItem;
+import com.pockyl.rustling_leaves.network.BagCollectPayload;
+import com.pockyl.rustling_leaves.network.WindSpellPayload;
 import com.pockyl.rustling_leaves.sim.Armful;
 import com.pockyl.rustling_leaves.sim.LeafListener;
 import com.pockyl.rustling_leaves.sim.LeafPool;
@@ -60,9 +70,6 @@ public final class LeafManager {
     private static final double TELEPORT_DISTANCE = 4.0;
     private static final int SAVE_INTERVAL = 20 * 30;
     private static final float RAKE_RADIUS = 2.0F;
-    private static final float SCOOP_RADIUS = 0.9F;
-    private static final int SCOOP_PER_STROKE = 40;
-    private static final int POUR_PER_TICK = 6;
 
     private static final LeafSettings SETTINGS = new LeafSettings();
     private static final LeafColors COLORS = new LeafColors();
@@ -81,8 +88,6 @@ public final class LeafManager {
     private static int burstsThisTick;
     private static int soundsThisTick;
     private static int disturbingEntity;
-    private static final Armful ARMFUL = new Armful();
-    private static int pourTicks;
 
     private LeafManager() {
     }
@@ -125,7 +130,6 @@ public final class LeafManager {
         disturbByEntities(camera);
         simulation.finishTick();
         SPAWNER.tick(level, simulation, camera.x, camera.z);
-        pour(minecraft);
         if (ticks % SAVE_INTERVAL == 0) {
             save(camera);
         }
@@ -156,10 +160,7 @@ public final class LeafManager {
                 renderer.tileQuads(), simulation.wind().whirlwinds().size()));
     }
 
-    /**
-     * Right click with a hoe or shovel on leaf litter rakes it together instead of tilling or making a path. With an
-     * empty hand, sneak + right click scoops leaves into the arms and right click pours them out again.
-     */
+    /** Right click with a hoe or shovel on leaf litter rakes it together instead of tilling or making a path. */
     @SubscribeEvent
     public static void onUseKey(InputEvent.InteractionKeyMappingTriggered event) {
         Minecraft minecraft = Minecraft.getInstance();
@@ -167,9 +168,6 @@ public final class LeafManager {
             return;
         }
         ItemStack stack = minecraft.player.getMainHandItem();
-        if (stack.isEmpty() && SETTINGS.armful && handleArmful(minecraft, event)) {
-            return;
-        }
         if (!SETTINGS.raking || !(minecraft.hitResult instanceof BlockHitResult hit) || hit.getType() != HitResult.Type.BLOCK) {
             return;
         }
@@ -192,62 +190,73 @@ public final class LeafManager {
         }
     }
 
-    private static boolean handleArmful(Minecraft minecraft, InputEvent.InteractionKeyMappingTriggered event) {
-        if (minecraft.player.isShiftKeyDown()) {
-            if (!(minecraft.hitResult instanceof BlockHitResult hit) || hit.getType() != HitResult.Type.BLOCK || ARMFUL.room() == 0) {
-                return false;
-            }
-            Vec3 at = hit.getLocation();
-            if (simulation.litterAround(at.x, at.y, at.z, SCOOP_RADIUS) == 0) {
-                return false;
-            }
-            Vec3 hand = handPosition(minecraft);
-            int taken = simulation.scoop(at.x, at.y, at.z, SCOOP_RADIUS, SCOOP_PER_STROKE, hand.x, hand.y, hand.z, ARMFUL);
-            if (taken > 0) {
-                event.setCanceled(true);
-                event.setSwingHand(true);
-                level.playLocalSound(at.x, at.y, at.z, SoundEvents.AZALEA_LEAVES_STEP, SoundSource.PLAYERS,
-                        Math.max(0.3F, SETTINGS.rustleVolume), 0.9F + level.random.nextFloat() * 0.2F, false);
-            }
-            return taken > 0;
+    // ------------------------------------------------------------------------------------------------------------
+    // Leaf tools (their items call in through ClientLeafEffects on every client, for every player using them)
+    // ------------------------------------------------------------------------------------------------------------
+
+    static void blow(LivingEntity user, Vec3 nozzle, Vec3 direction) {
+        if (simulation != null && user.level() == level) {
+            simulation.blow(nozzle.x, nozzle.y, nozzle.z, (float) direction.x, (float) direction.y, (float) direction.z,
+                    (float) LeafBlowerItem.RANGE, (float) LeafBlowerItem.SPREAD, 0.55F);
         }
-        if (ARMFUL.count() == 0) {
-            return false;
-        }
-        // The use key repeats every 4 ticks while held; keep pouring until it stops.
-        pourTicks = 5;
-        event.setCanceled(true);
-        event.setSwingHand(true);
-        return true;
     }
 
-    private static void pour(Minecraft minecraft) {
-        if (pourTicks <= 0) {
+    /** The bag of the local player reports what it collected to the server; other players' bags are only drawn. */
+    static void vacuum(LivingEntity user, Vec3 mouth, Vec3 direction) {
+        if (simulation == null || user.level() != level) {
             return;
         }
-        pourTicks--;
-        if (minecraft.player == null || ARMFUL.count() == 0 || !minecraft.options.keyUse.isDown()) {
-            pourTicks = 0;
+        Armful collected = new Armful();
+        boolean mine = user == Minecraft.getInstance().player;
+        int taken = simulation.vacuum(mouth.x, mouth.y, mouth.z, (float) direction.x, (float) direction.y, (float) direction.z,
+                BagCollectPayload.MAX_PER_TICK, collected);
+        if (mine && taken > 0) {
+            PacketDistributor.sendToServer(new BagCollectPayload(taken, collected.averageColor(), collected.mainShape()));
+        }
+    }
+
+    static void pour(LivingEntity user, Vec3 mouth, Vec3 direction, int count, BagContents contents) {
+        if (simulation == null || user.level() != level) {
             return;
         }
-        Vec3 hand = handPosition(minecraft);
-        Vec3 look = minecraft.player.getLookAngle();
-        int poured = simulation.pour(hand.x, hand.y, hand.z, (float) look.x, (float) look.y, (float) look.z, POUR_PER_TICK, ARMFUL);
-        if (poured > 0 && ticks % 4 == 0 && SETTINGS.rustleVolume > 0.0F) {
-            level.playLocalSound(hand.x, hand.y, hand.z, SoundEvents.AZALEA_LEAVES_STEP, SoundSource.PLAYERS,
-                    0.5F * SETTINGS.rustleVolume, 1.1F + level.random.nextFloat() * 0.3F, false);
+        Armful leaves = new Armful();
+        leaves.fill(count, contents.color(), contents.shape());
+        simulation.pour(mouth.x, mouth.y, mouth.z, (float) direction.x, (float) direction.y, (float) direction.z, count, leaves);
+    }
+
+    static void burst(double x, double y, double z) {
+        if (simulation == null) {
+            return;
+        }
+        BlockPos pos = BlockPos.containing(x, y, z);
+        int base = COLORS.base(Blocks.OAK_LEAVES.defaultBlockState(), level, pos);
+        simulation.burst(x, y, z, 220, base, Math.max(0.75F, SETTINGS.autumnColors));
+    }
+
+    public static void onWindSpell(WindSpellPayload payload) {
+        if (simulation == null) {
+            return;
+        }
+        if (payload.kind() == WindSpellPayload.SQUALL) {
+            simulation.wind().sendSquall(payload.x(), payload.z(), payload.dirX(), payload.dirZ());
+        } else {
+            double ground = simulation.groundBelow(payload.x(), payload.y() + 1.0, payload.z(), 16);
+            simulation.wind().summonWhirlwind(payload.x(), Double.isNaN(ground) ? payload.y() : ground, payload.z());
         }
     }
 
-    /** Where the arms hold leaves: in front of the eyes, a bit down. */
-    private static Vec3 handPosition(Minecraft minecraft) {
-        Vec3 look = minecraft.player.getLookAngle();
-        return minecraft.player.getEyePosition().add(look.scale(0.6)).add(0.0, -0.35, 0.0);
-    }
-
-    /** Leaves carried in the arms (shown next to the crosshair). */
-    static int armfulCount() {
-        return ARMFUL.count();
+    /**
+     * Using an item slows the player down to a fifth. Blowing leaves or bagging them while walking slowly would be
+     * tedious, so the leaf tools cancel that out (this runs just before vanilla applies the slowdown).
+     */
+    @SubscribeEvent
+    public static void onMovementInput(MovementInputUpdateEvent event) {
+        Player player = event.getEntity();
+        if (player.isUsingItem() && !player.isPassenger()
+                && (player.getUseItem().getItem() instanceof LeafBlowerItem || player.getUseItem().getItem() instanceof LeafBagItem)) {
+            event.getInput().leftImpulse *= 5.0F;
+            event.getInput().forwardImpulse *= 5.0F;
+        }
     }
 
     /** Hooked into block updates of the client level. */
@@ -433,8 +442,6 @@ public final class LeafManager {
         LAST_FALL.clear();
         SOUND_READY.clear();
         COLORS.clear();
-        ARMFUL.clear();
-        pourTicks = 0;
     }
 
     private static final class Listener implements LeafListener {

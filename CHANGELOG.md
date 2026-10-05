@@ -14,7 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   carpet undisturbed, jumping into a pile splashes leaves up.
 - Raking: right click leaf litter with a hoe or shovel to gather it into a pile.
 - Leaves behave like a granular material: piles settle into cones, fill hollows and bowls and run over the rim.
-- Scoop up an armful of leaves (sneak + right click with an empty hand) and pour it out anywhere (right click).
+- Leaf Blower: blow paths through the litter and heap leaves up.
+- Leaf Bag: suck leaves up, pour them out anywhere, compost them.
+- Autumn Bomb: a throwable burst of autumn leaves.
+- Staff of Winds: raise leaf whirlwinds and send squalls.
 - Visible wind: gust waves that skitter leaves over the ground, squalls that strip the trees, leaf whirlwinds.
 - Wind charges and explosions blow leaves away; breaking leaves blocks releases a burst of leaves.
 - Leaves float on water and burn in lava; litter falls when the block under it is removed.

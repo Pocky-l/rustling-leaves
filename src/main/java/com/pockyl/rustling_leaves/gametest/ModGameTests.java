@@ -3,7 +3,9 @@ package com.pockyl.rustling_leaves.gametest;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.ComposterBlock;
 import net.minecraft.world.level.block.SlabBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.SlabType;
@@ -11,6 +13,10 @@ import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 import com.pockyl.rustling_leaves.RustlingLeaves;
+import com.pockyl.rustling_leaves.item.BagContents;
+import com.pockyl.rustling_leaves.item.LeafBagItem;
+import com.pockyl.rustling_leaves.registry.ModDataComponents;
+import com.pockyl.rustling_leaves.registry.ModItems;
 import com.pockyl.rustling_leaves.sim.Armful;
 import com.pockyl.rustling_leaves.sim.LeafListener;
 import com.pockyl.rustling_leaves.sim.LeafPool;
@@ -352,8 +358,11 @@ public final class ModGameTests {
                 }
             }
         }
-        for (int n = 0; n < 60; n++) {
+        for (int n = 0; n < 70; n++) {
             sim.field().add(hole[0] + 1, hole[1] + 1, floorY, 0x6A8F3A, 0, 0L, 0);
+            sim.field().add(hole[0] + 2, hole[1] + 1, floorY, 0x6A8F3A, 0, 0L, 0);
+            sim.field().add(hole[0] + 1, hole[1] + 2, floorY, 0x6A8F3A, 0, 0L, 0);
+            sim.field().add(hole[0] + 2, hole[1] + 2, floorY, 0x6A8F3A, 0, 0L, 0);
         }
         sim.field().queueRelax(hole[0] + 1, hole[1] + 1);
         run(sim, helper, 300);
@@ -366,7 +375,76 @@ public final class ModGameTests {
             }
         }
         helper.assertTrue(outside > 0, "nothing ran over the rim");
-        helper.assertTrue(sim.field().total() + sim.pool().count() == 16 * 83 + 60, "leaves were lost");
+        helper.assertTrue(sim.field().total() + sim.pool().count() == 16 * 83 + 280, "leaves were lost");
+        helper.succeed();
+    }
+
+    @GameTest(template = "box")
+    public static void leafBlowerClearsAPath(GameTestHelper helper) {
+        floor(helper);
+        LeafSimulation sim = simulation(helper, 2048, LeafListener.NONE);
+        int total = carpet(sim, helper, 2.5, 6);
+        BlockPos origin = helper.absolutePos(BlockPos.ZERO);
+        double y = absoluteY(helper, 1.0);
+        int[] near = cellAt(helper, 2.0, 3.5);
+        int[] far = cellAt(helper, 5.75, 3.5);
+        int nearBefore = pileAround(sim, near, 2);
+        int farBefore = pileAround(sim, far, 2);
+        // Aimed down the +X axis, slightly downwards, from the west edge of the carpet.
+        float dirX = 0.96F;
+        float dirY = -0.28F;
+        for (int t = 0; t < 40; t++) {
+            sim.beginTick(helper.getLevel(), origin.getX() + 3.5, y, origin.getZ() + 3.5);
+            sim.blow(origin.getX() + 0.5, y + 0.8, origin.getZ() + 3.5, dirX, dirY, 0.0F, 7.0F, 0.47F, 0.55F);
+            sim.finishTick();
+        }
+        run(sim, helper, 300);
+        int nearAfter = pileAround(sim, near, 2);
+        int farAfter = pileAround(sim, far, 2);
+        helper.assertTrue(nearAfter < nearBefore / 2, "the blower did not clear the near side: " + nearBefore + " -> " + nearAfter);
+        helper.assertTrue(farAfter > farBefore, "nothing was blown ahead: " + farBefore + " -> " + farAfter);
+        helper.assertTrue(sim.field().total() + sim.pool().count() == total, "leaves were lost ");
+        helper.succeed();
+    }
+
+    @GameTest(template = "box")
+    public static void leafBagSucksUpLeaves(GameTestHelper helper) {
+        floor(helper);
+        LeafSimulation sim = simulation(helper, 1024, LeafListener.NONE);
+        int total = carpet(sim, helper, 2.0, 5);
+        BlockPos origin = helper.absolutePos(BlockPos.ZERO);
+        double y = absoluteY(helper, 1.0);
+        Armful bag = new Armful();
+        for (int t = 0; t < 60; t++) {
+            sim.beginTick(helper.getLevel(), origin.getX() + 3.5, y, origin.getZ() + 3.5);
+            sim.vacuum(origin.getX() + 1.0, y + 0.9, origin.getZ() + 3.5, 0.8F, -0.6F, 0.0F, 24, bag);
+            sim.finishTick();
+        }
+        run(sim, helper, 40);
+        helper.assertTrue(bag.count() > 60, "the bag took only " + bag.count() + " leaves");
+        helper.assertTrue(sim.field().total() + sim.pool().count() + bag.count() == total, "leaves were lost");
+        helper.succeed();
+    }
+
+    @GameTest(template = "box")
+    public static void leafBagFillsAComposter(GameTestHelper helper) {
+        BlockPos pos = new BlockPos(3, 1, 3);
+        helper.setBlock(pos, Blocks.COMPOSTER);
+        ItemStack bag = new ItemStack(ModItems.LEAF_BAG.get());
+        bag.set(ModDataComponents.BAG_CONTENTS.get(), BagContents.EMPTY.add(100, 0x6A8F3A, 0));
+        int layers = LeafBagItem.compost(helper.getLevel(), helper.absolutePos(pos), bag);
+        helper.assertTrue(layers == 3, "composted " + layers + " layers from 100 leaves");
+        helper.assertBlockProperty(pos, ComposterBlock.LEVEL, 3);
+        helper.assertTrue(LeafBagItem.contents(bag).count() == 100 - 3 * LeafBagItem.COMPOST_COST, "wrong leaves left in the bag");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void bagContentsMixAndCap(GameTestHelper helper) {
+        BagContents contents = BagContents.EMPTY.add(600, 0xFF0000, 1).add(600, 0x0000FF, 2);
+        helper.assertTrue(contents.count() == BagContents.CAPACITY, "bag holds " + contents.count());
+        helper.assertTrue((contents.color() & 0xFF) > 0 && (contents.color() >> 16 & 0xFF) > 0, "colors did not mix");
+        helper.assertTrue(contents.remove(5000).count() == 0, "removing too much went negative");
         helper.succeed();
     }
 

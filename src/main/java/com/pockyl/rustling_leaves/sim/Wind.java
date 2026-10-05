@@ -69,23 +69,97 @@ public final class Wind {
         }
     }
 
-    /** A gust front: a band across the wind direction moving downwind. */
+    /**
+     * A gust front: a band across its direction moving along it. Natural squalls follow the wind and span the whole
+     * area; a squall sent by a staff has its own direction and a limited width around its origin.
+     */
     static final class Squall {
-        /** Position of the front along the wind direction (dot product with the direction). */
+        final float dirX;
+        final float dirZ;
+        final double originX;
+        final double originZ;
+        /** Position of the front along the direction (dot product with the direction). */
         double front;
         final float speed;
         final float width;
         final float boost;
         final double end;
+        /** Half-width across the direction; infinite for natural squalls. */
+        final float halfWidth;
 
-        Squall(double front, float speed, float width, float boost, double end) {
+        Squall(float dirX, float dirZ, double originX, double originZ, double front, float speed, float width, float boost, double end,
+                float halfWidth) {
+            this.dirX = dirX;
+            this.dirZ = dirZ;
+            this.originX = originX;
+            this.originZ = originZ;
             this.front = front;
             this.speed = speed;
             this.width = width;
             this.boost = boost;
             this.end = end;
+            this.halfWidth = halfWidth;
+        }
+
+        /** How strongly the front is passing over a position, in [0, 1]. */
+        float band(double x, double z) {
+            float d = (float) (x * dirX + z * dirZ - front) / width;
+            float band = (float) Math.exp(-d * d);
+            if (halfWidth != Float.POSITIVE_INFINITY && band > 0.001F) {
+                float across = (float) ((x - originX) * -dirZ + (z - originZ) * dirX) / halfWidth;
+                band *= Math.max(0.0F, 1.0F - across * across);
+            }
+            return band;
         }
     }
+
+    /** A leaf blower's cone of air, renewed every tick while the blower runs. */
+    static final class Jet {
+        final double x;
+        final double y;
+        final double z;
+        final float dirX;
+        final float dirY;
+        final float dirZ;
+        final float length;
+        final float spread;
+        final float power;
+        int ttl = 2;
+
+        Jet(double x, double y, double z, float dirX, float dirY, float dirZ, float length, float spread, float power) {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            this.dirX = dirX;
+            this.dirY = dirY;
+            this.dirZ = dirZ;
+            this.length = length;
+            this.spread = spread;
+            this.power = power;
+        }
+
+        /** Air speed of the jet at a point, 0 outside the cone. */
+        float strength(double px, double py, double pz) {
+            double ox = px - x;
+            double oy = py - y;
+            double oz = pz - z;
+            double along = ox * dirX + oy * dirY + oz * dirZ;
+            if (along < 0.0 || along > length) {
+                return 0.0F;
+            }
+            double ax = ox - dirX * along;
+            double ay = oy - dirY * along;
+            double az = oz - dirZ * along;
+            double across = Math.sqrt(ax * ax + ay * ay + az * az);
+            double radius = 0.3 + along * spread;
+            if (across > radius) {
+                return 0.0F;
+            }
+            return (float) (power * (1.0 - along / length) * (1.0 - across / radius));
+        }
+    }
+
+    private final List<Jet> jets = new ArrayList<>();
 
     void update(Level level, int tick, LeafSettings settings, Terrain terrain, FastRandom random, double cameraX, double cameraY,
             double cameraZ) {
@@ -98,6 +172,7 @@ public final class Wind {
         thunder = open ? level.getThunderLevel(1.0F) : 0.0F;
         base = open ? (CALM + RAIN * rain + THUNDER * thunder) * settings.windStrength : 0.0F;
 
+        jets.removeIf(jet -> --jet.ttl <= 0);
         for (Iterator<Squall> it = squalls.iterator(); it.hasNext(); ) {
             Squall squall = it.next();
             squall.front += squall.speed;
@@ -146,7 +221,41 @@ public final class Wind {
     void spawnSquall(FastRandom random, double cameraX, double cameraZ) {
         double along = cameraX * dirX + cameraZ * dirZ;
         float strength = 0.12F + random.next() * 0.13F + 0.1F * thunder;
-        squalls.add(new Squall(along - 56.0, 0.5F + random.next() * 0.35F, 6.0F + random.next() * 8.0F, strength, along + 64.0));
+        squalls.add(new Squall(dirX, dirZ, cameraX, cameraZ, along - 56.0, 0.5F + random.next() * 0.35F, 6.0F + random.next() * 8.0F,
+                strength, along + 64.0, Float.POSITIVE_INFINITY));
+    }
+
+    /** A strong squall rolling from a spot along a direction, 12 blocks wide, for 48 blocks (staff of winds). */
+    public void sendSquall(double x, double z, float directionX, float directionZ) {
+        float length = Mth.sqrt(directionX * directionX + directionZ * directionZ);
+        if (length < 1.0E-4F) {
+            return;
+        }
+        float dx = directionX / length;
+        float dz = directionZ / length;
+        double along = x * dx + z * dz;
+        squalls.add(new Squall(dx, dz, x, z, along - 2.0, 0.8F, 5.0F, 0.32F, along + 48.0, 6.0F));
+    }
+
+    /** A leaf blower runs this tick: a cone of air from the nozzle. */
+    public void addJet(double x, double y, double z, float dirX, float dirY, float dirZ, float length, float spread, float power) {
+        jets.add(new Jet(x, y, z, dirX, dirY, dirZ, length, spread, power));
+    }
+
+    /** Air speed of the leaf blowers at a point. */
+    public float jetStrength(double x, double y, double z) {
+        float strongest = 0.0F;
+        for (int j = 0; j < jets.size(); j++) {
+            strongest = Math.max(strongest, jets.get(j).strength(x, y, z));
+        }
+        return strongest;
+    }
+
+    /** A whirlwind raised at a spot (staff of winds): strong, fading in, wandering like a natural one. */
+    public Whirlwind summonWhirlwind(double x, double y, double z) {
+        Whirlwind whirlwind = new Whirlwind(x, y, z, 1.8F, 9.0F, 0.42F, 1.0F, 20 * 22);
+        whirlwinds.add(whirlwind);
+        return whirlwind;
     }
 
     /** Starts a whirlwind near the camera on open ground; returns it, or null if no spot was found. */
@@ -197,11 +306,9 @@ public final class Wind {
         if (squalls.isEmpty()) {
             return 0.0F;
         }
-        double along = x * dirX + z * dirZ;
         float strongest = 0.0F;
         for (Squall squall : squalls) {
-            float d = (float) (along - squall.front) / squall.width;
-            strongest = Math.max(strongest, (float) Math.exp(-d * d));
+            strongest = Math.max(strongest, squall.band(x, z));
         }
         return strongest;
     }
@@ -213,24 +320,40 @@ public final class Wind {
             float altitude = 1.0F + Mth.clamp((float) (y - 62.0) / 80.0F, 0.0F, 0.8F);
             speed = base * (0.4F + 1.6F * gust(x, z)) * altitude;
         }
-        if (!squalls.isEmpty()) {
-            double along = x * dirX + z * dirZ;
-            for (Squall squall : squalls) {
-                float d = (float) (along - squall.front) / squall.width;
-                speed += squall.boost * (float) Math.exp(-d * d);
-            }
+        for (int s = 0; s < squalls.size(); s++) {
+            Squall squall = squalls.get(s);
+            speed += squall.boost * squall.band(x, z);
         }
         return speed;
     }
 
-    /** Air velocity at a position into {@code out[0..2]}, including whirlwinds. */
+    /** Air velocity at a position into {@code out[0..2]}, including squalls, whirlwinds and leaf blowers. */
     public void sample(double x, double y, double z, float[] out) {
-        float speed = speed(x, y, z);
-        out[0] = dirX * speed;
+        float ambient = 0.0F;
+        if (base > 0.0F) {
+            float altitude = 1.0F + Mth.clamp((float) (y - 62.0) / 80.0F, 0.0F, 0.8F);
+            ambient = base * (0.4F + 1.6F * gust(x, z)) * altitude;
+        }
+        out[0] = dirX * ambient;
         out[1] = 0.0F;
-        out[2] = dirZ * speed;
+        out[2] = dirZ * ambient;
+        for (int s = 0; s < squalls.size(); s++) {
+            Squall squall = squalls.get(s);
+            float push = squall.boost * squall.band(x, z);
+            out[0] += squall.dirX * push;
+            out[2] += squall.dirZ * push;
+        }
         for (int w = 0; w < whirlwinds.size(); w++) {
             addWhirlwind(whirlwinds.get(w), x, y, z, out);
+        }
+        for (int j = 0; j < jets.size(); j++) {
+            Jet jet = jets.get(j);
+            float strength = jet.strength(x, y, z);
+            if (strength > 0.0F) {
+                out[0] += jet.dirX * strength;
+                out[1] += jet.dirY * strength + strength * 0.15F;
+                out[2] += jet.dirZ * strength;
+            }
         }
     }
 
@@ -280,5 +403,6 @@ public final class Wind {
     void reset() {
         whirlwinds.clear();
         squalls.clear();
+        jets.clear();
     }
 }

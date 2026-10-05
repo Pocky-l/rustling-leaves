@@ -11,8 +11,8 @@ authors="${mod_authors}"
 displayURL="${mod_url}"
 logoFile="logo.png"
 description='''${mod_description}'''
-# Client-side only: servers and clients may have it or not, independently.
-displayTest="IGNORE_ALL_VERSION"
+# The leaves work on any server; installed on a server, the mod adds its tools (then clients need it too).
+displayTest="IGNORE_SERVER_VERSION"
 
 [[dependencies.${mod_id}]]
     modId="neoforge"

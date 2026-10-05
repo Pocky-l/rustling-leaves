@@ -50,6 +50,8 @@ public final class LeafSimulation {
     /** Leaves at the bottom of a stack that a foot presses down instead of moving. */
     private static final int TRAMPLED = 2;
     private static final float LAYER = LitterField.LAYER;
+    private static final int[] NEIGHBOR_X = {1, -1, 0, 0, 1, 1, -1, -1};
+    private static final int[] NEIGHBOR_Z = {0, 0, 1, -1, 1, -1, 1, -1};
     private static final float CELL = LitterField.CELL;
 
     private final LeafSettings settings;
@@ -481,8 +483,11 @@ public final class LeafSimulation {
         int n = chunk.count[c];
         double ground = pool.ground[i];
         if (n > 0 && (ground < chunk.base[c] - 0.1 || ground > chunk.base[c] + n * LAYER + 0.5)) {
-            // The cell already holds litter on another level (a roof above the ground, say).
-            startDying(i);
+            // The cell already holds litter on another level (a fence above a carpet, say): the leaf rolls over into
+            // a neighboring cell that can take it.
+            if (!shiftToCompatibleCell(i, cx, cz, ground)) {
+                startDying(i);
+            }
             return;
         }
         double base = n > 0 ? chunk.base[c] : ground;
@@ -503,6 +508,29 @@ public final class LeafSimulation {
             field.add(cx, cz, base, pool.baseColor[i], pool.shape[i], top, pool.color[i]);
         }
         pool.release(i);
+    }
+
+    private boolean shiftToCompatibleCell(int i, int cx, int cz, double ground) {
+        for (int d = 0; d < 8; d++) {
+            int nx = cx + NEIGHBOR_X[d];
+            int nz = cz + NEIGHBOR_Z[d];
+            LitterChunk chunk = field.chunkAtCell(nx, nz);
+            if (chunk == null) {
+                continue;
+            }
+            int c = LitterField.index(nx, nz);
+            int n = chunk.count[c];
+            boolean fits = n == 0 ? !Double.isNaN(terrain.solidTop((nx + 0.5) * CELL, ground - 0.01, (nz + 0.5) * CELL))
+                    : ground >= chunk.base[c] - 0.1 && ground <= chunk.base[c] + n * LAYER + 0.5;
+            if (fits) {
+                pool.x[i] = (nx + 0.5) * CELL;
+                pool.z[i] = (nz + 0.5) * CELL;
+                pool.savePrevious(i);
+                deposit(i);
+                return true;
+            }
+        }
+        return false;
     }
 
     // ------------------------------------------------------------------------------------------------------------
@@ -1133,6 +1161,182 @@ public final class LeafSimulation {
             poured++;
         }
         return poured;
+    }
+
+    /**
+     * A leaf blower runs this tick. The cone of air (also part of the wind field, so it carries leaves already in the
+     * air) strips the litter it sweeps over: the top leaves fly or skid ahead while the budget lasts, the rest is
+     * pushed forward along the ground, so a blower clears a path and heaps the leaves up where the air dies down.
+     */
+    public void blow(double x, double y, double z, float dirX, float dirY, float dirZ, float length, float spread, float power) {
+        wind.addJet(x, y, z, dirX, dirY, dirZ, length, spread, power);
+        float flat = Mth.sqrt(dirX * dirX + dirZ * dirZ);
+        float aheadX = flat > 1.0E-3F ? dirX / flat : 0.0F;
+        float aheadZ = flat > 1.0E-3F ? dirZ / flat : 0.0F;
+        double endX = x + dirX * length;
+        double endY = y + dirY * length;
+        double endZ = z + dirZ * length;
+        double reach = 0.3 + length * spread;
+        int budget = Math.min(30, pool.free());
+        for (int cx = LitterField.cell(Math.min(x, endX) - reach); cx <= LitterField.cell(Math.max(x, endX) + reach); cx++) {
+            for (int cz = LitterField.cell(Math.min(z, endZ) - reach); cz <= LitterField.cell(Math.max(z, endZ) + reach); cz++) {
+                LitterChunk chunk = field.chunkAtCell(cx, cz);
+                if (chunk == null) {
+                    continue;
+                }
+                int c = LitterField.index(cx, cz);
+                int n = chunk.count[c];
+                if (n == 0) {
+                    continue;
+                }
+                double top = chunk.base[c] + n * LAYER;
+                if (top < Math.min(y, endY) - reach - 0.5 || top > Math.max(y, endY) + reach) {
+                    continue;
+                }
+                // The air hugs the ground: sample a little above the litter.
+                float strength = wind.jetStrength((cx + 0.5) * CELL, top + 0.15, (cz + 0.5) * CELL);
+                if (strength <= 0.01F) {
+                    continue;
+                }
+                int moves = Math.min(n, stochasticRound(strength * 7.0F));
+                for (int k = 0; k < moves; k++) {
+                    if (budget > 0 && random.next() < 0.45F) {
+                        boolean fly = random.next() < 0.4F;
+                        float push = strength * (1.2F + random.next() * 0.8F);
+                        int i = release(cx, cz, fly ? LeafPool.FALLING : LeafPool.SLIDING, dirX * push + (random.next() - 0.5F) * 0.05F,
+                                fly ? 0.04F + random.next() * strength * 0.5F : 0.0F, dirZ * push + (random.next() - 0.5F) * 0.05F);
+                        if (i >= 0) {
+                            budget--;
+                            spinUp(i, push);
+                            continue;
+                        }
+                    }
+                    float distance = 0.4F + random.next() * (0.6F + strength * 2.0F);
+                    float spreadOff = (random.next() - 0.5F) * 0.5F;
+                    int tx = LitterField.cell((cx + 0.5) * CELL + aheadX * distance - aheadZ * spreadOff);
+                    int tz = LitterField.cell((cz + 0.5) * CELL + aheadZ * distance + aheadX * spreadOff);
+                    if (!shove(cx, cz, tx, tz)) {
+                        break;
+                    }
+                }
+                queueNeighbors(cx, cz);
+            }
+        }
+    }
+
+    /**
+     * A leaf bag sucks this tick: litter in a short cone in front of the mouth and loose leaves near it go into
+     * {@code sink}; leaves in the cone are pulled towards the mouth, some fly into it visibly.
+     *
+     * @return how many leaves were taken
+     */
+    public int vacuum(double x, double y, double z, float dirX, float dirY, float dirZ, int max, Armful sink) {
+        float length = 3.5F;
+        float spread = 0.55F;
+        int taken = 0;
+        int flying = Math.min(6, pool.free());
+        grid.query(x - length, z - length, x + length, z + length, nearby);
+        for (int n = 0; n < nearby.size() && taken < max; n++) {
+            int i = nearby.getInt(n);
+            byte state = pool.state[i];
+            if (state != LeafPool.FALLING && state != LeafPool.SLIDING && state != LeafPool.FLOATING) {
+                continue;
+            }
+            double ox = pool.x[i] - x;
+            double oy = pool.y[i] - y;
+            double oz = pool.z[i] - z;
+            double distance = Math.sqrt(ox * ox + oy * oy + oz * oz);
+            if (distance < 0.5) {
+                sink.add(pool.baseColor[i], pool.shape[i]);
+                pool.release(i);
+                taken++;
+                continue;
+            }
+            double along = ox * dirX + oy * dirY + oz * dirZ;
+            double across = Math.sqrt(Math.max(0.0, distance * distance - along * along));
+            if (along < 0.0 || along > length + 1.0 || across > 0.5 + along * spread) {
+                continue;
+            }
+            float pull = (float) (0.12 / Math.max(0.5, distance));
+            pool.state[i] = LeafPool.FALLING;
+            pool.flags[i] &= (byte) ~LeafPool.FLAG_SETTLING;
+            pool.vx[i] += (float) (-ox / distance) * pull;
+            pool.vy[i] += (float) (-oy / distance) * pull + 0.01F;
+            pool.vz[i] += (float) (-oz / distance) * pull;
+            clampSpeed(i);
+        }
+        for (int cx = LitterField.cell(x - length); cx <= LitterField.cell(x + length) && taken < max; cx++) {
+            for (int cz = LitterField.cell(z - length); cz <= LitterField.cell(z + length) && taken < max; cz++) {
+                LitterChunk chunk = field.chunkAtCell(cx, cz);
+                if (chunk == null) {
+                    continue;
+                }
+                int c = LitterField.index(cx, cz);
+                int count = chunk.count[c];
+                if (count == 0) {
+                    continue;
+                }
+                double ox = (cx + 0.5) * CELL - x;
+                double oy = chunk.base[c] + count * LAYER - y;
+                double oz = (cz + 0.5) * CELL - z;
+                double distance = Math.sqrt(ox * ox + oy * oy + oz * oz);
+                double along = ox * dirX + oy * dirY + oz * dirZ;
+                double across = Math.sqrt(Math.max(0.0, distance * distance - along * along));
+                if (along < 0.0 || along > length || across > 0.5 + along * spread) {
+                    continue;
+                }
+                float strength = (float) ((1.0 - along / length) * (1.0 - across / (0.5 + along * spread)));
+                int grab = Math.min(Math.min(count, max - taken), stochasticRound(strength * 3.0F));
+                for (int k = 0; k < grab; k++) {
+                    if (flying > 0) {
+                        int i = release(cx, cz, LeafPool.DYING, 0.0F, 0.0F, 0.0F);
+                        if (i >= 0) {
+                            flying--;
+                            int ticks = Math.max(3, (int) (distance / 0.35));
+                            pool.life[i] = ticks;
+                            pool.vx[i] = (float) (x - pool.x[i]) / ticks;
+                            pool.vy[i] = (float) (y - pool.y[i]) / ticks;
+                            pool.vz[i] = (float) (z - pool.z[i]) / ticks;
+                            pool.spinYaw[i] = (random.next() - 0.5F) * 0.9F;
+                            sink.add(pool.baseColor[i], pool.shape[i]);
+                            taken++;
+                            continue;
+                        }
+                    }
+                    field.take(cx, cz, pose);
+                    sink.add(pose.baseColor, pose.shape);
+                    taken++;
+                }
+                if (grab > 0) {
+                    queueNeighbors(cx, cz);
+                }
+            }
+        }
+        return taken;
+    }
+
+    /**
+     * An autumn bomb bursts: a cloud of leaves flies out in all directions (mostly up and out) and a light shock
+     * scatters the litter around.
+     */
+    public void burst(double x, double y, double z, int leaves, int baseColor, float autumnShare) {
+        for (int n = 0; n < leaves && pool.free() > 0; n++) {
+            LeafShape shape = random.next() < 0.7F ? LeafShape.BROAD : LeafShape.ROUND;
+            long hash = (long) (random.next() * Integer.MAX_VALUE) << 20 ^ (long) (random.next() * Integer.MAX_VALUE);
+            int color = LeafPalette.vary(baseColor, hash, autumnShare, shape);
+            int sprite = shape.firstSprite + Math.min(shape.variants - 1, (int) (random.next() * shape.variants));
+            float size = LeafShape.BASE_SIZE * shape.size * settings.leafSize * (0.8F + random.next() * 0.45F);
+            float angle = random.next() * Mth.TWO_PI;
+            float up = 0.15F + random.next() * 0.85F;
+            float out = Mth.sqrt(1.0F - up * up);
+            float speed = 0.25F + random.next() * 0.45F;
+            int i = spawn(x + (random.next() - 0.5F) * 0.3, y + 0.2, z + (random.next() - 0.5F) * 0.3, Mth.cos(angle) * out * speed,
+                    up * speed, Mth.sin(angle) * out * speed, color, baseColor, shape, sprite, size, false);
+            if (i >= 0) {
+                spinUp(i, speed);
+            }
+        }
+        explode(x, y, z, 1.0F, true);
     }
 
     /** Leaves of the litter in a radius around a point, at about that height. */

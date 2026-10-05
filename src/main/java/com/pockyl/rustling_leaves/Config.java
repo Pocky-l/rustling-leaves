@@ -73,11 +73,6 @@ public final class Config {
             .translation("rustling_leaves.configuration.raking")
             .define("raking", true);
 
-    private static final ModConfigSpec.BooleanValue ARMFUL = BUILDER
-            .comment("Sneak + right click leaf litter with an empty hand to scoop leaves up, right click to pour them out.")
-            .translation("rustling_leaves.configuration.armful")
-            .define("armful", true);
-
     static {
         BUILDER.pop().translation("rustling_leaves.configuration.sound").push("sound");
     }
@@ -105,7 +100,6 @@ public final class Config {
         settings.naturalPiles = NATURAL_PILES.get();
         settings.windEvents = WIND_EVENTS.get().floatValue();
         settings.raking = RAKING.get();
-        settings.armful = ARMFUL.get();
         settings.leafSize = LEAF_SIZE.get().floatValue();
         settings.autumnColors = AUTUMN_COLORS.get().floatValue();
         settings.leavesPerBreak = LEAVES_PER_BREAK.get();

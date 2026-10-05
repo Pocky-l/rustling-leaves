@@ -5,13 +5,13 @@
 <h1 align="center">Rustling Leaves</h1>
 
 <p align="center">
-  Physically simulated leaves: falling leaves, a forest floor of leaf piles you can wade through and rake, gusts and whirlwinds.
+  Physically simulated leaves: falling leaves, leaf piles you can wade through, rake and blow away, gusts, whirlwinds and leaf tools.
 </p>
 
 <p align="center">
   <img alt="Minecraft 1.21.1" src="https://img.shields.io/badge/Minecraft-1.21.1-62B47A">
   <a href="https://neoforged.net"><img alt="NeoForge" src="https://img.shields.io/badge/Loader-NeoForge-F16436"></a>
-  <img alt="Client-side" src="https://img.shields.io/badge/Side-Client-5B8DEF">
+  <img alt="Client, server optional" src="https://img.shields.io/badge/Side-Client%20%2B%20optional%20server-5B8DEF">
   <img alt="License MIT" src="https://img.shields.io/badge/License-MIT-blue">
 </p>
 
@@ -29,9 +29,15 @@
   Mobs, animals, minecarts and arrows stir leaves too, with a soft rustle.
 - **Leaves behave like a granular material**: piles settle into round cones, leaves trickle down slopes, fill
   hollows, ditches and cauldrons up to the rim and run over the edge.
-- **Carry leaves around**: sneak + right click leaf litter with an empty hand to scoop up an armful (up to 600
-  leaves, shown next to the crosshair), right click to pour them out in a stream wherever you look - fill a hole,
-  heap a pile, shower a friend.
+- **Leaf tools** (when the mod is also on the server):
+  - **Leaf Blower** - hold right click to blow a cone of air: it clears paths through the litter, heaps the leaves
+    up where the air dies down, throws loose leaves into the air and nudges items and mobs.
+  - **Leaf Bag** - hold right click to suck leaves up (they fly into the bag), sneak + hold right click to pour them
+    out in a stream - fill a hole, heap a pile, shower a friend. Holds 1000 leaves; use it on a composter to
+    turn every 32 leaves into a layer of compost.
+  - **Autumn Bomb** - a throwable bundle of leaves that bursts into a swirling cloud of autumn leaves.
+  - **Staff of Winds** - right click to raise a leaf whirlwind where you look, sneak + right click to send a squall
+    rolling ahead of you.
 - **Rake leaves into piles**: hold right click with a hoe or shovel on leaf litter to sweep the leaves around that
   spot together (it does not till the ground or make a path while there are leaves).
 - **Wind you can see**: gust waves sweep across the forest and skitter loose leaves over the ground until they
@@ -48,7 +54,8 @@
   are drawn from cached GPU meshes - a pile of thousands of leaves costs a few hundred quads; only moving leaves are
   simulated in full, and everything that pushes leaves finds them through a spatial grid. The F3 screen shows the
   current numbers.
-- **Client-side only**: works on any server, including vanilla ones; no items, nothing to install on the server.
+- **Works on any server**: the leaves, piles, wind and raking are client-side and work even on vanilla servers.
+  Installed on the server too, the mod adds the leaf tools, and everyone sees each other's tools at work.
 
 ## Controls
 
@@ -60,15 +67,25 @@ No keys. Just play:
 | Sneak | Walk over a thin carpet without disturbing it |
 | Jump into a pile | Leaves splash up around you |
 | Hold right click with a hoe or shovel | Rake the leaves around that spot into a pile |
-| Sneak + right click with an empty hand | Scoop up an armful of leaves |
-| Hold right click with an empty hand | Pour the leaves you carry |
+| Hold right click with the Leaf Blower | Blow leaves away |
+| Hold right click with the Leaf Bag | Suck leaves up; sneak to pour them out |
+| Right click a composter with the Leaf Bag | Compost 32 leaves per layer |
+| Throw an Autumn Bomb | Burst of autumn leaves |
+| Right click with the Staff of Winds | Whirlwind where you look; sneak for a squall |
 | Throw a wind charge | Blows leaves away in a swirl |
 | Explode TNT | Clears the ground and throws leaves high into the air |
 | Break a leaves block | Releases a burst of leaves |
 
 ## Crafting
 
-Nothing to craft: the mod adds no items or blocks, it changes how the world looks and feels.
+In creative mode the tools are in the **Pocky Mods** tab (and in Tools & Utilities / Combat).
+
+| Item | Recipe |
+|---|---|
+| Leaf Blower | `  I` / `IBI` / `RI ` - `I` iron ingot, `B` breeze rod, `R` redstone |
+| Leaf Bag | `S S` / `L L` / ` L ` - `S` string, `L` leather |
+| Autumn Bomb (x2) | shapeless: 2 leaves (any), gunpowder, paper |
+| Staff of Winds | `  W` / ` B ` / `S  ` - `W` wind charge, `B` breeze rod, `S` stick |
 
 ## Configuration
 
@@ -89,7 +106,6 @@ Nothing to craft: the mod adds no items or blocks, it changes how the world look
 | `physics.entityStrength` | `1.0` | How strongly players, mobs and projectiles push leaves |
 | `physics.explosionStrength` | `1.0` | How strongly explosions and wind charges blow leaves |
 | `physics.raking` | `true` | Rake leaves with a hoe or shovel |
-| `physics.armful` | `true` | Scoop and pour leaves with an empty hand |
 | `sound.rustleVolume` | `0.6` | Volume of rustling and whirlwinds |
 
 Leaf litter is saved in `saves/<world>/rustling_leaves/` (singleplayer) or `rustling_leaves/servers/<address>/`
@@ -98,7 +114,7 @@ Leaf litter is saved in `saves/<world>/rustling_leaves/` (singleplayer) or `rust
 ## Installation
 
 1. Install [NeoForge](https://neoforged.net) for Minecraft 1.21.1.
-2. Put this mod into the `mods` folder of your client. Servers do not need it.
+2. Put this mod into the `mods` folder of your client. For the leaf tools, install it on the server as well.
 
 ## Building
 

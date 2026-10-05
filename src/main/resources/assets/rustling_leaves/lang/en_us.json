@@ -20,6 +20,15 @@
   "rustling_leaves.configuration.naturalPiles": "Natural Drifts and Piles",
   "rustling_leaves.configuration.windEvents": "Squalls and Whirlwinds",
   "rustling_leaves.configuration.raking": "Raking with Hoe or Shovel",
-  "rustling_leaves.hud.armful": "%s leaves",
-  "rustling_leaves.configuration.armful": "Scoop and Pour Leaves"
+  "item.rustling_leaves.leaf_blower": "Leaf Blower",
+  "item.rustling_leaves.leaf_blower.tooltip": "Hold right click to blow leaves away",
+  "item.rustling_leaves.leaf_bag": "Leaf Bag",
+  "item.rustling_leaves.leaf_bag.contents": "%s / %s leaves",
+  "item.rustling_leaves.leaf_bag.tooltip": "Hold right click to suck up leaves, sneak to pour them out. Use on a composter to compost them",
+  "item.rustling_leaves.autumn_bomb": "Autumn Bomb",
+  "item.rustling_leaves.autumn_bomb.tooltip": "Throw it to burst into a cloud of autumn leaves",
+  "item.rustling_leaves.wind_staff": "Staff of Winds",
+  "item.rustling_leaves.wind_staff.tooltip": "Right click: raise a leaf whirlwind where you look",
+  "item.rustling_leaves.wind_staff.tooltip_squall": "Sneak + right click: send a squall ahead of you",
+  "entity.rustling_leaves.autumn_bomb": "Autumn Bomb"
 }

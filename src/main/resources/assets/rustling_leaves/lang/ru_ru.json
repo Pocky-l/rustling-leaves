@@ -20,6 +20,15 @@
   "rustling_leaves.configuration.naturalPiles": "Естественные наносы и кучи",
   "rustling_leaves.configuration.windEvents": "Шквалы и вихри",
   "rustling_leaves.configuration.raking": "Грабли (мотыга или лопата)",
-  "rustling_leaves.hud.armful": "Листьев: %s",
-  "rustling_leaves.configuration.armful": "Набирать и сыпать листья"
+  "item.rustling_leaves.leaf_blower": "Воздуходувка",
+  "item.rustling_leaves.leaf_blower.tooltip": "Зажмите ПКМ, чтобы сдувать листья",
+  "item.rustling_leaves.leaf_bag": "Мешок для листьев",
+  "item.rustling_leaves.leaf_bag.contents": "Листьев: %s / %s",
+  "item.rustling_leaves.leaf_bag.tooltip": "Зажмите ПКМ, чтобы всасывать листья, с Shift — высыпать. ПКМ по компостеру — в компост",
+  "item.rustling_leaves.autumn_bomb": "Осенняя бомба",
+  "item.rustling_leaves.autumn_bomb.tooltip": "Бросьте — и она взорвётся облаком осенних листьев",
+  "item.rustling_leaves.wind_staff": "Посох ветров",
+  "item.rustling_leaves.wind_staff.tooltip": "ПКМ: вызвать листовой вихрь туда, куда смотрите",
+  "item.rustling_leaves.wind_staff.tooltip_squall": "Shift + ПКМ: пустить шквал перед собой",
+  "entity.rustling_leaves.autumn_bomb": "Осенняя бомба"
 }

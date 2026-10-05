@@ -24,8 +24,6 @@ public final class LeafSettings {
     public float rustleVolume = 0.6F;
     /** Rake leaves into piles with a hoe or shovel. */
     public boolean raking = true;
-    /** Scoop leaves into the arms with sneak + right click (empty hand) and pour them with right click. */
-    public boolean armful = true;
 
     /** Moving leaves farther than this (horizontally) from the camera are dropped. */
     public double despawnRadius() {

@@ -26,6 +26,35 @@ public final class Armful {
         samples = 0;
     }
 
+    /** Adds {@code leaves} leaves of one tree color and shape (a bag pouring them back out). */
+    public void fill(int leaves, int baseColor, int shape) {
+        for (int n = 0; n < leaves && count < CAPACITY; n++) {
+            add(baseColor, shape);
+        }
+    }
+
+    /** Average tree color of the remembered leaves. */
+    public int averageColor() {
+        int samplesKept = Math.min(samples, SAMPLES);
+        if (samplesKept == 0) {
+            return 0x8A6A2E;
+        }
+        long r = 0;
+        long g = 0;
+        long b = 0;
+        for (int s = 0; s < samplesKept; s++) {
+            r += colors[s] >> 16 & 0xFF;
+            g += colors[s] >> 8 & 0xFF;
+            b += colors[s] & 0xFF;
+        }
+        return (int) (r / samplesKept) << 16 | (int) (g / samplesKept) << 8 | (int) (b / samplesKept);
+    }
+
+    /** Shape of the first remembered leaf. */
+    public int mainShape() {
+        return samples == 0 ? 0 : shapes[0];
+    }
+
     void add(int baseColor, int shape) {
         colors[samples % SAMPLES] = baseColor;
         shapes[samples % SAMPLES] = (byte) shape;

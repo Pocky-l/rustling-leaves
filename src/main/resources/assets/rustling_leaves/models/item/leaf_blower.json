@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/handheld",
+  "textures": {
+    "layer0": "rustling_leaves:item/leaf_blower"
+  }
+}
