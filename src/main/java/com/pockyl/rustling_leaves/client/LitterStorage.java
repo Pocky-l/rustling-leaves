@@ -31,8 +31,8 @@ import java.util.zip.GZIPOutputStream;
  * (small files) and written by a background thread from a snapshot.
  */
 final class LitterStorage implements AutoCloseable {
-    /** Version 2 re-seeds all ground: the natural litter became much lighter. */
-    private static final int FORMAT = 2;
+    /** Bumped when natural seeding changes, so that ground seen before is seeded again (3: fall pattern). */
+    private static final int FORMAT = 3;
 
     private final Path directory;
     private final Long2ObjectOpenHashMap<Region> regions = new Long2ObjectOpenHashMap<>();

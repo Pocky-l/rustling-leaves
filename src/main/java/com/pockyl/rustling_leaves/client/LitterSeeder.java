@@ -20,17 +20,52 @@ import com.pockyl.rustling_leaves.sim.LeafSimulation;
  * proper leaf pile. Runs once per chunk; the result is saved with the rest of the litter.
  */
 final class LitterSeeder {
-    private static final int MARGIN = 2;
+    /** How far (in blocks) leaves land from the crown they fell from. */
+    private static final int MARGIN = 7;
     private static final int GRID = 16 + 2 * MARGIN;
+    private static final int KERNEL = 2 * MARGIN + 1;
+    /** Spread of the fall pattern around a crown block, and how far it is carried downwind. */
+    private static final float SPREAD = 2.6F;
+    private static final float DOWNWIND = 1.6F;
+    /** Direction the wind mostly blows from in this mod's wind field (its mean heading). */
+    private static final float PREVAILING_X = Mth.cos(0.7F);
+    private static final float PREVAILING_Z = Mth.sin(0.7F);
+    /** Period of the large patches of litter, in blocks. */
+    private static final float PATCH_SIZE = 6.0F;
+    private static final float[] FALL_KERNEL = fallKernel();
 
     private final LeafColors colors;
     private final BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
     private final BlockState[] canopy = new BlockState[GRID * GRID];
     private final float[] density = new float[256];
+    private final double[] blockGround = new double[256];
     private final double[] ground = new double[256 * 16];
 
     LitterSeeder(LeafColors colors) {
         this.colors = colors;
+    }
+
+    /**
+     * Where leaves from one crown block end up: a Gaussian around it, shifted downwind. Normalized so that ground
+     * under a closed canopy gets density 1.
+     */
+    private static float[] fallKernel() {
+        float[] kernel = new float[KERNEL * KERNEL];
+        float sum = 0.0F;
+        for (int dz = -MARGIN; dz <= MARGIN; dz++) {
+            for (int dx = -MARGIN; dx <= MARGIN; dx++) {
+                // dx/dz go from the crown block to the ground block; the pattern is centered downwind of the crown.
+                float ox = dx - PREVAILING_X * DOWNWIND;
+                float oz = dz - PREVAILING_Z * DOWNWIND;
+                float weight = (float) Math.exp(-(ox * ox + oz * oz) / (2.0F * SPREAD * SPREAD));
+                kernel[(dz + MARGIN) * KERNEL + dx + MARGIN] = weight;
+                sum += weight;
+            }
+        }
+        for (int k = 0; k < kernel.length; k++) {
+            kernel[k] /= sum;
+        }
+        return kernel;
     }
 
     void seed(Level level, LeafSimulation simulation, LitterChunk chunk) {
@@ -42,74 +77,94 @@ final class LitterSeeder {
         int originX = chunk.x * 16;
         int originZ = chunk.z * 16;
         // Canopy: the top block of every column (with a margin into neighbor chunks) if it is foliage.
+        boolean anyCanopy = false;
         for (int gz = 0; gz < GRID; gz++) {
             for (int gx = 0; gx < GRID; gx++) {
                 int x = originX + gx - MARGIN;
                 int z = originZ + gz - MARGIN;
                 int top = level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z) - 1;
                 BlockState state = level.getBlockState(cursor.set(x, top, z));
-                canopy[gz * GRID + gx] = state.is(BlockTags.LEAVES) ? state : null;
+                boolean leaves = state.is(BlockTags.LEAVES);
+                canopy[gz * GRID + gx] = leaves ? state : null;
+                anyCanopy |= leaves;
             }
         }
-        boolean anyTrees = false;
+        if (!anyCanopy) {
+            return;
+        }
+        // Fall density: every crown block spreads its leaves over the ground around it (downwind a bit more).
+        boolean anyLitter = false;
         for (int bz = 0; bz < 16; bz++) {
             for (int bx = 0; bx < 16; bx++) {
-                int around = 0;
-                for (int dz = -MARGIN; dz <= MARGIN; dz++) {
-                    for (int dx = -MARGIN; dx <= MARGIN; dx++) {
-                        if (canopy[(bz + MARGIN + dz) * GRID + bx + MARGIN + dx] != null) {
-                            around++;
+                float d = 0.0F;
+                for (int kz = 0; kz < KERNEL; kz++) {
+                    for (int kx = 0; kx < KERNEL; kx++) {
+                        // Crown block at (bx - dx, bz - dz) for the kernel offset (dx, dz) = (kx - MARGIN, kz - MARGIN).
+                        if (canopy[(bz + 2 * MARGIN - kz) * GRID + bx + 2 * MARGIN - kx] != null) {
+                            d += FALL_KERNEL[kz * KERNEL + kx];
                         }
                     }
                 }
-                boolean under = canopy[(bz + MARGIN) * GRID + bx + MARGIN] != null;
-                float d = 0.5F * (under ? 1.0F : 0.0F) + 0.5F * around / 25.0F;
                 density[bz * 16 + bx] = d;
-                anyTrees |= d > 0.05F;
+                anyLitter |= d > 0.02F;
             }
         }
-        if (!anyTrees) {
+        if (!anyLitter) {
             return;
         }
+        // The ground of every block that gets leaves (one deep probe per block).
+        for (int bz = 0; bz < 16; bz++) {
+            for (int bx = 0; bx < 16; bx++) {
+                int b = bz * 16 + bx;
+                blockGround[b] = Double.NaN;
+                if (density[b] > 0.02F) {
+                    int x = originX + bx;
+                    int z = originZ + bz;
+                    double top = level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z) + 0.5;
+                    blockGround[b] = simulation.groundBelow(x + 0.5, top, z + 0.5, 48);
+                }
+            }
+        }
 
-        // Ground under every cell, and the carpet.
         float densitySum = 0.0F;
         for (int bz = 0; bz < 16; bz++) {
             for (int bx = 0; bx < 16; bx++) {
-                float d = density[bz * 16 + bx];
-                int x = originX + bx;
-                int z = originZ + bz;
-                double top = level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z) + 0.5;
-                BlockState treeState = nearestCanopy(bx, bz);
+                int b = bz * 16 + bx;
                 for (int c = 0; c < 16; c++) {
-                    ground[(bz * 16 + bx) * 16 + c] = Double.NaN;
+                    ground[b * 16 + c] = Double.NaN;
                 }
-                if (d <= 0.05F || treeState == null) {
+                float d = density[b];
+                double here = blockGround[b];
+                BlockState treeState = nearestCanopy(bx, bz);
+                if (d <= 0.02F || Double.isNaN(here) || treeState == null) {
                     continue;
                 }
                 densitySum += d;
-                int color = colors.base(treeState, level, cursor.set(x, (int) top, z));
+                int x = originX + bx;
+                int z = originZ + bz;
+                int color = colors.base(treeState, level, cursor.set(x, Mth.floor(here), z));
                 int shape = LeafShapes.of(treeState.getBlock()).ordinal();
-                long blockNoise = LeafPalette.hash(x, z, 0x5EED);
-                // One deep probe per block; the cells then only look around that height (slabs, stairs, paths).
-                double blockGround = simulation.groundBelow(x + 0.5, top, z + 0.5, 48);
-                if (Double.isNaN(blockGround)) {
-                    continue;
-                }
-                int walls = settings.naturalPiles && d >= 0.3F ? walls(simulation, x, z, blockGround + 0.1) : 0;
+                // Hollows collect leaves, humps and ledges shed them.
+                float relief = (float) Mth.clamp(neighborGround(bx, bz, here) - here, -1.0, 1.0);
+                float terrain = Mth.clamp(1.0F + relief * 1.5F, 0.3F, 2.0F);
+                int walls = settings.naturalPiles && d >= 0.3F ? walls(simulation, x, z, here + 0.1) : 0;
                 for (int c = 0; c < 16; c++) {
                     int cellX = x * 4 + (c & 3);
                     int cellZ = z * 4 + (c >> 2);
                     double cx = (cellX + 0.5) * LitterField.CELL;
                     double cz = (cellZ + 0.5) * LitterField.CELL;
-                    double surface = simulation.groundBelow(cx, Math.floor(blockGround) + 1.0, cz, 2);
+                    double surface = simulation.groundBelow(cx, Math.floor(here) + 1.0, cz, 2);
                     if (Double.isNaN(surface) || !litterGround(level, cx, surface, cz)) {
                         continue;
                     }
-                    ground[(bz * 16 + bx) * 16 + c] = surface;
-                    float noise = 0.5F * unit(LeafPalette.hash(cellX, cellZ, 0x5EED)) + 0.5F * unit(blockNoise);
-                    // Patchy: in the sparser half of the noise the ground stays bare.
-                    int leaves = Math.max(0, Math.round(d * carpet * (noise - 0.4F) * 2.4F));
+                    ground[b * 16 + c] = surface;
+                    // Soft patches of a few blocks, with a little grain inside them.
+                    float pattern = 0.7F * patchNoise(cx, cz) + 0.3F * unit(LeafPalette.hash(cellX, cellZ, 0x5EED));
+                    int leaves = Math.round(d * terrain * carpet * 2.4F * (pattern - 0.38F));
+                    if (leaves <= 0) {
+                        // Away from the patches only the odd stray leaf.
+                        leaves = unit(LeafPalette.hash(cellZ, cellX, 0x57A7)) < d * 0.3F ? 1 : 0;
+                    }
                     leaves += wallDrift(walls, c & 3, c >> 2, d);
                     chunk.seedCell(LitterField.index(cellX, cellZ), leaves, (float) surface, color, shape);
                 }
@@ -122,6 +177,38 @@ final class LitterSeeder {
                 addPile(chunk, originX, originZ, LeafPalette.hash(chunk.x, chunk.z, p));
             }
         }
+    }
+
+    /** Average ground height of the neighboring blocks of this chunk (the block's own where unknown). */
+    private double neighborGround(int bx, int bz, double here) {
+        double sum = 0.0;
+        int[][] offsets = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+        for (int[] offset : offsets) {
+            int nx = bx + offset[0];
+            int nz = bz + offset[1];
+            double value = nx >= 0 && nx < 16 && nz >= 0 && nz < 16 ? blockGround[nz * 16 + nx] : Double.NaN;
+            sum += Double.isNaN(value) || Math.abs(value - here) > 2.0 ? here : value;
+        }
+        return sum / 4.0;
+    }
+
+    /** Smooth value noise in [0, 1] with features about {@link #PATCH_SIZE} blocks across, the same in every chunk. */
+    private static float patchNoise(double x, double z) {
+        double gx = x / PATCH_SIZE;
+        double gz = z / PATCH_SIZE;
+        int x0 = Mth.floor(gx);
+        int z0 = Mth.floor(gz);
+        float fx = smooth((float) (gx - x0));
+        float fz = smooth((float) (gz - z0));
+        float n00 = unit(LeafPalette.hash(x0, z0, 0xFA11));
+        float n10 = unit(LeafPalette.hash(x0 + 1, z0, 0xFA11));
+        float n01 = unit(LeafPalette.hash(x0, z0 + 1, 0xFA11));
+        float n11 = unit(LeafPalette.hash(x0 + 1, z0 + 1, 0xFA11));
+        return Mth.lerp(fz, Mth.lerp(fx, n00, n10), Mth.lerp(fx, n01, n11));
+    }
+
+    private static float smooth(float t) {
+        return t * t * (3.0F - 2.0F * t);
     }
 
     /** Litter lies on solid natural or built ground, not on top of logs or on snow. */
