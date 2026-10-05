@@ -41,6 +41,8 @@ public final class LeafSimulation {
     private static final int MAX_AIR_TICKS = 20 * 120;
     private static final int MAX_SLIDE_TICKS = 20 * 30;
     private static final int SETTLE_TICKS = 6;
+    /** Brightness of a soaked leaf. */
+    public static final float WET_SHADE = 0.66F;
     /** Share of leaves that tumble instead of fluttering (in nature: long, stiff leaves). */
     private static final float TUMBLER_SHARE = 0.25F;
     private static final float GROUND_FRICTION = 0.86F;
@@ -544,6 +546,9 @@ public final class LeafSimulation {
         float scale = 1.0F / CELL;
         long top = LitterField.encodeTop((float) (pool.x[i] * scale - cx), (float) (pool.z[i] * scale - cz), pool.yaw[i], pool.size[i],
                 pool.sprite[i]);
+        if ((pool.flags[i] & LeafPool.FLAG_WET) != 0) {
+            pool.color[i] = LeafPalette.scale(pool.color[i], WET_SHADE);
+        }
         if ((pool.flags[i] & LeafPool.FLAG_NATURAL) != 0 && n >= settings.carpetDepth && n > 0) {
             field.replaceTop(cx, cz, top, pool.color[i]);
         } else {
@@ -710,8 +715,11 @@ public final class LeafSimulation {
     }
 
     /**
-     * A leaf drifting on water: carried by the current and a little by the wind, rocking on the ripples, stopped by
-     * banks, carried down waterfalls. It slowly soaks (faster in rain) and then sinks.
+     * A leaf on water. Wet leaves stick to the surface: they lie flat on it and ride its ripples, the current carries
+     * them (down slopes of flowing water and over waterfalls), turns them along the flow and spins them where the flow
+     * swirls. Like any small floating things they are drawn to each other and to banks (the meniscus effect), so they
+     * gather into rafts and lines along the shore. Water pouring onto a leaf pushes it under. Slowly it soaks (faster
+     * in rain) and sinks.
      */
     private void tickFloating(int i) {
         pool.age[i] += 1 + (int) (wind.rain() * 2.0F);
@@ -729,7 +737,7 @@ public final class LeafSimulation {
             return;
         }
         if (fluid.hasProperty(FlowingFluid.FALLING) && fluid.getValue(FlowingFluid.FALLING)) {
-            // Over a waterfall: tumbling down with the water.
+            // In a waterfall: carried down with the water, tumbling.
             pool.y[i] -= 0.3;
             pool.vx[i] *= 0.8F;
             pool.vz[i] *= 0.8F;
@@ -740,53 +748,120 @@ public final class LeafSimulation {
             pool.roll[i] += (random.next() - 0.5F) * 0.4F;
             return;
         }
-        double surface = cursor.getY() + fluid.getHeight(level, cursor);
+        int surfaceBlock = cursor.getY();
+        double surface = surfaceBlock + fluid.getHeight(level, cursor);
+        if (level.getFluidState(cursor.set(Mth.floor(x), surfaceBlock + 1, Mth.floor(z))).is(FluidTags.WATER)) {
+            // Water pours onto it: pushed under, soaked at once.
+            startSinking(i);
+            pool.vy[i] = -0.06F;
+            pool.spinYaw[i] = (random.next() - 0.5F) * 0.6F;
+            return;
+        }
+        cursor.set(Mth.floor(x), surfaceBlock, Mth.floor(z));
         if (((i + tick) % 10) == 0) {
             Vec3 flow = fluid.getFlow(level, cursor);
-            pool.auxA[i] = (float) flow.x * 0.06F;
-            pool.auxB[i] = (float) flow.z * 0.06F;
+            pool.auxA[i] = (float) flow.x * 0.07F;
+            pool.auxB[i] = (float) flow.z * 0.07F;
+            // Curl of the current from the flow one block east and south: where it bends, it swirls.
+            Vec3 east = flowAt(cursor.getX() + 1, surfaceBlock, cursor.getZ());
+            Vec3 south = flowAt(cursor.getX(), surfaceBlock, cursor.getZ() + 1);
+            pool.swirl[i] = (float) ((east.z - flow.z) - (south.x - flow.x));
             pool.light[i] = terrain.lightAt(x, surface + 0.1, z);
         }
         wind.sample(x, surface, z, air);
-        pool.vx[i] += (pool.auxA[i] + air[0] * 0.25F - pool.vx[i]) * 0.08F + (random.next() - 0.5F) * 0.002F;
-        pool.vz[i] += (pool.auxB[i] + air[2] * 0.25F - pool.vz[i]) * 0.08F + (random.next() - 0.5F) * 0.002F;
-        double y = surface + 0.015;
+        float vx = pool.vx[i];
+        float vz = pool.vz[i];
+        vx += (pool.auxA[i] + air[0] * 0.2F - vx) * 0.12F;
+        vz += (pool.auxB[i] + air[2] * 0.2F - vz) * 0.12F;
+
+        // Meniscus attraction between floating leaves; close neighbors drift together, very close ones do not overlap.
+        grid.query(x - 0.6, z - 0.6, x + 0.6, z + 0.6, nearby);
+        for (int n = 0; n < nearby.size(); n++) {
+            int j = nearby.getInt(n);
+            if (j == i || pool.state[j] != LeafPool.FLOATING) {
+                continue;
+            }
+            float dx = (float) (pool.x[j] - x);
+            float dz = (float) (pool.z[j] - z);
+            float distSq = dx * dx + dz * dz;
+            if (distSq > 0.36F || distSq < 1.0E-6F) {
+                continue;
+            }
+            float dist = Mth.sqrt(distSq);
+            float pull = dist < 0.09F ? -0.004F : 0.0025F * (1.0F - dist / 0.6F);
+            vx += dx / dist * pull;
+            vz += dz / dist * pull;
+            if (dist < 0.3F) {
+                vx += (pool.vx[j] - vx) * 0.06F;
+                vz += (pool.vz[j] - vz) * 0.06F;
+            }
+        }
+        // ...and to banks: near a wall a leaf is drawn in and sticks.
+        double probeY = surface - 0.05;
+        boolean touching = false;
+        for (int side = 0; side < 4; side++) {
+            float sx = side == 0 ? 1.0F : side == 1 ? -1.0F : 0.0F;
+            float sz = side == 2 ? 1.0F : side == 3 ? -1.0F : 0.0F;
+            if (!Double.isNaN(terrain.solidTop(x + sx * 0.3, probeY + 0.1, z + sz * 0.3))) {
+                vx += sx * 0.002F;
+                vz += sz * 0.002F;
+                touching |= !Double.isNaN(terrain.solidTop(x + sx * 0.14, probeY + 0.1, z + sz * 0.14));
+            }
+        }
+        if (touching) {
+            vx *= 0.75F;
+            vz *= 0.75F;
+        }
+        pool.vx[i] = vx;
+        pool.vz[i] = vz;
+
+        double y = surface + 0.012;
         double nx = x + pool.vx[i];
         if (Double.isNaN(terrain.solidTop(nx, y, z))) {
             x = nx;
         } else {
-            // Against a bank leaves lose their speed and gather.
-            pool.vx[i] *= -0.15F;
-            pool.vz[i] *= 0.7F;
+            pool.vx[i] = 0.0F;
         }
         double nz = z + pool.vz[i];
         if (Double.isNaN(terrain.solidTop(x, y, nz))) {
             z = nz;
         } else {
-            pool.vz[i] *= -0.15F;
-            pool.vx[i] *= 0.7F;
+            pool.vz[i] = 0.0F;
         }
-        // Ride the ripples: height and tilt follow the shared wave field, so neighboring leaves rock together.
         float height = wave(x, z);
         float slopeX = (wave(x + 0.2, z) - height) / 0.2F;
         float slopeZ = (wave(x, z + 0.2) - height) / 0.2F;
+        float soak = pool.age[i] / (float) pool.life[i];
         pool.x[i] = x;
-        pool.y[i] = y + height;
+        pool.y[i] = y + height - soak * 0.01;
         pool.z[i] = z;
-        float speed = Mth.sqrt(pool.vx[i] * pool.vx[i] + pool.vz[i] * pool.vz[i]);
-        pool.spinYaw[i] = pool.spinYaw[i] * 0.97F + (random.next() - 0.5F) * (0.004F + speed * 0.05F);
+
+        // Turning: lined up with the current like a weather vane, spun by its swirl, a little jitter.
+        float flowSpeed = Mth.sqrt(pool.auxA[i] * pool.auxA[i] + pool.auxB[i] * pool.auxB[i]);
+        float vane = 0.0F;
+        if (flowSpeed > 0.005F) {
+            float along = (float) Mth.atan2(pool.auxB[i], pool.auxA[i]);
+            vane = wrapHalfTurn(along - pool.yaw[i]) * 0.02F * Math.min(1.0F, flowSpeed / 0.05F);
+        }
+        pool.spinYaw[i] = pool.spinYaw[i] * 0.9F + pool.swirl[i] * 0.04F + vane + (random.next() - 0.5F) * 0.003F;
         pool.yaw[i] += pool.spinYaw[i];
+        // Flat on the water, following only the gentle slope of the ripples.
         float sin = Mth.sin(pool.yaw[i]);
         float cos = Mth.cos(pool.yaw[i]);
-        float soak = pool.age[i] / (float) pool.life[i];
-        // Soaked leaves ride lower and flatter.
-        pool.y[i] -= soak * 0.012;
-        pool.roll[i] += ((float) Math.atan(slopeX * cos - slopeZ * sin) * 8.0F - pool.roll[i]) * 0.3F;
-        pool.pitch[i] += ((float) -Math.atan(slopeX * sin + slopeZ * cos) * 8.0F - pool.pitch[i]) * 0.3F;
+        pool.roll[i] += ((float) Math.atan(slopeX * cos - slopeZ * sin) * 1.5F - pool.roll[i]) * 0.4F;
+        pool.pitch[i] += ((float) -Math.atan(slopeX * sin + slopeZ * cos) * 1.5F - pool.pitch[i]) * 0.4F;
+    }
+
+    private Vec3 flowAt(int x, int y, int z) {
+        BlockPos.MutableBlockPos cursor = terrain.cursor();
+        cursor.set(x, y, z);
+        FluidState fluid = level.getFluidState(cursor);
+        return fluid.is(FluidTags.WATER) ? fluid.getFlow(level, cursor) : Vec3.ZERO;
     }
 
     private void startSinking(int i) {
         pool.state[i] = LeafPool.SINKING;
+        pool.flags[i] |= LeafPool.FLAG_WET;
         pool.y[i] -= 0.04;
         pool.vy[i] = -0.004F;
         pool.age[i] = 0;

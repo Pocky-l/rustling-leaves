@@ -20,7 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Staff of Winds: raise leaf whirlwinds and send squalls.
 - Visible wind: gust waves that skitter leaves over the ground, squalls that strip the trees, leaf whirlwinds.
 - Wind charges and explosions blow leaves away; breaking leaves blocks releases a burst of leaves.
-- Leaves float on water, drift with the current and down waterfalls, then soak, sink and settle on the bottom;
+- Leaves on water darken as they soak, drift and spin with the current, gather into rafts and along banks, go down
+  waterfalls, are pushed under by pouring water and finally sink to the bottom;
   they burn in lava. Litter falls when the block under it is removed.
 - Leaf colors match the tree and biome, with autumn colors; different shapes for broad-leaved trees, birch, spruce
   and cherry.

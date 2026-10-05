@@ -37,8 +37,9 @@ Physically simulated leaves: falling leaves, leaf piles you can wade through, ra
   dies down, a rising column in the middle (and a swirl for wind charges). Leaves ride it out, get lifted, flutter
   down again; some just hop and fall back where they lay.
 - Breaking or decaying leaves releases a burst of leaves; when the block under litter disappears, the litter falls,
-  and a block placed on litter ends up with the leaves on top. Leaves float on water, rock on its ripples, drift with the current and go down waterfalls; slowly they soak,
-  sink swaying and settle on the bottom. They burn in lava.
+  and a block placed on litter ends up with the leaves on top. Leaves on water stick flat to the surface and darken as they soak; they drift with the current (and down
+  waterfalls), turn along the flow and spin where it swirls, gather into rafts and along the banks, get pushed under
+  where water pours onto them, and finally sink swaying to the bottom. They burn in lava.
 - **Colors match the tree** in every biome (also modded trees), with a share of autumn yellows, oranges and reds;
   litter on the ground looks a bit more aged. Oak, birch, spruce and cherry trees drop different shapes.
 - **Built for huge numbers of leaves**: lying leaves are stored as stacks per quarter block and only the visible ones

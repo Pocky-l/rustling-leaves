@@ -499,9 +499,11 @@ final class LeafRenderer implements AutoCloseable {
             if (state == LeafPool.DYING) {
                 size *= Math.max(0.0F, (pool.life[i] - partialTick) / LeafSimulation.DYING_TICKS);
             }
+            float wet = pool.wetness(i);
+            int color = wet > 0.0F ? shade(pool.color[i], 1.0F - (1.0F - LeafSimulation.WET_SHADE) * wet) : pool.color[i];
             emit(builder, x, y, z, Mth.lerp(partialTick, pool.prevYaw[i], pool.yaw[i]),
                     Mth.lerp(partialTick, pool.prevPitch[i], pool.pitch[i]), Mth.lerp(partialTick, pool.prevRoll[i], pool.roll[i]),
-                    size, pool.color[i], pool.light[i], pool.sprite[i]);
+                    size, color, pool.light[i], pool.sprite[i]);
         }
         MeshData mesh = builder.build();
         movingEmpty = mesh == null;

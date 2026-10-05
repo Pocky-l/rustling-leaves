@@ -25,6 +25,8 @@ public final class LeafPool {
     public static final byte FLAG_EXPOSED = 4;
     /** Falls tumbling about its long axis (and glides sideways) instead of fluttering like a pendulum. */
     public static final byte FLAG_TUMBLER = 8;
+    /** Soaked: drawn darker, stays darker in the litter. */
+    public static final byte FLAG_WET = 16;
 
     public final int capacity;
 
@@ -58,6 +60,8 @@ public final class LeafPool {
     /** Water flow for floating leaves; target tilt while settling. */
     public final float[] auxA;
     public final float[] auxB;
+    /** Swirl of the water current under a floating leaf (its curl), which turns the leaf. */
+    public final float[] swirl;
     /** Surface the leaf touched down on. */
     public final double[] ground;
 
@@ -104,6 +108,7 @@ public final class LeafPool {
         size = new float[capacity];
         auxA = new float[capacity];
         auxB = new float[capacity];
+        swirl = new float[capacity];
         ground = new double[capacity];
         color = new int[capacity];
         baseColor = new int[capacity];
@@ -148,6 +153,14 @@ public final class LeafPool {
 
     public int free() {
         return capacity - count;
+    }
+
+    /** How soaked the leaf is, 0 (dry) to 1, for drawing it darker. */
+    public float wetness(int leaf) {
+        if (state[leaf] == FLOATING) {
+            return Math.min(1.0F, age[leaf] / (float) Math.max(1, life[leaf])) * 0.7F + 0.3F;
+        }
+        return (flags[leaf] & FLAG_WET) != 0 || state[leaf] == SINKING ? 1.0F : 0.0F;
     }
 
     public void savePrevious(int leaf) {

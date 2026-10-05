@@ -111,6 +111,44 @@ public final class ModGameTests {
     }
 
     @GameTest(template = "box")
+    public static void floatingLeavesDriftTogether(GameTestHelper helper) {
+        floor(helper);
+        for (int y = 1; y <= 2; y++) {
+            fill(helper, 0, 0, 6, 6, y, Blocks.STONE.defaultBlockState());
+            fill(helper, 1, 1, 5, 5, y, Blocks.WATER.defaultBlockState());
+        }
+        LeafSimulation sim = simulation(helper, 64, LeafListener.NONE);
+        int a = spawn(sim, helper, 3.25, 2.95, 3.5);
+        int b = spawn(sim, helper, 3.75, 2.95, 3.5);
+        run(sim, helper, 240);
+        LeafPool pool = sim.pool();
+        helper.assertTrue(pool.state[a] == LeafPool.FLOATING && pool.state[b] == LeafPool.FLOATING, "leaves are not floating");
+        double after = Math.hypot(pool.x[a] - pool.x[b], pool.z[a] - pool.z[b]);
+        helper.assertTrue(after < 0.25, "floating leaves 0.5 apart did not gather: now " + after);
+        helper.succeed();
+    }
+
+    @GameTest(template = "box")
+    public static void waterPouringOntoALeafSinksIt(GameTestHelper helper) {
+        floor(helper);
+        for (int y = 1; y <= 2; y++) {
+            fill(helper, 0, 0, 6, 6, y, Blocks.STONE.defaultBlockState());
+            fill(helper, 1, 1, 5, 5, y, Blocks.WATER.defaultBlockState());
+        }
+        LeafSimulation sim = simulation(helper, 64, LeafListener.NONE);
+        int leaf = spawn(sim, helper, 3.5, 3.2, 3.5);
+        run(sim, helper, 40);
+        helper.assertTrue(sim.pool().state[leaf] == LeafPool.FLOATING, "leaf is not floating");
+        BlockPos origin = helper.absolutePos(BlockPos.ZERO);
+        BlockPos above = new BlockPos((int) Math.floor(sim.pool().x[leaf]), origin.getY() + 3,
+                (int) Math.floor(sim.pool().z[leaf]));
+        helper.getLevel().setBlock(above, Blocks.WATER.defaultBlockState(), 2);
+        run(sim, helper, 3);
+        helper.assertTrue(sim.pool().state[leaf] == LeafPool.SINKING, "the leaf was not pushed under");
+        helper.succeed();
+    }
+
+    @GameTest(template = "box")
     public static void leafBurnsInLava(GameTestHelper helper) {
         floor(helper);
         fill(helper, 0, 0, 6, 6, 1, Blocks.STONE.defaultBlockState());
