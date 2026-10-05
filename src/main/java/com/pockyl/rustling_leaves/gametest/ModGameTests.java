@@ -94,6 +94,23 @@ public final class ModGameTests {
     }
 
     @GameTest(template = "box")
+    public static void soakedLeafSinksToTheBottom(GameTestHelper helper) {
+        floor(helper);
+        for (int y = 1; y <= 2; y++) {
+            fill(helper, 0, 0, 6, 6, y, Blocks.STONE.defaultBlockState());
+            fill(helper, 1, 1, 5, 5, y, Blocks.WATER.defaultBlockState());
+        }
+        LeafSimulation sim = simulation(helper, 64, LeafListener.NONE);
+        int leaf = spawn(sim, helper, 3.5, 4.5, 3.5);
+        run(sim, helper, 200);
+        helper.assertTrue(sim.pool().state[leaf] == LeafPool.FLOATING, "leaf is not floating first");
+        run(sim, helper, 20 * 60 * 3);
+        helper.assertTrue(sim.pool().count() == 0 && sim.field().total() == 1, "the leaf did not settle on the bottom");
+        assertAllBases(sim, helper, 1.0);
+        helper.succeed();
+    }
+
+    @GameTest(template = "box")
     public static void leafBurnsInLava(GameTestHelper helper) {
         floor(helper);
         fill(helper, 0, 0, 6, 6, 1, Blocks.STONE.defaultBlockState());

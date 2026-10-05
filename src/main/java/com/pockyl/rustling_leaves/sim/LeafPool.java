@@ -14,6 +14,8 @@ public final class LeafPool {
     public static final byte FLOATING = 3;
     /** Shrinking away; {@link #life} counts the remaining ticks. */
     public static final byte DYING = 4;
+    /** Soaked through, slowly sinking and swaying down to the bottom of the water. */
+    public static final byte SINKING = 5;
 
     /** The leaf just fell off a tree; it only thickens the litter up to the natural carpet depth. */
     public static final byte FLAG_NATURAL = 1;
@@ -21,6 +23,8 @@ public final class LeafPool {
     public static final byte FLAG_SETTLING = 2;
     /** Under the open sky, so the wind can push it along the ground. */
     public static final byte FLAG_EXPOSED = 4;
+    /** Falls tumbling about its long axis (and glides sideways) instead of fluttering like a pendulum. */
+    public static final byte FLAG_TUMBLER = 8;
 
     public final int capacity;
 

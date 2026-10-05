@@ -19,6 +19,7 @@ import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.phys.AABB;
@@ -69,6 +70,15 @@ final class LeafRenderer implements AutoCloseable {
     /** The pile body sits below the loose leaves and is darker: it reads as the depth of the pile. */
     private static final float BODY_SINK = 0.02F;
     private static final float BODY_SHADE = 0.6F;
+    /** Stacks this deep hide the ground completely: they get the solid body under their leaf layer. */
+    private static final int BODY_MIN = 12;
+    /** Stacks this deep get the denser leaf layer. */
+    private static final int DENSE_MIN = 7;
+    /** The leaf layer lies just under the loose top leaves. */
+    private static final float LAYER_SINK = 0.006F;
+    private static final int TEX_BODY = 0;
+    private static final int TEX_SPARSE = 1;
+    private static final int TEX_LAYER = 2;
     private static final int RING = LitterChunk.TILE + 2;
     private static final float TILE_BLOCKS = LitterChunk.TILE * LitterField.CELL;
 
@@ -89,11 +99,12 @@ final class LeafRenderer implements AutoCloseable {
     private final double[] ringBase = new double[RING * RING];
     private final double[] ringTop = new double[RING * RING];
     private final int[] ringColor = new int[RING * RING];
-    private float litterU0;
-    private float litterV0;
-    private float litterU1;
-    private float litterV1;
+    private final float[] layerU0 = new float[3];
+    private final float[] layerV0 = new float[3];
+    private final float[] layerU1 = new float[3];
+    private final float[] layerV1 = new float[3];
     private double currentOriginY;
+    private float currentSink;
     private int frame;
     private int lastTileQuads;
 
@@ -202,11 +213,14 @@ final class LeafRenderer implements AutoCloseable {
             u1[s] = sprite.getU1();
             v1[s] = sprite.getV1();
         }
-        TextureAtlasSprite litter = atlas.getSprite(LeafShapes.LITTER);
-        litterU0 = litter.getU0();
-        litterV0 = litter.getV0();
-        litterU1 = litter.getU1();
-        litterV1 = litter.getV1();
+        ResourceLocation[] layers = {LeafShapes.LITTER, LeafShapes.LITTER_SPARSE, LeafShapes.LITTER_LAYER};
+        for (int t = 0; t < layers.length; t++) {
+            TextureAtlasSprite sprite = atlas.getSprite(layers[t]);
+            layerU0[t] = sprite.getU0();
+            layerV0[t] = sprite.getV0();
+            layerU1[t] = sprite.getU1();
+            layerV1[t] = sprite.getV1();
+        }
     }
 
     /** Finds tiles of loaded litter chunks, drops tiles of unloaded ones and lists those that need a rebuild. */
@@ -309,7 +323,12 @@ final class LeafRenderer implements AutoCloseable {
                 int light = simulation.lightAt((cellX + 0.5) * LitterField.CELL, top + 0.05, (cellZ + 0.5) * LitterField.CELL);
                 int layers = topLayers;
                 if (n >= SURFACE_MIN) {
-                    emitSurface(builder, tile, lx, lz, base, light);
+                    // Carpet: a leaf layer with gaps over the ground. Pile: a solid shadowed body under that layer.
+                    if (n >= BODY_MIN) {
+                        emitSurface(builder, tile, lx, lz, base, light, TEX_BODY, BODY_SINK, BODY_SHADE);
+                        quads++;
+                    }
+                    emitSurface(builder, tile, lx, lz, base, light, n >= DENSE_MIN ? TEX_LAYER : TEX_SPARSE, LAYER_SINK, 1.0F);
                     quads++;
                     side = Math.min(side, SURFACE_SIDE_LAYERS);
                     layers = tile.wantDetailed ? SURFACE_TOP_LAYERS : 1;
@@ -362,10 +381,13 @@ final class LeafRenderer implements AutoCloseable {
     }
 
     /**
-     * The body of a pile: one quad per cell whose corners are the average heights of the four cells around them, so
-     * the pile is a smooth mound that runs down to the ground at its edges, covered with a seamless leaf texture.
+     * One quad per cell of the smooth litter surface: its corners are the average heights of the four cells around
+     * them, so carpets and piles are smooth mounds that run down to the ground at their edges. Used for the solid
+     * pile body and for the leaf layers with gaps; {@code sink} puts it below the loose top leaves.
      */
-    private void emitSurface(BufferBuilder builder, Tile tile, int lx, int lz, double base, int light) {
+    private void emitSurface(BufferBuilder builder, Tile tile, int lx, int lz, double base, int light, int texture, float sink,
+            float shadeFactor) {
+        currentSink = sink;
         float h00 = corner(lx, lz, base);
         float h10 = corner(lx + 1, lz, base);
         float h11 = corner(lx + 1, lz + 1, base);
@@ -377,23 +399,23 @@ final class LeafRenderer implements AutoCloseable {
         int c01 = cornerColor(lx, lz + 1, self);
         int cellX = tile.cellX + lx;
         int cellZ = tile.cellZ + lz;
-        float du = (litterU1 - litterU0) * 0.25F;
-        float dv = (litterV1 - litterV0) * 0.25F;
-        float u = litterU0 + du * (cellX & 3);
-        float v = litterV0 + dv * (cellZ & 3);
+        float du = (layerU1[texture] - layerU0[texture]) * 0.25F;
+        float dv = (layerV1[texture] - layerV0[texture]) * 0.25F;
+        float u = layerU0[texture] + du * (cellX & 3);
+        float v = layerV0[texture] + dv * (cellZ & 3);
         float x0 = lx * LitterField.CELL;
         float z0 = lz * LitterField.CELL;
         float x1 = x0 + LitterField.CELL;
         float z1 = z0 + LitterField.CELL;
-        bodyVertex(builder, lx, lz, base, x0, h00, z0, c00, u, v, light);
-        bodyVertex(builder, lx, lz + 1, base, x0, h01, z1, c01, u, v + dv, light);
-        bodyVertex(builder, lx + 1, lz + 1, base, x1, h11, z1, c11, u + du, v + dv, light);
-        bodyVertex(builder, lx + 1, lz, base, x1, h10, z0, c10, u + du, v, light);
+        bodyVertex(builder, lx, lz, base, x0, h00, z0, c00, u, v, light, shadeFactor);
+        bodyVertex(builder, lx, lz + 1, base, x0, h01, z1, c01, u, v + dv, light, shadeFactor);
+        bodyVertex(builder, lx + 1, lz + 1, base, x1, h11, z1, c11, u + du, v + dv, light, shadeFactor);
+        bodyVertex(builder, lx + 1, lz, base, x1, h10, z0, c10, u + du, v, light, shadeFactor);
     }
 
     /** One corner of the pile body, shaded with a normal smoothed over the neighboring corners (no facets). */
     private void bodyVertex(BufferBuilder builder, int cornerX, int cornerZ, double base, float x, float y, float z, int color, float u,
-            float v, int light) {
+            float v, int light, float shadeFactor) {
         float east = corner(Math.min(LitterChunk.TILE, cornerX + 1), cornerZ, base);
         float west = corner(Math.max(0, cornerX - 1), cornerZ, base);
         float south = corner(cornerX, Math.min(LitterChunk.TILE, cornerZ + 1), base);
@@ -406,7 +428,7 @@ final class LeafRenderer implements AutoCloseable {
         float nx = -slopeX / length;
         float ny = 1.0F / length;
         float nz = -slopeZ / length;
-        float shade = (nx * nx * 0.6F + ny * ny + nz * nz * 0.8F) * BODY_SHADE;
+        float shade = (nx * nx * 0.6F + ny * ny + nz * nz * 0.8F) * shadeFactor;
         builder.addVertex(x, y, z, opaque(color, shade), u, v, OverlayTexture.NO_OVERLAY, light, nx, ny, nz);
     }
 
@@ -422,7 +444,7 @@ final class LeafRenderer implements AutoCloseable {
                 sum += ringCount[r] > 0 && Math.abs(ringBase[r] - base) < 0.6 ? ringTop[r] : base;
             }
         }
-        return (float) (sum * 0.25 - LitterField.SURFACE_DROP - BODY_SINK - currentOriginY);
+        return (float) (sum * 0.25 - LitterField.SURFACE_DROP - currentSink - currentOriginY);
     }
 
     /** Color of a cell corner: the average of the surrounding stacks, so colors blend smoothly across a pile. */

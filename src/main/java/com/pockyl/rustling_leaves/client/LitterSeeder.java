@@ -96,7 +96,7 @@ final class LitterSeeder {
                 if (Double.isNaN(blockGround)) {
                     continue;
                 }
-                int walls = settings.naturalPiles && d >= 0.1F ? walls(simulation, x, z, blockGround + 0.1) : 0;
+                int walls = settings.naturalPiles && d >= 0.3F ? walls(simulation, x, z, blockGround + 0.1) : 0;
                 for (int c = 0; c < 16; c++) {
                     int cellX = x * 4 + (c & 3);
                     int cellZ = z * 4 + (c >> 2);
@@ -108,16 +108,16 @@ final class LitterSeeder {
                     }
                     ground[(bz * 16 + bx) * 16 + c] = surface;
                     float noise = 0.5F * unit(LeafPalette.hash(cellX, cellZ, 0x5EED)) + 0.5F * unit(blockNoise);
-                    int leaves = Math.round(d * carpet * (0.3F + 1.2F * noise));
+                    // Patchy: in the sparser half of the noise the ground stays bare.
+                    int leaves = Math.max(0, Math.round(d * carpet * (noise - 0.4F) * 2.4F));
                     leaves += wallDrift(walls, c & 3, c >> 2, d);
                     chunk.seedCell(LitterField.index(cellX, cellZ), leaves, (float) surface, color, shape);
                 }
             }
         }
-        if (settings.naturalPiles && densitySum / 256.0F > 0.2F) {
+        if (settings.naturalPiles && densitySum / 256.0F > 0.3F) {
             long chunkHash = LeafPalette.hash(chunk.x, chunk.z, 0x9113);
-            int piles = unit(chunkHash) < 0.35F ? 1 : 0;
-            piles += unit(chunkHash >>> 20) < 0.1F ? 1 : 0;
+            int piles = unit(chunkHash) < 0.12F ? 1 : 0;
             for (int p = 0; p < piles; p++) {
                 addPile(chunk, originX, originZ, LeafPalette.hash(chunk.x, chunk.z, p));
             }
@@ -159,7 +159,7 @@ final class LitterSeeder {
         if ((walls & 8) != 0) {
             nearest = Math.min(nearest, cellZ);
         }
-        return nearest >= 4 ? 0 : Math.round((8 + 14 * d) * (1.0F - nearest / 4.0F));
+        return nearest >= 4 ? 0 : Math.round((2 + 6 * d) * (1.0F - nearest / 4.0F));
     }
 
     /** A dome-shaped leaf pile somewhere under the trees of this chunk. */
@@ -178,8 +178,8 @@ final class LitterSeeder {
         int sourceCell = LitterField.index((originX + (column & 15)) * 4 + 1, (originZ + (column >> 4)) * 4 + 1);
         int pileColor = chunk.color[sourceCell];
         int pileShape = chunk.shape[sourceCell];
-        float radius = 1.0F + unit(hash >>> 13) * 1.5F;
-        float peak = 18.0F + unit(hash >>> 29) * 22.0F;
+        float radius = 0.8F + unit(hash >>> 13) * 0.9F;
+        float peak = 10.0F + unit(hash >>> 29) * 14.0F;
         double centerX = originX + (column & 15) + 0.5;
         double centerZ = originZ + (column >> 4) + 0.5;
         int reach = Mth.ceil(radius * 4);

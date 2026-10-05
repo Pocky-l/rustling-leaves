@@ -62,11 +62,43 @@ final class LeafSpawner {
             while (bottom > top - MAX_CANOPY_DEPTH && level.getBlockState(cursor.set(x, bottom - 1, z)).is(BlockTags.LEAVES)) {
                 bottom--;
             }
-            // Start anywhere inside the canopy; foliage only slows leaves down, so they drift out of it naturally.
-            double y = bottom + random.nextDouble() * (top - bottom + 1);
-            float push = windHere * 0.8F;
-            spawn(level, simulation, state, cursor.set(x, Mth.floor(y), z), x + random.nextDouble(), y, z + random.nextDouble(),
-                    wind.dirX() * push, 0.0F, wind.dirZ() * push, true);
+            detach(level, simulation, state, x, z, bottom, top, windHere * 0.8F, wind);
+        }
+    }
+
+    private static final int[][] SIDES = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+
+    /**
+     * A leaf comes off the outside of the crown: from the underside of the lowest leaves (most of the time) or from
+     * an open side of a leaves block in the column, so it is seen from the moment it lets go.
+     */
+    private void detach(Level level, LeafSimulation simulation, BlockState state, int x, int z, int bottom, int top, float push,
+            Wind wind) {
+        double sx = x + random.nextDouble();
+        double sz = z + random.nextDouble();
+        double sy = bottom - 0.05;
+        float ox = 0.0F;
+        float oz = 0.0F;
+        boolean below = level.getBlockState(cursor.set(x, bottom - 1, z)).getCollisionShape(level, cursor).isEmpty();
+        if (!below || random.nextFloat() < 0.4F) {
+            int y = bottom + random.nextInt(top - bottom + 1);
+            int[] side = SIDES[random.nextInt(SIDES.length)];
+            BlockState neighbor = level.getBlockState(cursor.set(x + side[0], y, z + side[1]));
+            if (neighbor.isAir()) {
+                sx = side[0] == 0 ? sx : x + (side[0] > 0 ? 1.05 : -0.05);
+                sz = side[1] == 0 ? sz : z + (side[1] > 0 ? 1.05 : -0.05);
+                sy = y + random.nextDouble();
+                ox = side[0] * 0.02F;
+                oz = side[1] * 0.02F;
+            } else if (!below) {
+                return;
+            }
+        }
+        int i = spawn(level, simulation, state, cursor.set(x, Mth.floor(sy), z), sx, sy, sz, wind.dirX() * push + ox, -0.01F,
+                wind.dirZ() * push + oz, true);
+        if (i >= 0) {
+            simulation.pool().spinPitch[i] += (random.nextFloat() - 0.5F) * 0.3F;
+            simulation.pool().spinRoll[i] += (random.nextFloat() - 0.5F) * 0.3F;
         }
     }
 
@@ -82,7 +114,7 @@ final class LeafSpawner {
         }
     }
 
-    private void spawn(Level level, LeafSimulation simulation, BlockState state, BlockPos colorPos, double x, double y, double z, float vx,
+    private int spawn(Level level, LeafSimulation simulation, BlockState state, BlockPos colorPos, double x, double y, double z, float vx,
             float vy, float vz, boolean natural) {
         LeafSettings settings = simulation.settings();
         LeafShape shape = LeafShapes.of(state.getBlock());
@@ -90,6 +122,6 @@ final class LeafSpawner {
         int color = LeafPalette.vary(base, random.nextLong(), settings.autumnColors, shape);
         int sprite = shape.firstSprite + random.nextInt(shape.variants);
         float size = LeafShape.BASE_SIZE * shape.size * settings.leafSize * (0.8F + random.nextFloat() * 0.45F);
-        simulation.spawn(x, y, z, vx, vy, vz, color, base, shape, sprite, size, natural);
+        return simulation.spawn(x, y, z, vx, vy, vz, color, base, shape, sprite, size, natural);
     }
 }

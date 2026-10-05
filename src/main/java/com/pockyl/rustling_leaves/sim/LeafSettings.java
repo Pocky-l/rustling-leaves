@@ -10,7 +10,7 @@ public final class LeafSettings {
     public float fallRate = 1.0F;
     public int spawnRadius = 32;
     /** Natural leaf carpet thickness in leaves per quarter-block cell; falling leaves stop thickening it beyond this. */
-    public int carpetDepth = 6;
+    public int carpetDepth = 4;
     /** Whether new forest ground starts with drifts against walls and trunks and the odd leaf pile. */
     public boolean naturalPiles = true;
     public float leafSize = 1.0F;

@@ -160,6 +160,67 @@ public final class Wind {
     }
 
     private final List<Jet> jets = new ArrayList<>();
+    private final List<Blast> blasts = new ArrayList<>();
+
+    /**
+     * The air of an explosion or wind charge: a ring of outflow that expands and dies down within about a second,
+     * a rising column in the middle and (for wind charges) a swirl. Leaves are light, so this moving air rather than
+     * the first kick decides where they go: they ride out on the ring, get caught in the updraft and flutter down.
+     */
+    static final class Blast {
+        final double x;
+        final double y;
+        final double z;
+        final float radius;
+        final float strength;
+        final float swirl;
+        int age;
+
+        Blast(double x, double y, double z, float radius, float strength, float swirl) {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            this.radius = radius;
+            this.strength = strength;
+            this.swirl = swirl;
+        }
+
+        boolean done() {
+            return age > 36;
+        }
+
+        void add(double px, double py, double pz, float[] out) {
+            float dx = (float) (px - x);
+            float dy = (float) (py - y);
+            float dz = (float) (pz - z);
+            float flat = Mth.sqrt(dx * dx + dz * dz);
+            if (flat > radius * 1.6F || dy < -2.0F || dy > radius * 1.5F) {
+                return;
+            }
+            float decay = (float) Math.exp(-age / 10.0);
+            float front = radius * (1.0F - (float) Math.exp(-age / 6.0)) * 1.3F;
+            float width = 0.8F + radius * 0.25F;
+            float ring = (flat - front) / width;
+            float outflow = strength * decay * (float) Math.exp(-ring * ring);
+            float nx = flat > 1.0E-3F ? dx / flat : 0.0F;
+            float nz = flat > 1.0E-3F ? dz / flat : 0.0F;
+            out[0] += (nx - nz * swirl) * outflow;
+            out[2] += (nz + nx * swirl) * outflow;
+            out[1] += outflow * 0.35F;
+            // The column in the middle draws air in at the bottom and lifts it.
+            if (flat < radius * 0.6F) {
+                float core = 1.0F - flat / (radius * 0.6F);
+                out[1] += strength * 0.55F * core * (float) Math.exp(-age / 14.0);
+                out[0] -= nx * strength * 0.15F * core * decay;
+                out[2] -= nz * strength * 0.15F * core * decay;
+            }
+        }
+    }
+
+    /** Starts the air pulse of an explosion. */
+    public void addBlast(double x, double y, double z, float radius, float strength, float swirl) {
+        blasts.add(new Blast(x, y, z, radius, strength, swirl));
+    }
 
     void update(Level level, int tick, LeafSettings settings, Terrain terrain, FastRandom random, double cameraX, double cameraY,
             double cameraZ) {
@@ -173,6 +234,10 @@ public final class Wind {
         base = open ? (CALM + RAIN * rain + THUNDER * thunder) * settings.windStrength : 0.0F;
 
         jets.removeIf(jet -> --jet.ttl <= 0);
+        for (Blast blast : blasts) {
+            blast.age++;
+        }
+        blasts.removeIf(Blast::done);
         for (Iterator<Squall> it = squalls.iterator(); it.hasNext(); ) {
             Squall squall = it.next();
             squall.front += squall.speed;
@@ -346,6 +411,9 @@ public final class Wind {
         for (int w = 0; w < whirlwinds.size(); w++) {
             addWhirlwind(whirlwinds.get(w), x, y, z, out);
         }
+        for (int b = 0; b < blasts.size(); b++) {
+            blasts.get(b).add(x, y, z, out);
+        }
         for (int j = 0; j < jets.size(); j++) {
             Jet jet = jets.get(j);
             float strength = jet.strength(x, y, z);
@@ -404,5 +472,6 @@ public final class Wind {
         whirlwinds.clear();
         squalls.clear();
         jets.clear();
+        blasts.clear();
     }
 }

@@ -7,6 +7,7 @@ import net.minecraft.tags.FluidTags;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.FlowingFluid;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.phys.Vec3;
 
@@ -40,6 +41,8 @@ public final class LeafSimulation {
     private static final int MAX_AIR_TICKS = 20 * 120;
     private static final int MAX_SLIDE_TICKS = 20 * 30;
     private static final int SETTLE_TICKS = 6;
+    /** Share of leaves that tumble instead of fluttering (in nature: long, stiff leaves). */
+    private static final float TUMBLER_SHARE = 0.25F;
     private static final float GROUND_FRICTION = 0.86F;
     private static final float LIFT_THRESHOLD = 0.045F;
     private static final float LIFT_SCALE = 8.0F;
@@ -141,6 +144,7 @@ public final class LeafSimulation {
                 case LeafPool.FALLING -> tickFalling(i);
                 case LeafPool.SLIDING -> tickSliding(i);
                 case LeafPool.FLOATING -> tickFloating(i);
+                case LeafPool.SINKING -> tickSinking(i);
                 case LeafPool.DYING -> {
                     pool.x[i] += pool.vx[i];
                     pool.y[i] += pool.vy[i];
@@ -206,6 +210,10 @@ public final class LeafSimulation {
         pool.vy[i] = vy;
         pool.vz[i] = vz;
         pool.flags[i] = natural ? LeafPool.FLAG_NATURAL : 0;
+        if (random.next() < TUMBLER_SHARE) {
+            pool.flags[i] |= LeafPool.FLAG_TUMBLER;
+            pool.spinPitch[i] = (random.next() < 0.5F ? -1.0F : 1.0F) * (0.25F + random.next() * 0.2F);
+        }
         pool.state[i] = LeafPool.FALLING;
         return i;
     }
@@ -227,6 +235,12 @@ public final class LeafSimulation {
         pool.ground[i] = pose.y;
         pool.flags[i] = 0;
         pool.state[i] = state;
+        if (state != LeafPool.DYING && level != null && underwater(pose.x, pose.y + 0.05, pose.z)) {
+            pool.state[i] = LeafPool.SINKING;
+            pool.vx[i] *= 0.3F;
+            pool.vy[i] *= 0.3F;
+            pool.vz[i] *= 0.3F;
+        }
         return i;
     }
 
@@ -238,8 +252,9 @@ public final class LeafSimulation {
         pool.spinPitch[i] = 0.0F;
         pool.spinRoll[i] = 0.0F;
         pool.phase[i] = random.next() * Mth.TWO_PI;
-        pool.freq[i] = 0.1F + random.next() * 0.12F;
-        pool.sway[i] = 0.03F + random.next() * 0.04F;
+        float glide = random.next();
+        pool.freq[i] = 0.2F - glide * 0.12F + random.next() * 0.03F;
+        pool.sway[i] = 0.025F + glide * glide * 0.075F;
         pool.swayDir[i] = random.next() * Mth.TWO_PI;
         pool.size[i] = size;
         pool.auxA[i] = 0.0F;
@@ -252,6 +267,12 @@ public final class LeafSimulation {
         pool.light[i] = level != null ? terrain.lightAt(x, y + 0.1, z) : 0xF000F0;
         pool.age[i] = 0;
         pool.life[i] = 0;
+    }
+
+    private boolean underwater(double x, double y, double z) {
+        BlockPos.MutableBlockPos cursor = terrain.cursor();
+        cursor.set(Mth.floor(x), Mth.floor(y), Mth.floor(z));
+        return level.getFluidState(cursor).is(FluidTags.WATER);
     }
 
     /** Removes every moving leaf and all litter in memory. */
@@ -330,10 +351,24 @@ public final class LeafSimulation {
         float cos = Mth.cos(phase);
         float sin = Mth.sin(phase);
         float swayDir = pool.swayDir[i] += (random.next() - 0.5F) * 0.06F;
-        float sway = pool.sway[i] * cos;
-        float relX = air[0] + Mth.cos(swayDir) * sway - pool.vx[i];
+        boolean tumbler = (pool.flags[i] & LeafPool.FLAG_TUMBLER) != 0;
+        float ownX;
+        float ownZ;
+        if (tumbler) {
+            // Autorotation: a leaf spinning about its long axis gets lift across that axis and glides sideways.
+            float glide = 0.03F * Math.signum(pool.spinPitch[i]);
+            ownX = Mth.sin(pool.yaw[i]) * glide;
+            ownZ = Mth.cos(pool.yaw[i]) * glide;
+            // Edge-on most of the time: no broadside stall, a steadier and faster descent.
+            sin = 0.45F;
+        } else {
+            float sway = pool.sway[i] * cos;
+            ownX = Mth.cos(swayDir) * sway;
+            ownZ = Mth.sin(swayDir) * sway;
+        }
+        float relX = air[0] + ownX - pool.vx[i];
         float relY = air[1] - pool.vy[i];
-        float relZ = air[2] + Mth.sin(swayDir) * sway - pool.vz[i];
+        float relZ = air[2] + ownZ - pool.vz[i];
         float rel = Mth.sqrt(relX * relX + relY * relY + relZ * relZ);
         float quadratic = (1.0F + QUADRATIC_DRAG * rel) * (foliage ? FOLIAGE_DRAG : 1.0F);
         float dragH = Math.min(0.6F, DRAG_HORIZONTAL * quadratic);
@@ -346,12 +381,19 @@ public final class LeafSimulation {
         // Orientation: a springy pull towards the flutter pose (tilted into the swing), weakened while the leaf is
         // tumbling fast. Both faces of a leaf are equivalent, hence the half-turn wrap.
         float tumble = Math.min(1.0F, rel * 5.0F);
-        float spring = 0.07F * (1.0F - 0.9F * tumble);
-        float damping = 0.85F + 0.12F * tumble;
-        float tilt = 0.65F * sin;
-        float relDir = swayDir - pool.yaw[i];
-        pool.spinPitch[i] = (pool.spinPitch[i] + wrapHalfTurn(tilt * Mth.cos(relDir) - pool.pitch[i]) * spring) * damping;
-        pool.spinRoll[i] = (pool.spinRoll[i] + wrapHalfTurn(tilt * Mth.sin(relDir) - pool.roll[i]) * spring) * damping;
+        if (tumbler) {
+            // Keep spinning about the long axis at the leaf's own rate; the roll stays level.
+            float rate = Math.signum(pool.spinPitch[i] == 0.0F ? 1.0F : pool.spinPitch[i]) * (0.3F + (i & 7) * 0.025F);
+            pool.spinPitch[i] += (rate - pool.spinPitch[i]) * 0.05F;
+            pool.spinRoll[i] = (pool.spinRoll[i] + wrapHalfTurn(-pool.roll[i]) * 0.05F) * 0.9F;
+        } else {
+            float spring = 0.07F * (1.0F - 0.9F * tumble);
+            float damping = 0.85F + 0.12F * tumble;
+            float tilt = 0.65F * Mth.sin(phase);
+            float relDir = swayDir - pool.yaw[i];
+            pool.spinPitch[i] = (pool.spinPitch[i] + wrapHalfTurn(tilt * Mth.cos(relDir) - pool.pitch[i]) * spring) * damping;
+            pool.spinRoll[i] = (pool.spinRoll[i] + wrapHalfTurn(tilt * Mth.sin(relDir) - pool.roll[i]) * spring) * damping;
+        }
         pool.spinYaw[i] = pool.spinYaw[i] * 0.985F + (air[0] * pool.vz[i] - air[2] * pool.vx[i]) * 0.5F;
         pool.pitch[i] += pool.spinPitch[i];
         pool.roll[i] += pool.spinRoll[i];
@@ -656,12 +698,25 @@ public final class LeafSimulation {
         pool.auxA[i] = 0.0F;
         pool.auxB[i] = 0.0F;
         pool.age[i] = 0;
-        pool.life[i] = 20 * 60 * 3 + (int) (random.next() * 20 * 60 * 2);
+        // Ticks until it is soaked through and sinks.
+        pool.life[i] = 20 * 60 + (int) (random.next() * 20 * 90);
     }
 
+    /** Height of the water surface waves at a point: coherent ripples that travel with time, rougher in wind. */
+    private float wave(double x, double z) {
+        float t = tick;
+        float amplitude = 0.012F * (1.0F + 3.0F * Math.min(0.2F, wind.speed(x, 63.0, z)) / 0.2F);
+        return amplitude * (Mth.sin(t * 0.08F + (float) (x * 0.9 + z * 0.6)) + 0.5F * Mth.sin(t * 0.13F + (float) (z * 1.1 - x * 0.5)));
+    }
+
+    /**
+     * A leaf drifting on water: carried by the current and a little by the wind, rocking on the ripples, stopped by
+     * banks, carried down waterfalls. It slowly soaks (faster in rain) and then sinks.
+     */
     private void tickFloating(int i) {
-        if (++pool.age[i] >= pool.life[i]) {
-            startDying(i);
+        pool.age[i] += 1 + (int) (wind.rain() * 2.0F);
+        if (pool.age[i] >= pool.life[i]) {
+            startSinking(i);
             return;
         }
         double x = pool.x[i];
@@ -673,6 +728,18 @@ public final class LeafSimulation {
             pool.state[i] = LeafPool.FALLING;
             return;
         }
+        if (fluid.hasProperty(FlowingFluid.FALLING) && fluid.getValue(FlowingFluid.FALLING)) {
+            // Over a waterfall: tumbling down with the water.
+            pool.y[i] -= 0.3;
+            pool.vx[i] *= 0.8F;
+            pool.vz[i] *= 0.8F;
+            pool.x[i] += pool.vx[i];
+            pool.z[i] += pool.vz[i];
+            pool.spinPitch[i] = (random.next() - 0.5F) * 0.5F;
+            pool.pitch[i] += pool.spinPitch[i];
+            pool.roll[i] += (random.next() - 0.5F) * 0.4F;
+            return;
+        }
         double surface = cursor.getY() + fluid.getHeight(level, cursor);
         if (((i + tick) % 10) == 0) {
             Vec3 flow = fluid.getFlow(level, cursor);
@@ -681,29 +748,98 @@ public final class LeafSimulation {
             pool.light[i] = terrain.lightAt(x, surface + 0.1, z);
         }
         wind.sample(x, surface, z, air);
-        pool.vx[i] += (pool.auxA[i] + air[0] * 0.25F - pool.vx[i]) * 0.08F;
-        pool.vz[i] += (pool.auxB[i] + air[2] * 0.25F - pool.vz[i]) * 0.08F;
+        pool.vx[i] += (pool.auxA[i] + air[0] * 0.25F - pool.vx[i]) * 0.08F + (random.next() - 0.5F) * 0.002F;
+        pool.vz[i] += (pool.auxB[i] + air[2] * 0.25F - pool.vz[i]) * 0.08F + (random.next() - 0.5F) * 0.002F;
         double y = surface + 0.015;
         double nx = x + pool.vx[i];
         if (Double.isNaN(terrain.solidTop(nx, y, z))) {
             x = nx;
         } else {
-            pool.vx[i] *= -0.5F;
+            // Against a bank leaves lose their speed and gather.
+            pool.vx[i] *= -0.15F;
+            pool.vz[i] *= 0.7F;
         }
         double nz = z + pool.vz[i];
         if (Double.isNaN(terrain.solidTop(x, y, nz))) {
             z = nz;
         } else {
-            pool.vz[i] *= -0.5F;
+            pool.vz[i] *= -0.15F;
+            pool.vx[i] *= 0.7F;
         }
+        // Ride the ripples: height and tilt follow the shared wave field, so neighboring leaves rock together.
+        float height = wave(x, z);
+        float slopeX = (wave(x + 0.2, z) - height) / 0.2F;
+        float slopeZ = (wave(x, z + 0.2) - height) / 0.2F;
         pool.x[i] = x;
-        pool.y[i] = y;
+        pool.y[i] = y + height;
         pool.z[i] = z;
-        pool.spinYaw[i] = pool.spinYaw[i] * 0.98F + (random.next() - 0.5F) * 0.004F;
+        float speed = Mth.sqrt(pool.vx[i] * pool.vx[i] + pool.vz[i] * pool.vz[i]);
+        pool.spinYaw[i] = pool.spinYaw[i] * 0.97F + (random.next() - 0.5F) * (0.004F + speed * 0.05F);
         pool.yaw[i] += pool.spinYaw[i];
-        float bob = pool.age[i] * 0.12F + i;
-        pool.pitch[i] = 0.06F * Mth.sin(bob);
-        pool.roll[i] = 0.06F * Mth.cos(bob * 0.8F);
+        float sin = Mth.sin(pool.yaw[i]);
+        float cos = Mth.cos(pool.yaw[i]);
+        float soak = pool.age[i] / (float) pool.life[i];
+        // Soaked leaves ride lower and flatter.
+        pool.y[i] -= soak * 0.012;
+        pool.roll[i] += ((float) Math.atan(slopeX * cos - slopeZ * sin) * 8.0F - pool.roll[i]) * 0.3F;
+        pool.pitch[i] += ((float) -Math.atan(slopeX * sin + slopeZ * cos) * 8.0F - pool.pitch[i]) * 0.3F;
+    }
+
+    private void startSinking(int i) {
+        pool.state[i] = LeafPool.SINKING;
+        pool.y[i] -= 0.04;
+        pool.vy[i] = -0.004F;
+        pool.age[i] = 0;
+        pool.flags[i] &= (byte) ~LeafPool.FLAG_SETTLING;
+    }
+
+    /**
+     * A soaked leaf sinking: very slowly, swaying in a lazy pendulum and drifting with the current, until it settles on
+     * the bottom and joins the litter there.
+     */
+    private void tickSinking(int i) {
+        if (++pool.age[i] > MAX_AIR_TICKS * 2) {
+            startDying(i);
+            return;
+        }
+        if ((pool.flags[i] & LeafPool.FLAG_SETTLING) != 0) {
+            settle(i);
+            return;
+        }
+        double x = pool.x[i];
+        double z = pool.z[i];
+        BlockPos.MutableBlockPos cursor = terrain.cursor();
+        cursor.set(Mth.floor(x), Mth.floor(pool.y[i]), Mth.floor(z));
+        FluidState fluid = level.getFluidState(cursor);
+        if (!fluid.is(FluidTags.WATER)) {
+            pool.state[i] = LeafPool.FALLING;
+            return;
+        }
+        if (((i + tick) % 10) == 0) {
+            Vec3 flow = fluid.getFlow(level, cursor);
+            pool.auxA[i] = (float) flow.x * 0.03F;
+            pool.auxB[i] = (float) flow.z * 0.03F;
+            pool.light[i] = terrain.lightAt(x, pool.y[i], z);
+        }
+        float phase = pool.phase[i] += pool.freq[i] * 0.45F;
+        float cos = Mth.cos(phase);
+        float sin = Mth.sin(phase);
+        float sway = pool.sway[i] * 0.35F * cos;
+        float targetX = pool.auxA[i] + Mth.cos(pool.swayDir[i]) * sway;
+        float targetZ = pool.auxB[i] + Mth.sin(pool.swayDir[i]) * sway;
+        float targetY = -0.014F * (0.5F + 0.9F * sin * sin);
+        pool.vx[i] += (targetX - pool.vx[i]) * 0.15F;
+        pool.vy[i] += (targetY - pool.vy[i]) * 0.15F;
+        pool.vz[i] += (targetZ - pool.vz[i]) * 0.15F;
+        float tilt = 0.45F * sin;
+        float relDir = pool.swayDir[i] - pool.yaw[i];
+        pool.spinPitch[i] = (pool.spinPitch[i] + wrapHalfTurn(tilt * Mth.cos(relDir) - pool.pitch[i]) * 0.04F) * 0.85F;
+        pool.spinRoll[i] = (pool.spinRoll[i] + wrapHalfTurn(tilt * Mth.sin(relDir) - pool.roll[i]) * 0.04F) * 0.85F;
+        pool.spinYaw[i] *= 0.97F;
+        pool.pitch[i] += pool.spinPitch[i];
+        pool.roll[i] += pool.spinRoll[i];
+        pool.yaw[i] += pool.spinYaw[i];
+        move(i);
     }
 
     // ------------------------------------------------------------------------------------------------------------
@@ -733,7 +869,8 @@ public final class LeafSimulation {
             }
             float speed = wind.speed(x, top, z);
             float excess = speed - LIFT_THRESHOLD;
-            if (excess <= 0.0F || random.next() >= excess * LIFT_SCALE * wetness || !terrain.canSeeSky(x, top + 0.3, z)) {
+            if (excess <= 0.0F || random.next() >= excess * LIFT_SCALE * wetness || !terrain.canSeeSky(x, top + 0.3, z)
+                    || underwater(x, top + 0.05, z)) {
                 continue;
             }
             float push = speed * (1.2F + random.next());
@@ -824,6 +961,12 @@ public final class LeafSimulation {
     private void impulse(int i, float vx, float vy, float vz) {
         byte state = pool.state[i];
         if (state == LeafPool.DYING || state == LeafPool.FREE) {
+            return;
+        }
+        if (state == LeafPool.FLOATING && vy < 0.1F || state == LeafPool.SINKING) {
+            pool.vx[i] += vx * 0.6F;
+            pool.vz[i] += vz * 0.6F;
+            clampSpeed(i);
             return;
         }
         if (state == LeafPool.FLOATING || state == LeafPool.SLIDING && vy > 0.02F) {
@@ -1366,6 +1509,12 @@ public final class LeafSimulation {
             return;
         }
         float swirl = random.next() < 0.5F ? -1.0F : 1.0F;
+        // The moving air does most of the work; the shock front only gives the first kick (see Wind.Blast).
+        if (windCharge) {
+            wind.addBlast(x, y, z, Math.min(8.0F, 2.0F + power * 2.2F), 0.45F * strength, 0.8F * swirl);
+        } else {
+            wind.addBlast(x, y, z, Math.min(24.0F, power * 3.0F), Math.min(1.0F, 0.35F + 0.08F * power) * strength, 0.15F * swirl);
+        }
         if (windCharge) {
             shockwaves.add(new Shockwave(x, y, z, Math.min(8.0F, 2.0F + power * 2.2F), 0.8F * strength, 0.55F, 0.9F, 0.45F * swirl,
                     Math.round(260 * strength)));
@@ -1402,7 +1551,7 @@ public final class LeafSimulation {
 
     private void blast(Shockwave wave, int i, double dx, double dy, double dz, float dist) {
         float falloff = 1.0F - dist / wave.radius;
-        float magnitude = wave.strength * falloff * Mth.sqrt(falloff) * (0.7F + 0.6F * random.next());
+        float magnitude = wave.strength * 0.6F * falloff * Mth.sqrt(falloff) * (0.7F + 0.6F * random.next());
         float nx;
         float ny;
         float nz;

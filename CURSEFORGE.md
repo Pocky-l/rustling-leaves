@@ -4,10 +4,12 @@ Physically simulated leaves: falling leaves, leaf piles you can wade through, ra
 
 ## Features
 
-- **Falling leaves**: trees around you shed leaves that flutter, sway and glide down like real leaves -
-  broadside they drift, edge-on they slip, and each one spins and tilts in its own rhythm.
-- **A real forest floor**: leaves pile up in layers - a carpet under the trees, drifts banked against walls and
-  trunks, and now and then a proper leaf pile. Piles slump to a natural angle of repose and leaves slide down their
+- **Falling leaves**: leaves let go of the underside and open sides of tree crowns and come down like real
+  leaves - most flutter and glide in pendulum swings (some in wide, lazy arcs), others tumble about their long axis
+  and slide off sideways.
+- **A real forest floor**: leaves pile up in layers - a patchy carpet under the trees with the ground showing
+  through, small drifts against walls and trunks, and once in a while a leaf pile. Thin litter is a layer of loose
+  leaves, deep piles get a solid body under them. Piles slump to a natural angle of repose and leaves slide down their
   sides. The ground cover is **saved with your world** (per server in multiplayer), so piles stay where they are.
 - **Wade through piles**: the leaves under your feet are pressed down and stay, part of the pile is pushed aside
   with every step and leaves a trail, some leaves skid over the ground and a few fly up after you (more when
@@ -31,10 +33,12 @@ Physically simulated leaves: falling leaves, leaf piles you can wade through, ra
   pile up against obstacles; **squalls** - strong gust fronts - roll through and strip a band of trees at once;
   **leaf whirlwinds** wander over open ground, suck up the litter and spin it up in a swirling column.
   Rain makes leaves wet and heavy, thunderstorms tear them off the trees.
-- **Wind charges** blow leaves away in a swirling ring; **explosions** send a shock front through the forest floor
-  that clears the ground and throws leaves high into the air.
+- **Wind charges** and **explosions** push a pulse of air through the leaves: a ring of wind that rushes outwards and
+  dies down, a rising column in the middle (and a swirl for wind charges). Leaves ride it out, get lifted, flutter
+  down again; some just hop and fall back where they lay.
 - Breaking or decaying leaves releases a burst of leaves; when the block under litter disappears, the litter falls,
-  and a block placed on litter ends up with the leaves on top. Leaves float and drift on water and burn in lava.
+  and a block placed on litter ends up with the leaves on top. Leaves float on water, rock on its ripples, drift with the current and go down waterfalls; slowly they soak,
+  sink swaying and settle on the bottom. They burn in lava.
 - **Colors match the tree** in every biome (also modded trees), with a share of autumn yellows, oranges and reds;
   litter on the ground looks a bit more aged. Oak, birch, spruce and cherry trees drop different shapes.
 - **Built for huge numbers of leaves**: lying leaves are stored as stacks per quarter block and only the visible ones

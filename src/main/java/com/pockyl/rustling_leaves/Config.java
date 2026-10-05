@@ -29,7 +29,7 @@ public final class Config {
             .comment("Thickness of the natural leaf carpet under trees, in leaves per quarter block (0 = no carpet).",
                     "Falling leaves stop thickening it beyond this; piles you make are not limited.")
             .translation("rustling_leaves.configuration.carpetDepth")
-            .defineInRange("carpetDepth", 6, 0, 40);
+            .defineInRange("carpetDepth", 4, 0, 40);
     private static final ModConfigSpec.BooleanValue NATURAL_PILES = BUILDER
             .comment("Whether forests start with leaves banked against walls and trunks and the odd leaf pile.")
             .translation("rustling_leaves.configuration.naturalPiles")

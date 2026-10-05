@@ -23,6 +23,10 @@ final class LeafShapes {
 
     /** Seamless texture of densely packed leaves for the body of piles. */
     static final ResourceLocation LITTER = RustlingLeaves.id("block/leaf/litter");
+    /** Loose leaves with gaps, over a thin carpet: the ground shows through. */
+    static final ResourceLocation LITTER_SPARSE = RustlingLeaves.id("block/leaf/litter_sparse");
+    /** Denser loose leaves with gaps, over thicker carpets and on top of pile bodies. */
+    static final ResourceLocation LITTER_LAYER = RustlingLeaves.id("block/leaf/litter_layer");
 
     private static final Map<Block, LeafShape> BY_BLOCK = new IdentityHashMap<>();
 
