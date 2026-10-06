@@ -798,10 +798,11 @@ final class LeafRenderer implements AutoCloseable {
         int b = (int) ((rgb & 0xFF) * shade);
         int color = 0xFF000000 | r << 16 | g << 8 | b;
         int overlay = OverlayTexture.NO_OVERLAY;
+        // Counter-clockwise seen from the normal's side: shader packs (Iris) recompute the normal from the winding.
         builder.addVertex(x - ax - bx, y - ay - by, z - az - bz, color, u0[sprite], v0[sprite], overlay, light, nx, ny, nz);
-        builder.addVertex(x + ax - bx, y + ay - by, z + az - bz, color, u1[sprite], v0[sprite], overlay, light, nx, ny, nz);
-        builder.addVertex(x + ax + bx, y + ay + by, z + az + bz, color, u1[sprite], v1[sprite], overlay, light, nx, ny, nz);
         builder.addVertex(x - ax + bx, y - ay + by, z - az + bz, color, u0[sprite], v1[sprite], overlay, light, nx, ny, nz);
+        builder.addVertex(x + ax + bx, y + ay + by, z + az + bz, color, u1[sprite], v1[sprite], overlay, light, nx, ny, nz);
+        builder.addVertex(x + ax - bx, y + ay - by, z + az - bz, color, u1[sprite], v0[sprite], overlay, light, nx, ny, nz);
     }
 
     @Override
