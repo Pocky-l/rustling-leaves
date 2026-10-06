@@ -2,6 +2,10 @@
 
 Physically simulated leaves: falling leaves, leaf piles you can wade through, rake and blow away, gusts, whirlwinds and leaf tools.
 
+![Leaf litter under the trees and leaves drifting on the water](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/screenshots/forest-floor.jpg)
+
+*Leaf litter under the trees and leaves drifting on the water*
+
 ## Features
 
 - **Falling leaves**: leaves let go of the underside and open sides of tree crowns and come down like real
@@ -66,6 +70,16 @@ raking, rustle volume.
 ## Requirements
 
 [NeoForge](https://neoforged.net) 1.21.1. The leaves work client-side on any server; install the mod on the server too for the leaf tools.
+
+## Screenshots
+
+![A leaf pile you can wade through, rake and blow away](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/screenshots/leaf-pile.jpg)
+
+*A leaf pile you can wade through, rake and blow away*
+
+![Falling leaves in a birch forest at night](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/screenshots/night-forest.jpg)
+
+*Falling leaves in a birch forest at night*
 
 ## Credits
 
