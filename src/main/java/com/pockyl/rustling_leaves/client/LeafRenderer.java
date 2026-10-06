@@ -28,6 +28,7 @@ import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
 import com.pockyl.rustling_leaves.RustlingLeaves;
+import com.pockyl.rustling_leaves.client.compat.ShaderPacks;
 import com.pockyl.rustling_leaves.sim.LeafPalette;
 import com.pockyl.rustling_leaves.sim.LeafPool;
 import com.pockyl.rustling_leaves.sim.LeafShape;
@@ -49,7 +50,8 @@ import java.util.List;
  *   distance. A chunk switches between the two only once the other mesh is ready, so nothing pops in or out;</li>
  *   <li>moving leaves, written into one streaming buffer each frame and interpolated between ticks.</li>
  * </ul>
- * Both use the vanilla cutout terrain shader, so fog, lightmap and day/night match the world.
+ * Both use the vanilla cutout terrain shader, so fog, lightmap and day/night match the world; with a shader pack Iris
+ * swaps it for the pack's terrain program, so the leaves get the pack's lighting like the blocks around them.
  */
 final class LeafRenderer implements AutoCloseable {
     private static final RenderType LEAVES = RenderType.create(RustlingLeaves.MOD_ID + "_leaves", DefaultVertexFormat.BLOCK,
@@ -102,6 +104,7 @@ final class LeafRenderer implements AutoCloseable {
     private final ByteBufferBuilder bytes = new ByteBufferBuilder(1 << 18);
     private final VertexBuffer moving = new VertexBuffer(VertexBuffer.Usage.DYNAMIC);
     private boolean movingEmpty = true;
+    private boolean shaderPack;
     private final float[] u0 = new float[LeafShape.SPRITE_COUNT];
     private final float[] v0 = new float[LeafShape.SPRITE_COUNT];
     private final float[] u1 = new float[LeafShape.SPRITE_COUNT];
@@ -231,6 +234,15 @@ final class LeafRenderer implements AutoCloseable {
         updateSprites();
         Vec3 cam = camera.getPosition();
         frame++;
+        // While a shader pack is active, Iris reads BLOCK vertices in its larger terrain layout - also from buffers
+        // that were built before: switching a pack on or off rebuilds every mesh, otherwise they come out garbled.
+        if (ShaderPacks.inUse() != shaderPack) {
+            shaderPack = !shaderPack;
+            for (ChunkView view : views.values()) {
+                view.close();
+            }
+            views.clear();
+        }
         collectTiles(cam);
         rebuildTiles();
         buildMoving(cam, camera.getLookVector(), partialTick);

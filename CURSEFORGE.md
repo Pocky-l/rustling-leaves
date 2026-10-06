@@ -57,6 +57,12 @@ Everything can be tuned in the in-game config screen: number of leaves, fall rat
 carpet thickness, leaf size, autumn colors, wind, squalls and whirlwinds, footstep and explosion strength,
 raking, rustle volume.
 
+## Compatibility
+
+- **Shader packs** ([Iris](https://modrinth.com/mod/iris), Oculus): falling leaves and the litter are drawn with the pack's terrain program, so they
+  are lit and shaded like the blocks around them. Switching a pack on or off in game rebuilds the leaf meshes.
+- [Sodium](https://modrinth.com/mod/sodium) works.
+
 ## Requirements
 
 [NeoForge](https://neoforged.net) 1.21.1. The leaves work client-side on any server; install the mod on the server too for the leaf tools.

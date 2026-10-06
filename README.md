@@ -119,6 +119,12 @@ In creative mode the tools are in the **Pocky Mods** tab (and in Tools & Utiliti
 Leaf litter is saved in `saves/<world>/rustling_leaves/` (singleplayer) or `rustling_leaves/servers/<address>/`
 (multiplayer).
 
+## Compatibility
+
+- **Shader packs** ([Iris](https://modrinth.com/mod/iris), Oculus): falling leaves and the litter are drawn with the pack's terrain program, so they
+  are lit and shaded like the blocks around them. Switching a pack on or off in game rebuilds the leaf meshes.
+- [Sodium](https://modrinth.com/mod/sodium) works.
+
 ## Installation
 
 1. Install [NeoForge](https://neoforged.net) for Minecraft 1.21.1.

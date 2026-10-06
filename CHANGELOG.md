@@ -26,3 +26,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Leaf colors match the tree and biome, with autumn colors; different shapes for broad-leaved trees, birch, spruce
   and cherry.
 - Rustling sounds; client config for leaves, wind, interactions and sound.
+- Works with shader packs ([Iris](https://modrinth.com/mod/iris)): leaves are lit and shaded by the pack like the blocks around them.
