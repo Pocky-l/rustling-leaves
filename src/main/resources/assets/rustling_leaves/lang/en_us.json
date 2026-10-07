@@ -6,6 +6,7 @@
   "rustling_leaves.configuration.leaves": "Leaves",
   "rustling_leaves.configuration.maxLeaves": "Maximum Moving Leaves",
   "rustling_leaves.configuration.fallRate": "Fall Rate",
+  "rustling_leaves.configuration.treeFallRates": "Fall Rate Depends on the Tree",
   "rustling_leaves.configuration.spawnRadius": "Falling Radius (blocks)",
   "rustling_leaves.configuration.leafSize": "Leaf Size",
   "rustling_leaves.configuration.autumnColors": "Autumn Colors",

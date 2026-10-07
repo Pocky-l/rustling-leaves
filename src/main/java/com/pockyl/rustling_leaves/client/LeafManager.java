@@ -22,6 +22,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.LevelResource;
@@ -261,6 +262,18 @@ public final class LeafManager {
     }
 
     /** Hooked into block updates of the client level. */
+    /**
+     * Called instead of a vanilla cherry petal particle under the cherry leaves at {@code pos}: drops a simulated petal
+     * there (scaled by the fall rate). Returns false when the simulation is off, so the vanilla particle shows.
+     */
+    public static boolean replaceCherryPetal(Level particleLevel, BlockPos pos, BlockState state) {
+        if (simulation == null || particleLevel != level) {
+            return false;
+        }
+        SPAWNER.dropBelow(level, simulation, state, pos);
+        return true;
+    }
+
     public static void onBlockChanged(ClientLevel changed, BlockPos pos, BlockState oldState, BlockState newState) {
         if (simulation == null || changed != level || oldState == newState) {
             return;

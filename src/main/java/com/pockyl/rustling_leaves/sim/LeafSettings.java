@@ -8,6 +8,8 @@ public final class LeafSettings {
     /** Maximum number of moving (simulated) leaves; leaves lying on the ground are not counted. */
     public int maxLeaves = 8000;
     public float fallRate = 1.0F;
+    /** Whether birches and cherries shed more and conifers less than other trees. */
+    public boolean treeFallRates = true;
     public int spawnRadius = 32;
     /** Natural leaf carpet thickness in leaves per quarter-block cell; falling leaves stop thickening it beyond this. */
     public int carpetDepth = 4;
@@ -24,6 +26,11 @@ public final class LeafSettings {
     public float rustleVolume = 0.6F;
     /** Rake leaves into piles with a hoe or shovel. */
     public boolean raking = true;
+
+    /** How often trees with leaves of this shape drop them, relative to the base fall rate. */
+    public float shedRate(LeafShape shape) {
+        return treeFallRates ? shape.shedRate : 1.0F;
+    }
 
     /** Moving leaves farther than this (horizontally) from the camera are dropped. */
     public double despawnRadius() {

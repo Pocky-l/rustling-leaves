@@ -52,6 +52,19 @@ public final class ModGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+    public static void treesShedAtTheirOwnRate(GameTestHelper helper) {
+        LeafSettings settings = new LeafSettings();
+        helper.assertTrue(settings.shedRate(LeafShape.ROUND) > settings.shedRate(LeafShape.BROAD), "birches shed more than oaks");
+        helper.assertTrue(settings.shedRate(LeafShape.PETAL) > settings.shedRate(LeafShape.BROAD), "cherries shed more than oaks");
+        helper.assertTrue(settings.shedRate(LeafShape.NEEDLE) < 0.5F * settings.shedRate(LeafShape.BROAD), "conifers hardly shed");
+        settings.treeFallRates = false;
+        for (LeafShape shape : LeafShape.values()) {
+            helper.assertTrue(settings.shedRate(shape) == 1.0F, "with the option off every tree sheds alike");
+        }
+        helper.succeed();
+    }
+
     @GameTest(template = "box")
     public static void fallingLeafJoinsTheLitter(GameTestHelper helper) {
         floor(helper);

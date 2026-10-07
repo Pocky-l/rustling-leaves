@@ -21,6 +21,10 @@ public final class Config {
             .comment("How often leaves fall from trees (multiplier, 0 disables falling leaves).")
             .translation("rustling_leaves.configuration.fallRate")
             .defineInRange("fallRate", 1.0, 0.0, 10.0);
+    private static final ModConfigSpec.BooleanValue TREE_FALL_RATES = BUILDER
+            .comment("Whether the tree matters: birches shed more leaves, spruces and other conifers hardly any.")
+            .translation("rustling_leaves.configuration.treeFallRates")
+            .define("treeFallRates", true);
     private static final ModConfigSpec.IntValue SPAWN_RADIUS = BUILDER
             .comment("Radius around the camera, in blocks, in which trees drop leaves.")
             .translation("rustling_leaves.configuration.spawnRadius")
@@ -100,6 +104,7 @@ public final class Config {
     public static void apply(LeafSettings settings) {
         settings.maxLeaves = MAX_LEAVES.get();
         settings.fallRate = FALL_RATE.get().floatValue();
+        settings.treeFallRates = TREE_FALL_RATES.get();
         settings.spawnRadius = SPAWN_RADIUS.get();
         settings.carpetDepth = CARPET_DEPTH.get();
         settings.naturalPiles = NATURAL_PILES.get();

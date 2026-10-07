@@ -4,6 +4,7 @@
   "package": "com.pockyl.rustling_leaves.mixin",
   "compatibilityLevel": "JAVA_21",
   "client": [
+    "CherryLeavesBlockMixin",
     "ClientLevelMixin",
     "ClientPacketListenerMixin"
   ],

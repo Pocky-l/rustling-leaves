@@ -46,6 +46,8 @@ Physically simulated leaves: falling leaves, leaf piles you can wade through, ra
   where water pours onto them, and finally sink swaying to the bottom. They burn in lava.
 - **Colors match the tree** in every biome (also modded trees), with a share of autumn yellows, oranges and reds;
   litter on the ground looks a bit more aged. Oak, birch, spruce and cherry trees drop different shapes.
+- **Every tree sheds its own way**: birches drop leaves more often, spruces and other conifers hardly ever lose a
+  needle. Cherry trees drop simulated petals instead of the vanilla petal particles, exactly as many as vanilla does.
 - **Built for huge numbers of leaves**: lying leaves are stored as stacks per quarter block and only the visible ones
   are drawn from cached GPU meshes - a pile of thousands of leaves costs a few hundred quads. Far away the litter
   switches to a simplified layer (one mesh per chunk), so the forest floor stays visible out to the render distance

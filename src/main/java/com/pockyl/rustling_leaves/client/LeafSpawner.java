@@ -5,6 +5,7 @@ import net.minecraft.tags.BlockTags;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.CherryLeavesBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 
@@ -51,11 +52,16 @@ final class LeafSpawner {
             if (top < level.getMinBuildHeight()) {
                 continue;
             }
-            // Stronger wind at this spot shakes more leaves off: gust waves, squall fronts, storms.
-            float windHere = wind.speed(x, top, z);
-            float local = chance * (1.0F + windHere * 12.0F + wind.squall(x, z) * 10.0F);
             BlockState state = level.getBlockState(cursor.set(x, top, z));
-            if (!state.is(BlockTags.LEAVES) || random.nextFloat() >= local) {
+            if (!state.is(BlockTags.LEAVES)) {
+                continue;
+            }
+            // Stronger wind at this spot shakes more leaves off: gust waves, squall fronts, storms. Vanilla cherry trees
+            // already shed at their own pace through dropBelow, so only the wind adds petals here.
+            float windHere = wind.speed(x, top, z);
+            float calm = state.getBlock() instanceof CherryLeavesBlock ? 0.0F : 1.0F;
+            float local = chance * (calm + windHere * 12.0F + wind.squall(x, z) * 10.0F);
+            if (random.nextFloat() >= local * settings.shedRate(LeafShapes.of(state.getBlock()))) {
                 continue;
             }
             int bottom = top;
@@ -99,6 +105,21 @@ final class LeafSpawner {
         if (i >= 0) {
             simulation.pool().spinPitch[i] += (random.nextFloat() - 0.5F) * 0.3F;
             simulation.pool().spinRoll[i] += (random.nextFloat() - 0.5F) * 0.3F;
+        }
+    }
+
+    /**
+     * One leaf from under the leaves block at {@code pos}, where vanilla spawns its cherry petal particle; the fall
+     * rate scales how many come (rate 2 = two leaves, 0.5 = every other one).
+     */
+    void dropBelow(Level level, LeafSimulation simulation, BlockState state, BlockPos pos) {
+        LeafSettings settings = simulation.settings();
+        int count = Mth.floor(settings.fallRate) + (random.nextFloat() < Mth.frac(settings.fallRate) ? 1 : 0);
+        Wind wind = simulation.wind();
+        float push = wind.speed(pos.getX(), pos.getY(), pos.getZ()) * 0.8F;
+        for (int n = 0; n < count && simulation.pool().free() > 0; n++) {
+            spawn(level, simulation, state, pos, pos.getX() + random.nextDouble(), pos.getY() - 0.05, pos.getZ() + random.nextDouble(),
+                    wind.dirX() * push, -0.01F, wind.dirZ() * push, true);
         }
     }
 

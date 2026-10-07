@@ -6,6 +6,7 @@
   "rustling_leaves.configuration.leaves": "Листья",
   "rustling_leaves.configuration.maxLeaves": "Максимум летящих листьев",
   "rustling_leaves.configuration.fallRate": "Частота листопада",
+  "rustling_leaves.configuration.treeFallRates": "Листопад зависит от дерева",
   "rustling_leaves.configuration.spawnRadius": "Радиус листопада (блоков)",
   "rustling_leaves.configuration.leafSize": "Размер листьев",
   "rustling_leaves.configuration.autumnColors": "Осенние цвета",
