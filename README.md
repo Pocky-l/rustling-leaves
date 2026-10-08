@@ -9,8 +9,9 @@
 </p>
 
 <p align="center">
-  <img alt="Minecraft 1.21.1" src="https://img.shields.io/badge/Minecraft-1.21.1-62B47A">
+  <img alt="Minecraft 1.21.1 | 1.20.1" src="https://img.shields.io/badge/Minecraft-1.21.1%20%7C%201.20.1-62B47A">
   <a href="https://neoforged.net"><img alt="NeoForge" src="https://img.shields.io/badge/Loader-NeoForge-F16436"></a>
+  <a href="https://files.minecraftforge.net"><img alt="Forge" src="https://img.shields.io/badge/Loader-Forge-DFA86A"></a>
   <img alt="Client, server optional" src="https://img.shields.io/badge/Side-Client%20%2B%20optional%20server-5B8DEF">
   <img alt="License MIT" src="https://img.shields.io/badge/License-MIT-blue">
 </p>
@@ -81,7 +82,7 @@ No keys. Just play:
 | Right click a composter with the Leaf Bag | Compost 32 leaves per layer |
 | Throw an Autumn Bomb | Burst of autumn leaves |
 | Right click with the Staff of Winds | Whirlwind where you look; sneak for a squall |
-| Throw a wind charge | Blows leaves away in a swirl |
+| Throw a wind charge (1.21.1 only) | Blows leaves away in a swirl |
 | Explode TNT | Clears the ground and throws leaves high into the air |
 | Break a leaves block | Releases a burst of leaves |
 
@@ -91,14 +92,14 @@ In creative mode the tools are in the **Pocky Mods** tab (and in Tools & Utiliti
 
 | Item | Recipe |
 |---|---|
-| Leaf Blower | `  I` / `IBI` / `RI ` - `I` iron ingot, `B` breeze rod, `R` redstone |
+| Leaf Blower | `  I` / `IBI` / `RI ` - `I` iron ingot, `B` breeze rod (blaze rod on 1.20.1), `R` redstone |
 | Leaf Bag | `S S` / `L L` / ` L ` - `S` string, `L` leather |
 | Autumn Bomb (x2) | shapeless: 2 leaves (any), gunpowder, paper |
-| Staff of Winds | `  W` / ` B ` / `S  ` - `W` wind charge, `B` breeze rod, `S` stick |
+| Staff of Winds | `  W` / ` B ` / `S  ` - `W` wind charge (phantom membrane on 1.20.1), `B` breeze rod (blaze rod on 1.20.1), `S` stick |
 
 ## Configuration
 
-`config/rustling_leaves-client.toml` (also in the in-game config screen: Mods -> Rustling Leaves -> Config):
+`config/rustling_leaves-client.toml` (on 1.21.1 also in the in-game config screen: Mods -> Rustling Leaves -> Config):
 
 | Option | Default | Description |
 |---|---|---|
@@ -130,7 +131,13 @@ Leaf litter is saved in `saves/<world>/rustling_leaves/` (singleplayer) or `rust
 
 ## Installation
 
-1. Install [NeoForge](https://neoforged.net) for Minecraft 1.21.1.
+Supported versions:
+
+- Minecraft 1.21.1 with [NeoForge](https://neoforged.net) - branch `main`.
+- Minecraft 1.20.1 with [Forge](https://files.minecraftforge.net) 47 - branch `1.20.1`.
+
+1. Install [NeoForge](https://neoforged.net) for Minecraft 1.21.1 or [Forge](https://files.minecraftforge.net) for
+   Minecraft 1.20.1.
 2. Put this mod into the `mods` folder of your client. For the leaf tools, install it on the server as well.
 
 ## Building

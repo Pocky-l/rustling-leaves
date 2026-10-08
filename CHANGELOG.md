@@ -4,6 +4,15 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0+1.20.1] - Unreleased
+### Changed
+- Ported to Minecraft 1.20.1 (Forge).
+- Minecraft 1.20.1 has no breeze rods or wind charges: the Leaf Blower is crafted with a blaze rod instead of a breeze
+  rod, the Staff of Winds with a blaze rod and a phantom membrane instead of a breeze rod and a wind charge.
+- The leaf tools, the autumn bomb and whirlwinds use other vanilla sounds, since the breeze and wind charge sounds do
+  not exist in 1.20.1.
+- There is no in-game config screen on Forge 1.20.1; the options are in `config/rustling_leaves-client.toml`.
+
 ## [1.1.0] - 2026-10-07
 ### Added
 - Every tree sheds its own way: birches drop leaves more often, spruces and other conifers hardly ever lose a needle.
