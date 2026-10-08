@@ -1,32 +1,39 @@
 package com.pockyl.rustling_leaves.item;
 
-import com.mojang.serialization.Codec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
-import io.netty.buffer.ByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.util.Mth;
+import net.minecraft.world.item.ItemStack;
 
 import com.pockyl.rustling_leaves.sim.LeafPalette;
 
 /**
  * What a leaf bag holds: how many leaves, their average tree color (0xRRGGBB) and their shape (see
- * {@code LeafShape}), enough to pour back leaves that look like the ones collected.
+ * {@code LeafShape}), enough to pour back leaves that look like the ones collected. Stored in the stack's NBT under
+ * {@value #TAG}; a bag without it is empty.
  */
 public record BagContents(int count, int color, int shape) {
     public static final int CAPACITY = 1000;
     public static final BagContents EMPTY = new BagContents(0, 0x8A6A2E, 0);
+    private static final String TAG = "BagContents";
 
-    public static final Codec<BagContents> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-            Codec.intRange(0, CAPACITY).fieldOf("count").forGetter(BagContents::count),
-            Codec.INT.fieldOf("color").forGetter(BagContents::color),
-            Codec.intRange(0, 15).fieldOf("shape").forGetter(BagContents::shape)
-    ).apply(instance, BagContents::new));
+    /** The contents saved in a stack, or {@link #EMPTY}; out-of-range values are clamped. */
+    public static BagContents of(ItemStack stack) {
+        CompoundTag root = stack.getTag();
+        if (root == null || !root.contains(TAG, Tag.TAG_COMPOUND)) {
+            return EMPTY;
+        }
+        CompoundTag tag = root.getCompound(TAG);
+        return new BagContents(Mth.clamp(tag.getInt("count"), 0, CAPACITY), tag.getInt("color"), Mth.clamp(tag.getInt("shape"), 0, 15));
+    }
 
-    public static final StreamCodec<ByteBuf, BagContents> STREAM_CODEC = StreamCodec.composite(
-            ByteBufCodecs.VAR_INT, BagContents::count,
-            ByteBufCodecs.INT, BagContents::color,
-            ByteBufCodecs.VAR_INT, BagContents::shape,
-            BagContents::new);
+    public void save(ItemStack stack) {
+        CompoundTag tag = new CompoundTag();
+        tag.putInt("count", count);
+        tag.putInt("color", color);
+        tag.putInt("shape", shape);
+        stack.getOrCreateTag().put(TAG, tag);
+    }
 
     public int room() {
         return CAPACITY - count;

@@ -13,8 +13,10 @@ import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.neoforge.network.PacketDistributor;
+import net.minecraftforge.network.PacketDistributor;
+import org.jetbrains.annotations.Nullable;
 
+import com.pockyl.rustling_leaves.network.ModNetwork;
 import com.pockyl.rustling_leaves.network.WindSpellPayload;
 
 import java.util.List;
@@ -48,9 +50,9 @@ public final class WindStaffItem extends Item {
                 Vec3 at = hit.getType() == HitResult.Type.MISS ? player.getEyePosition().add(look.scale(12.0)) : hit.getLocation();
                 payload = new WindSpellPayload(WindSpellPayload.WHIRLWIND, at.x, at.y, at.z, 0.0F, 0.0F);
             }
-            PacketDistributor.sendToPlayersTrackingEntityAndSelf(player, payload);
-            level.playSound(null, player.getX(), player.getY(), player.getZ(), squall ? SoundEvents.BREEZE_SHOOT : SoundEvents.WIND_CHARGE_THROW,
-                    SoundSource.PLAYERS, 1.0F, squall ? 0.7F : 1.0F);
+            ModNetwork.CHANNEL.send(PacketDistributor.TRACKING_ENTITY_AND_SELF.with(() -> player), payload);
+            level.playSound(null, player.getX(), player.getY(), player.getZ(),
+                    squall ? SoundEvents.ENDER_DRAGON_FLAP : SoundEvents.PHANTOM_FLAP, SoundSource.PLAYERS, 1.0F, squall ? 0.7F : 1.0F);
         }
         player.getCooldowns().addCooldown(this, squall ? SQUALL_COOLDOWN : WHIRLWIND_COOLDOWN);
         player.swing(hand);
@@ -58,7 +60,7 @@ public final class WindStaffItem extends Item {
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
+    public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tooltip, TooltipFlag flag) {
         tooltip.add(Component.translatable("item.rustling_leaves.wind_staff.tooltip").withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.translatable("item.rustling_leaves.wind_staff.tooltip_squall").withStyle(ChatFormatting.GRAY));
     }

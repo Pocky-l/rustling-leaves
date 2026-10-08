@@ -1,6 +1,6 @@
 package com.pockyl.rustling_leaves.client.compat;
 
-import net.neoforged.fml.ModList;
+import net.minecraftforge.fml.ModList;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;

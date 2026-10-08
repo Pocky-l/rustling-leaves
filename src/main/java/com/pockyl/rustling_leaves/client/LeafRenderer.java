@@ -1,11 +1,10 @@
 package com.pockyl.rustling_leaves.client;
 
+import com.mojang.blaze3d.platform.Window;
 import com.mojang.blaze3d.shaders.Uniform;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.ByteBufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.VertexBuffer;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
@@ -54,13 +53,9 @@ import java.util.List;
  * swaps it for the pack's terrain program, so the leaves get the pack's lighting like the blocks around them.
  */
 final class LeafRenderer implements AutoCloseable {
-    private static final RenderType LEAVES = RenderType.create(RustlingLeaves.MOD_ID + "_leaves", DefaultVertexFormat.BLOCK,
-            VertexFormat.Mode.QUADS, 1 << 16, false, false, RenderType.CompositeState.builder()
-                    .setLightmapState(RenderStateShard.LIGHTMAP)
-                    .setShaderState(RenderStateShard.RENDERTYPE_CUTOUT_MIPPED_SHADER)
-                    .setTextureState(RenderStateShard.BLOCK_SHEET_MIPPED)
-                    .setCullState(RenderStateShard.NO_CULL)
-                    .createCompositeState(false));
+    private static final RenderType LEAVES = LeafRenderType.LEAVES;
+    /** Shared by every renderer: a BufferBuilder cannot free its memory, so it is created once and reused. */
+    private static BufferBuilder bytes;
     private static final long REBUILD_BUDGET_NANOS = 3_000_000L;
     private static final double DETAIL_DISTANCE = 40.0;
     /** Beyond this distance (to the chunk center) a chunk is drawn as one coarse mesh; 8 blocks of hysteresis. */
@@ -101,7 +96,6 @@ final class LeafRenderer implements AutoCloseable {
     private final int[] blockLeaves = new int[BLOCK_RING * BLOCK_RING];
     private final int[] blockColor = new int[BLOCK_RING * BLOCK_RING];
     private final LitterField.Pose pose = new LitterField.Pose();
-    private final ByteBufferBuilder bytes = new ByteBufferBuilder(1 << 18);
     private final VertexBuffer moving = new VertexBuffer(VertexBuffer.Usage.DYNAMIC);
     private boolean movingEmpty = true;
     private boolean shaderPack;
@@ -127,6 +121,25 @@ final class LeafRenderer implements AutoCloseable {
         this.simulation = simulation;
         this.pool = simulation.pool();
         this.field = simulation.field();
+        if (bytes == null) {
+            bytes = new BufferBuilder(1 << 18);
+        }
+    }
+
+    /** Subclass only to reach the render state shards, which are protected in this version. */
+    private static final class LeafRenderType extends RenderType {
+        static final RenderType LEAVES = RenderType.create(RustlingLeaves.MOD_ID + "_leaves", DefaultVertexFormat.BLOCK,
+                VertexFormat.Mode.QUADS, 1 << 16, false, false, RenderType.CompositeState.builder()
+                        .setLightmapState(RenderStateShard.LIGHTMAP)
+                        .setShaderState(RenderStateShard.RENDERTYPE_CUTOUT_MIPPED_SHADER)
+                        .setTextureState(RenderStateShard.BLOCK_SHEET_MIPPED)
+                        .setCullState(RenderStateShard.NO_CULL)
+                        .createCompositeState(false));
+
+        private LeafRenderType(String name, VertexFormat format, VertexFormat.Mode mode, int bufferSize, boolean crumbling, boolean sort,
+                Runnable setup, Runnable clear) {
+            super(name, format, mode, bufferSize, crumbling, sort, setup, clear);
+        }
     }
 
     /** A static GPU mesh of litter with its origin, bounds and the chunk revision it was built from. */
@@ -253,7 +266,7 @@ final class LeafRenderer implements AutoCloseable {
             LEAVES.clearRenderState();
             return;
         }
-        shader.setDefaultUniforms(VertexFormat.Mode.QUADS, modelView, projection, Minecraft.getInstance().getWindow());
+        setUniforms(shader, modelView, projection);
         shader.apply();
         Uniform offset = shader.CHUNK_OFFSET;
         int quads = 0;
@@ -283,6 +296,45 @@ final class LeafRenderer implements AutoCloseable {
         VertexBuffer.unbind();
         shader.clear();
         LEAVES.clearRenderState();
+    }
+
+    /** The uniforms vanilla sets before drawing a terrain layer (this version has no helper for it). */
+    private static void setUniforms(ShaderInstance shader, Matrix4f modelView, Matrix4f projection) {
+        for (int i = 0; i < 12; i++) {
+            shader.setSampler("Sampler" + i, RenderSystem.getShaderTexture(i));
+        }
+        if (shader.MODEL_VIEW_MATRIX != null) {
+            shader.MODEL_VIEW_MATRIX.set(modelView);
+        }
+        if (shader.PROJECTION_MATRIX != null) {
+            shader.PROJECTION_MATRIX.set(projection);
+        }
+        if (shader.COLOR_MODULATOR != null) {
+            shader.COLOR_MODULATOR.set(RenderSystem.getShaderColor());
+        }
+        if (shader.FOG_START != null) {
+            shader.FOG_START.set(RenderSystem.getShaderFogStart());
+        }
+        if (shader.FOG_END != null) {
+            shader.FOG_END.set(RenderSystem.getShaderFogEnd());
+        }
+        if (shader.FOG_COLOR != null) {
+            shader.FOG_COLOR.set(RenderSystem.getShaderFogColor());
+        }
+        if (shader.FOG_SHAPE != null) {
+            shader.FOG_SHAPE.set(RenderSystem.getShaderFogShape().getIndex());
+        }
+        if (shader.TEXTURE_MATRIX != null) {
+            shader.TEXTURE_MATRIX.set(RenderSystem.getTextureMatrix());
+        }
+        if (shader.GAME_TIME != null) {
+            shader.GAME_TIME.set(RenderSystem.getShaderGameTime());
+        }
+        if (shader.SCREEN_SIZE != null) {
+            Window window = Minecraft.getInstance().getWindow();
+            shader.SCREEN_SIZE.set((float) window.getWidth(), (float) window.getHeight());
+        }
+        RenderSystem.setupShaderLights(shader);
     }
 
     private static int draw(Mesh mesh, Frustum frustum, Uniform offset, Vec3 cam) {
@@ -461,7 +513,8 @@ final class LeafRenderer implements AutoCloseable {
         mesh.originY = Math.floor(minY);
         currentOriginYFar = mesh.originY;
         mesh.bounds = new AABB(mesh.originX, minY - 0.2, mesh.originZ, mesh.originX + 16, maxY + 0.3, mesh.originZ + 16);
-        BufferBuilder builder = new BufferBuilder(bytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
+        BufferBuilder builder = bytes;
+        builder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
         int quads = 0;
         for (int bz = 1; bz < 17; bz++) {
             for (int bx = 1; bx < 17; bx++) {
@@ -489,7 +542,7 @@ final class LeafRenderer implements AutoCloseable {
             }
         }
         mesh.quads = quads;
-        MeshData data = builder.build();
+        BufferBuilder.RenderedBuffer data = builder.endOrDiscardIfEmpty();
         if (data == null) {
             mesh.empty = true;
             return;
@@ -522,10 +575,10 @@ final class LeafRenderer implements AutoCloseable {
         float u1t = layerU1[texture];
         float v1t = layerV1[texture];
         int overlay = OverlayTexture.NO_OVERLAY;
-        builder.addVertex(x0, h00 - sink, z0, color, u0t, v0t, overlay, light, 0.0F, 1.0F, 0.0F);
-        builder.addVertex(x0, h01 - sink, z0 + 1.0F, color, u0t, v1t, overlay, light, 0.0F, 1.0F, 0.0F);
-        builder.addVertex(x0 + 1.0F, h11 - sink, z0 + 1.0F, color, u1t, v1t, overlay, light, 0.0F, 1.0F, 0.0F);
-        builder.addVertex(x0 + 1.0F, h10 - sink, z0, color, u1t, v0t, overlay, light, 0.0F, 1.0F, 0.0F);
+        vertex(builder, x0, h00 - sink, z0, color, u0t, v0t, overlay, light, 0.0F, 1.0F, 0.0F);
+        vertex(builder, x0, h01 - sink, z0 + 1.0F, color, u0t, v1t, overlay, light, 0.0F, 1.0F, 0.0F);
+        vertex(builder, x0 + 1.0F, h11 - sink, z0 + 1.0F, color, u1t, v1t, overlay, light, 0.0F, 1.0F, 0.0F);
+        vertex(builder, x0 + 1.0F, h10 - sink, z0, color, u1t, v0t, overlay, light, 0.0F, 1.0F, 0.0F);
     }
 
     private void buildTile(Tile tile) {
@@ -554,7 +607,8 @@ final class LeafRenderer implements AutoCloseable {
         tile.bounds = new AABB(tile.originX - 0.3, minY - 0.2, tile.originZ - 0.3, tile.originX + TILE_BLOCKS + 0.3, maxY + 0.3,
                 tile.originZ + TILE_BLOCKS + 0.3);
         loadRing(tile);
-        BufferBuilder builder = new BufferBuilder(bytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
+        BufferBuilder builder = bytes;
+        builder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
         int quads = 0;
         for (int lz = 0; lz < LitterChunk.TILE; lz++) {
             for (int lx = 0; lx < LitterChunk.TILE; lx++) {
@@ -595,7 +649,7 @@ final class LeafRenderer implements AutoCloseable {
             }
         }
         tile.quads = quads;
-        MeshData mesh = builder.build();
+        BufferBuilder.RenderedBuffer mesh = builder.endOrDiscardIfEmpty();
         if (mesh == null) {
             tile.empty = true;
             return;
@@ -679,7 +733,7 @@ final class LeafRenderer implements AutoCloseable {
         float ny = 1.0F / length;
         float nz = -slopeZ / length;
         float shade = (nx * nx * 0.6F + ny * ny + nz * nz * 0.8F) * shadeFactor;
-        builder.addVertex(x, y, z, opaque(color, shade), u, v, OverlayTexture.NO_OVERLAY, light, nx, ny, nz);
+        vertex(builder, x, y, z, opaque(color, shade), u, v, OverlayTexture.NO_OVERLAY, light, nx, ny, nz);
     }
 
     /**
@@ -733,7 +787,8 @@ final class LeafRenderer implements AutoCloseable {
     }
 
     private void buildMoving(Vec3 cam, Vector3f look, float partialTick) {
-        BufferBuilder builder = new BufferBuilder(bytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
+        BufferBuilder builder = bytes;
+        builder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
         for (int i = 0, highWater = pool.highWater(); i < highWater; i++) {
             byte state = pool.state[i];
             if (state == LeafPool.FREE) {
@@ -755,7 +810,7 @@ final class LeafRenderer implements AutoCloseable {
                     Mth.lerp(partialTick, pool.prevPitch[i], pool.pitch[i]), Mth.lerp(partialTick, pool.prevRoll[i], pool.roll[i]),
                     size, color, pool.light[i], pool.sprite[i]);
         }
-        MeshData mesh = builder.build();
+        BufferBuilder.RenderedBuffer mesh = builder.endOrDiscardIfEmpty();
         movingEmpty = mesh == null;
         if (mesh != null) {
             moving.bind();
@@ -799,10 +854,17 @@ final class LeafRenderer implements AutoCloseable {
         int color = 0xFF000000 | r << 16 | g << 8 | b;
         int overlay = OverlayTexture.NO_OVERLAY;
         // Counter-clockwise seen from the normal's side: shader packs (Iris) recompute the normal from the winding.
-        builder.addVertex(x - ax - bx, y - ay - by, z - az - bz, color, u0[sprite], v0[sprite], overlay, light, nx, ny, nz);
-        builder.addVertex(x - ax + bx, y - ay + by, z - az + bz, color, u0[sprite], v1[sprite], overlay, light, nx, ny, nz);
-        builder.addVertex(x + ax + bx, y + ay + by, z + az + bz, color, u1[sprite], v1[sprite], overlay, light, nx, ny, nz);
-        builder.addVertex(x + ax - bx, y + ay - by, z + az - bz, color, u1[sprite], v0[sprite], overlay, light, nx, ny, nz);
+        vertex(builder, x - ax - bx, y - ay - by, z - az - bz, color, u0[sprite], v0[sprite], overlay, light, nx, ny, nz);
+        vertex(builder, x - ax + bx, y - ay + by, z - az + bz, color, u0[sprite], v1[sprite], overlay, light, nx, ny, nz);
+        vertex(builder, x + ax + bx, y + ay + by, z + az + bz, color, u1[sprite], v1[sprite], overlay, light, nx, ny, nz);
+        vertex(builder, x + ax - bx, y + ay - by, z + az - bz, color, u1[sprite], v0[sprite], overlay, light, nx, ny, nz);
+    }
+
+    /** One vertex of the BLOCK format; the color is 0xAARRGGBB. */
+    private static void vertex(BufferBuilder builder, float x, float y, float z, int color, float u, float v, int overlay, int light,
+            float nx, float ny, float nz) {
+        builder.vertex(x, y, z, (color >> 16 & 0xFF) / 255.0F, (color >> 8 & 0xFF) / 255.0F, (color & 0xFF) / 255.0F,
+                (color >>> 24) / 255.0F, u, v, overlay, light, nx, ny, nz);
     }
 
     @Override
@@ -812,6 +874,5 @@ final class LeafRenderer implements AutoCloseable {
         }
         views.clear();
         moving.close();
-        bytes.close();
     }
 }

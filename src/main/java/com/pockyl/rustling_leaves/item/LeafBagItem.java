@@ -22,9 +22,9 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ComposterBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
+import org.jetbrains.annotations.Nullable;
 
 import com.pockyl.rustling_leaves.LeafEffects;
-import com.pockyl.rustling_leaves.registry.ModDataComponents;
 
 import java.util.List;
 
@@ -45,7 +45,7 @@ public final class LeafBagItem extends Item {
     }
 
     public static BagContents contents(ItemStack stack) {
-        return stack.getOrDefault(ModDataComponents.BAG_CONTENTS.get(), BagContents.EMPTY);
+        return BagContents.of(stack);
     }
 
     /** Where leaves go in and come out: held in front of the player, at chest height. */
@@ -72,7 +72,7 @@ public final class LeafBagItem extends Item {
             if (level.isClientSide) {
                 LeafEffects.get().pour(user, mouth, direction, poured, contents);
             } else {
-                stack.set(ModDataComponents.BAG_CONTENTS.get(), contents.remove(poured));
+                contents.remove(poured).save(stack);
                 if (remainingUseDuration % 4 == 0) {
                     level.playSound(null, mouth.x, mouth.y, mouth.z, SoundEvents.AZALEA_LEAVES_STEP, SoundSource.PLAYERS, 0.6F,
                             1.1F + level.random.nextFloat() * 0.3F);
@@ -83,8 +83,8 @@ public final class LeafBagItem extends Item {
         if (level.isClientSide) {
             LeafEffects.get().vacuum(user, mouth, direction);
         } else if (remainingUseDuration % 8 == 0) {
-            level.playSound(null, mouth.x, mouth.y, mouth.z, SoundEvents.BREEZE_IDLE_GROUND, SoundSource.PLAYERS, 0.35F,
-                    1.6F + level.random.nextFloat() * 0.2F);
+            level.playSound(null, mouth.x, mouth.y, mouth.z, SoundEvents.PLAYER_ATTACK_SWEEP, SoundSource.PLAYERS, 0.2F,
+                    1.8F + level.random.nextFloat() * 0.2F);
         }
     }
 
@@ -118,14 +118,14 @@ public final class LeafBagItem extends Item {
         if (newLayer == 7) {
             level.scheduleTick(pos, state.getBlock(), 20);
         }
-        stack.set(ModDataComponents.BAG_CONTENTS.get(), contents.remove(layers * COMPOST_COST));
+        contents.remove(layers * COMPOST_COST).save(stack);
         level.levelEvent(1500, pos, 1);
         level.playSound(null, pos, SoundEvents.COMPOSTER_FILL_SUCCESS, SoundSource.BLOCKS, 1.0F, 1.0F);
         return layers;
     }
 
     @Override
-    public int getUseDuration(ItemStack stack, LivingEntity entity) {
+    public int getUseDuration(ItemStack stack) {
         return 72000;
     }
 
@@ -150,7 +150,7 @@ public final class LeafBagItem extends Item {
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
+    public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tooltip, TooltipFlag flag) {
         tooltip.add(Component.translatable("item.rustling_leaves.leaf_bag.contents", contents(stack).count(), BagContents.CAPACITY)
                 .withStyle(ChatFormatting.GOLD));
         tooltip.add(Component.translatable("item.rustling_leaves.leaf_bag.tooltip").withStyle(ChatFormatting.GRAY));

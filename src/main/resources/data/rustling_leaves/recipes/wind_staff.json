@@ -8,17 +8,17 @@
   ],
   "key": {
     "W": {
-      "item": "minecraft:wind_charge"
+      "item": "minecraft:phantom_membrane"
     },
     "B": {
-      "item": "minecraft:breeze_rod"
+      "item": "minecraft:blaze_rod"
     },
     "S": {
       "item": "minecraft:stick"
     }
   },
   "result": {
-    "id": "rustling_leaves:wind_staff",
+    "item": "rustling_leaves:wind_staff",
     "count": 1
   }
 }

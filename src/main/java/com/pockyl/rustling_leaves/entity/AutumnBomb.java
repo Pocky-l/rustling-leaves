@@ -35,7 +35,7 @@ public final class AutumnBomb extends ThrowableItemProjectile {
         super.onHit(result);
         if (!level().isClientSide) {
             level().broadcastEntityEvent(this, BURST);
-            level().playSound(null, getX(), getY(), getZ(), SoundEvents.WIND_CHARGE_BURST.value(), SoundSource.NEUTRAL, 0.6F, 1.3F);
+            level().playSound(null, getX(), getY(), getZ(), SoundEvents.FIREWORK_ROCKET_BLAST, SoundSource.NEUTRAL, 0.6F, 1.3F);
             level().playSound(null, getX(), getY(), getZ(), SoundEvents.AZALEA_LEAVES_BREAK, SoundSource.NEUTRAL, 1.5F, 0.7F);
             discard();
         }

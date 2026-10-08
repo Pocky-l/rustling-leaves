@@ -18,6 +18,7 @@ import net.minecraft.world.item.UseAnim;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import org.jetbrains.annotations.Nullable;
 
 import com.pockyl.rustling_leaves.LeafEffects;
 
@@ -57,7 +58,7 @@ public final class LeafBlowerItem extends Item {
             return;
         }
         if (remainingUseDuration % 10 == 0) {
-            level.playSound(null, nozzle.x, nozzle.y, nozzle.z, SoundEvents.BREEZE_IDLE_AIR, SoundSource.PLAYERS, 0.5F,
+            level.playSound(null, nozzle.x, nozzle.y, nozzle.z, SoundEvents.PLAYER_ATTACK_SWEEP, SoundSource.PLAYERS, 0.35F,
                     1.4F + level.random.nextFloat() * 0.2F);
         }
         AABB area = new AABB(nozzle, nozzle.add(direction.scale(RANGE))).inflate(RANGE * SPREAD);
@@ -83,7 +84,7 @@ public final class LeafBlowerItem extends Item {
     }
 
     @Override
-    public int getUseDuration(ItemStack stack, LivingEntity entity) {
+    public int getUseDuration(ItemStack stack) {
         return 72000;
     }
 
@@ -93,7 +94,7 @@ public final class LeafBlowerItem extends Item {
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
+    public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tooltip, TooltipFlag flag) {
         tooltip.add(Component.translatable("item.rustling_leaves.leaf_blower.tooltip").withStyle(ChatFormatting.GRAY));
     }
 }

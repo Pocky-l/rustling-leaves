@@ -6,7 +6,9 @@
       "conditions": {
         "items": [
           {
-            "items": "minecraft:breeze_rod"
+            "items": [
+              "minecraft:gunpowder"
+            ]
           }
         ]
       }
@@ -14,7 +16,7 @@
     "has_the_recipe": {
       "trigger": "minecraft:recipe_unlocked",
       "conditions": {
-        "recipe": "rustling_leaves:wind_staff"
+        "recipe": "rustling_leaves:autumn_bomb"
       }
     }
   },
@@ -26,7 +28,7 @@
   ],
   "rewards": {
     "recipes": [
-      "rustling_leaves:wind_staff"
+      "rustling_leaves:autumn_bomb"
     ]
   }
 }

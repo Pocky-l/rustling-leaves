@@ -12,7 +12,7 @@ import com.pockyl.rustling_leaves.client.LeafManager;
 
 /**
  * Every block change the client sees (breaking, placing, decay, pistons, explosions) with the old and the new state.
- * NeoForge has no client-side block change event.
+ * Forge has no client-side block change event.
  */
 @Mixin(ClientLevel.class)
 abstract class ClientLevelMixin {

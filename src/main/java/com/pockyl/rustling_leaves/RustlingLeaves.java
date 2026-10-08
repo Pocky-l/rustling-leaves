@@ -4,13 +4,16 @@ import com.mojang.logging.LogUtils;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.bus.api.IEventBus;
-import net.neoforged.fml.common.Mod;
-import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
+import net.minecraftforge.eventbus.api.IEventBus;
+import net.minecraftforge.fml.DistExecutor;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import org.slf4j.Logger;
 
+import com.pockyl.rustling_leaves.client.RustlingLeavesClient;
 import com.pockyl.rustling_leaves.network.ModNetwork;
-import com.pockyl.rustling_leaves.registry.ModDataComponents;
 import com.pockyl.rustling_leaves.registry.ModEntities;
 import com.pockyl.rustling_leaves.registry.ModItems;
 import com.pockyl.rustling_leaves.registry.PockyModsTab;
@@ -24,18 +27,20 @@ public final class RustlingLeaves {
     public static final String MOD_ID = "rustling_leaves";
     public static final Logger LOGGER = LogUtils.getLogger();
 
-    public RustlingLeaves(IEventBus modBus) {
-        ModDataComponents.register(modBus);
+    public RustlingLeaves() {
+        IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
         ModItems.register(modBus);
         ModEntities.register(modBus);
-        modBus.addListener(ModNetwork::register);
+        ModNetwork.register();
         PockyModsTab.register(modBus, () -> new ItemStack(ModItems.LEAF_BLOWER.get()), output -> {
-            output.accept(ModItems.LEAF_BLOWER);
-            output.accept(ModItems.LEAF_BAG);
-            output.accept(ModItems.AUTUMN_BOMB);
-            output.accept(ModItems.WIND_STAFF);
+            output.accept(ModItems.LEAF_BLOWER.get());
+            output.accept(ModItems.LEAF_BAG.get());
+            output.accept(ModItems.AUTUMN_BOMB.get());
+            output.accept(ModItems.WIND_STAFF.get());
         });
         modBus.addListener(RustlingLeaves::addToVanillaTabs);
+        // The client class is only loaded on a client; a dedicated server never resolves it.
+        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> RustlingLeavesClient.init(modBus));
     }
 
     private static void addToVanillaTabs(BuildCreativeModeTabContentsEvent event) {
@@ -49,6 +54,6 @@ public final class RustlingLeaves {
     }
 
     public static ResourceLocation id(String path) {
-        return ResourceLocation.fromNamespaceAndPath(MOD_ID, path);
+        return new ResourceLocation(MOD_ID, path);
     }
 }

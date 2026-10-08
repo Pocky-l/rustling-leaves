@@ -6,7 +6,9 @@
       "conditions": {
         "items": [
           {
-            "items": "minecraft:breeze_rod"
+            "items": [
+              "minecraft:leather"
+            ]
           }
         ]
       }
@@ -14,7 +16,7 @@
     "has_the_recipe": {
       "trigger": "minecraft:recipe_unlocked",
       "conditions": {
-        "recipe": "rustling_leaves:leaf_blower"
+        "recipe": "rustling_leaves:leaf_bag"
       }
     }
   },
@@ -26,7 +28,7 @@
   ],
   "rewards": {
     "recipes": [
-      "rustling_leaves:leaf_blower"
+      "rustling_leaves:leaf_bag"
     ]
   }
 }

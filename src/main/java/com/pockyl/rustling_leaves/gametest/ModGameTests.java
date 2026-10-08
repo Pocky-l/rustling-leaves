@@ -9,13 +9,12 @@ import net.minecraft.world.level.block.ComposterBlock;
 import net.minecraft.world.level.block.SlabBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.SlabType;
-import net.neoforged.neoforge.gametest.GameTestHolder;
-import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import net.minecraftforge.gametest.GameTestHolder;
+import net.minecraftforge.gametest.PrefixGameTestTemplate;
 
 import com.pockyl.rustling_leaves.RustlingLeaves;
 import com.pockyl.rustling_leaves.item.BagContents;
 import com.pockyl.rustling_leaves.item.LeafBagItem;
-import com.pockyl.rustling_leaves.registry.ModDataComponents;
 import com.pockyl.rustling_leaves.registry.ModItems;
 import com.pockyl.rustling_leaves.sim.Armful;
 import com.pockyl.rustling_leaves.sim.LeafListener;
@@ -523,7 +522,7 @@ public final class ModGameTests {
         BlockPos pos = new BlockPos(3, 1, 3);
         helper.setBlock(pos, Blocks.COMPOSTER);
         ItemStack bag = new ItemStack(ModItems.LEAF_BAG.get());
-        bag.set(ModDataComponents.BAG_CONTENTS.get(), BagContents.EMPTY.add(100, 0x6A8F3A, 0));
+        BagContents.EMPTY.add(100, 0x6A8F3A, 0).save(bag);
         int layers = LeafBagItem.compost(helper.getLevel(), helper.absolutePos(pos), bag);
         helper.assertTrue(layers == 3, "composted " + layers + " layers from 100 leaves");
         helper.assertBlockProperty(pos, ComposterBlock.LEVEL, 3);

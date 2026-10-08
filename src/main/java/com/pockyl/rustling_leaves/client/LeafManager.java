@@ -5,9 +5,9 @@ import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.protocol.game.ClientboundExplodePacket;
 import net.minecraft.resources.ResourceLocation;
@@ -29,15 +29,14 @@ import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.client.event.ClientTickEvent;
-import net.neoforged.neoforge.client.event.CustomizeGuiOverlayEvent;
-import net.neoforged.neoforge.client.event.InputEvent;
-import net.neoforged.neoforge.client.event.MovementInputUpdateEvent;
-import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
-import net.neoforged.neoforge.network.PacketDistributor;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.client.event.CustomizeGuiOverlayEvent;
+import net.minecraftforge.client.event.InputEvent;
+import net.minecraftforge.client.event.MovementInputUpdateEvent;
+import net.minecraftforge.client.event.RenderLevelStageEvent;
+import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
 
 import com.pockyl.rustling_leaves.Config;
 import com.pockyl.rustling_leaves.RustlingLeaves;
@@ -45,6 +44,7 @@ import com.pockyl.rustling_leaves.item.BagContents;
 import com.pockyl.rustling_leaves.item.LeafBagItem;
 import com.pockyl.rustling_leaves.item.LeafBlowerItem;
 import com.pockyl.rustling_leaves.network.BagCollectPayload;
+import com.pockyl.rustling_leaves.network.ModNetwork;
 import com.pockyl.rustling_leaves.network.WindSpellPayload;
 import com.pockyl.rustling_leaves.sim.Armful;
 import com.pockyl.rustling_leaves.sim.LeafListener;
@@ -63,7 +63,7 @@ import java.util.List;
  * loaded, saved and seeded, feeds the simulation entities, explosions, block changes and rake strokes, spawns leaves
  * from trees and renders everything.
  */
-@EventBusSubscriber(modid = RustlingLeaves.MOD_ID, value = Dist.CLIENT)
+@Mod.EventBusSubscriber(modid = RustlingLeaves.MOD_ID, value = Dist.CLIENT)
 public final class LeafManager {
     private static final int MAX_BURSTS_PER_TICK = 24;
     private static final int MAX_SOUNDS_PER_TICK = 3;
@@ -100,7 +100,10 @@ public final class LeafManager {
     }
 
     @SubscribeEvent
-    public static void onClientTick(ClientTickEvent.Post event) {
+    public static void onClientTick(TickEvent.ClientTickEvent event) {
+        if (event.phase != TickEvent.Phase.END) {
+            return;
+        }
         Minecraft minecraft = Minecraft.getInstance();
         if (configChanged) {
             configChanged = false;
@@ -146,13 +149,14 @@ public final class LeafManager {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_CUTOUT_BLOCKS || renderer == null) {
             return;
         }
-        renderer.render(event.getCamera(), event.getFrustum(), event.getModelViewMatrix(), event.getProjectionMatrix(),
-                event.getPartialTick().getGameTimeDeltaPartialTick(false));
+        // The level pose stack holds the camera rotation: it is the model-view matrix the terrain is drawn with.
+        renderer.render(event.getCamera(), event.getFrustum(), event.getPoseStack().last().pose(), event.getProjectionMatrix(),
+                event.getPartialTick());
     }
 
     @SubscribeEvent
     public static void onDebugText(CustomizeGuiOverlayEvent.DebugText event) {
-        if (simulation == null || !Minecraft.getInstance().getDebugOverlay().showDebugScreen()) {
+        if (simulation == null || !Minecraft.getInstance().options.renderDebug) {
             return;
         }
         LeafPool pool = simulation.pool();
@@ -212,8 +216,9 @@ public final class LeafManager {
         boolean mine = user == Minecraft.getInstance().player;
         int taken = simulation.vacuum(mouth.x, mouth.y, mouth.z, (float) direction.x, (float) direction.y, (float) direction.z,
                 BagCollectPayload.MAX_PER_TICK, collected);
-        if (mine && taken > 0) {
-            PacketDistributor.sendToServer(new BagCollectPayload(taken, collected.averageColor(), collected.mainShape()));
+        ClientPacketListener connection = Minecraft.getInstance().getConnection();
+        if (mine && taken > 0 && connection != null && ModNetwork.CHANNEL.isRemotePresent(connection.getConnection())) {
+            ModNetwork.CHANNEL.sendToServer(new BagCollectPayload(taken, collected.averageColor(), collected.mainShape()));
         }
     }
 
@@ -295,18 +300,15 @@ public final class LeafManager {
         }
     }
 
-    /** Hooked into the explosion packet, which the server sends for TNT, creepers, wind charges and the like. */
+    /**
+     * Hooked into the explosion packet, which the server sends for TNT, creepers, fireballs and the like. Minecraft
+     * 1.20.1 has no wind charges, so every explosion is a real one.
+     */
     public static void onExplosion(ClientboundExplodePacket packet) {
         if (simulation == null) {
             return;
         }
-        boolean windCharge = isGust(packet.getSmallExplosionParticles()) || isGust(packet.getLargeExplosionParticles());
-        simulation.explode(packet.getX(), packet.getY(), packet.getZ(), packet.getPower(), windCharge);
-    }
-
-    private static boolean isGust(ParticleOptions particle) {
-        return particle.getType() == ParticleTypes.GUST_EMITTER_SMALL || particle.getType() == ParticleTypes.GUST_EMITTER_LARGE
-                || particle.getType() == ParticleTypes.GUST || particle.getType() == ParticleTypes.SMALL_GUST;
+        simulation.explode(packet.getX(), packet.getY(), packet.getZ(), packet.getPower(), false);
     }
 
     // ------------------------------------------------------------------------------------------------------------
@@ -486,7 +488,7 @@ public final class LeafManager {
         @Override
         public void onWhirl(double x, double y, double z, float intensity) {
             if (SETTINGS.rustleVolume > 0.0F) {
-                level.playLocalSound(x, y + 1.0, z, SoundEvents.BREEZE_IDLE_GROUND, SoundSource.AMBIENT,
+                level.playLocalSound(x, y + 1.0, z, SoundEvents.ELYTRA_FLYING, SoundSource.AMBIENT,
                         0.25F * intensity * SETTINGS.rustleVolume, 0.6F + level.random.nextFloat() * 0.2F, false);
             }
         }

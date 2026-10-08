@@ -1,28 +1,29 @@
 package com.pockyl.rustling_leaves.registry;
 
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Rarity;
-import net.neoforged.bus.api.IEventBus;
-import net.neoforged.neoforge.registries.DeferredItem;
-import net.neoforged.neoforge.registries.DeferredRegister;
+import net.minecraftforge.eventbus.api.IEventBus;
+import net.minecraftforge.registries.DeferredRegister;
+import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraftforge.registries.RegistryObject;
 
 import com.pockyl.rustling_leaves.RustlingLeaves;
 import com.pockyl.rustling_leaves.item.AutumnBombItem;
-import com.pockyl.rustling_leaves.item.BagContents;
 import com.pockyl.rustling_leaves.item.LeafBagItem;
 import com.pockyl.rustling_leaves.item.LeafBlowerItem;
 import com.pockyl.rustling_leaves.item.WindStaffItem;
 
 public final class ModItems {
-    public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(RustlingLeaves.MOD_ID);
+    public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, RustlingLeaves.MOD_ID);
 
-    public static final DeferredItem<LeafBlowerItem> LEAF_BLOWER = ITEMS.registerItem("leaf_blower",
-            properties -> new LeafBlowerItem(properties.stacksTo(1).rarity(Rarity.UNCOMMON)));
-    public static final DeferredItem<LeafBagItem> LEAF_BAG = ITEMS.registerItem("leaf_bag",
-            properties -> new LeafBagItem(properties.stacksTo(1).component(ModDataComponents.BAG_CONTENTS.get(), BagContents.EMPTY)));
-    public static final DeferredItem<AutumnBombItem> AUTUMN_BOMB = ITEMS.registerItem("autumn_bomb",
-            properties -> new AutumnBombItem(properties.stacksTo(16)));
-    public static final DeferredItem<WindStaffItem> WIND_STAFF = ITEMS.registerItem("wind_staff",
-            properties -> new WindStaffItem(properties.stacksTo(1).rarity(Rarity.RARE)));
+    public static final RegistryObject<LeafBlowerItem> LEAF_BLOWER = ITEMS.register("leaf_blower",
+            () -> new LeafBlowerItem(new Item.Properties().stacksTo(1).rarity(Rarity.UNCOMMON)));
+    public static final RegistryObject<LeafBagItem> LEAF_BAG = ITEMS.register("leaf_bag",
+            () -> new LeafBagItem(new Item.Properties().stacksTo(1)));
+    public static final RegistryObject<AutumnBombItem> AUTUMN_BOMB = ITEMS.register("autumn_bomb",
+            () -> new AutumnBombItem(new Item.Properties().stacksTo(16)));
+    public static final RegistryObject<WindStaffItem> WIND_STAFF = ITEMS.register("wind_staff",
+            () -> new WindStaffItem(new Item.Properties().stacksTo(1).rarity(Rarity.RARE)));
 
     private ModItems() {
     }
