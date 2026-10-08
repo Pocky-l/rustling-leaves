@@ -27,9 +27,34 @@ public final class LeafSettings {
     /** Rake leaves into piles with a hoe or shovel. */
     public boolean raking = true;
 
+    /** Whether leaf fall follows the seasons of a season mod. */
+    public boolean seasons = true;
+    /** Season options: fall rate in late autumn and in winter, autumn color share in late autumn (multipliers). */
+    public float autumnFallRate = 3.0F;
+    public float winterFallRate = 0.05F;
+    public float autumnColorBoost = 3.0F;
+
+    /**
+     * Multipliers of the current season (1 = no season): how often trees drop leaves, how often cherries drop petals
+     * and how many leaves fall in autumn colors. The client sets them through {@link SeasonCurve} from the season mod.
+     */
+    public float seasonFallRate = 1.0F;
+    public float seasonPetalRate = 1.0F;
+    public float seasonAutumnColors = 1.0F;
+
     /** How often trees with leaves of this shape drop them, relative to the base fall rate. */
     public float shedRate(LeafShape shape) {
         return treeFallRates ? shape.shedRate : 1.0F;
+    }
+
+    /** The season's multiplier of how often trees with leaves of this shape drop them. */
+    public float seasonRate(LeafShape shape) {
+        return shape == LeafShape.PETAL ? seasonPetalRate : seasonFallRate;
+    }
+
+    /** Share of newly fallen leaves in autumn colors: the configured share, raised or lowered by the season. */
+    public float autumnShare() {
+        return Math.min(1.0F, autumnColors * seasonAutumnColors);
     }
 
     /** Moving leaves farther than this (horizontally) from the camera are dropped. */

@@ -88,6 +88,10 @@ configurations {
 
 dependencies {
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+    // Optional: leaf fall follows the seasons when Serene Seasons is installed.
+    modCompileOnly "com.github.glitchfiend:SereneSeasons-forge:${minecraft_version}-${serene_seasons_version}"
+    // Its config classes (for the dimension whitelist) extend GlitchCore's.
+    modCompileOnly "com.github.glitchfiend:GlitchCore-forge:${minecraft_version}-${glitchcore_version}"
 }
 
 var generateModMetadata = tasks.register('generateModMetadata', ProcessResources) {

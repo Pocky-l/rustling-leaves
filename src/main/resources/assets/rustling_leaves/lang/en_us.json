@@ -32,5 +32,10 @@
   "item.rustling_leaves.wind_staff.tooltip": "Right click: raise a leaf whirlwind where you look",
   "item.rustling_leaves.wind_staff.tooltip_squall": "Sneak + right click: send a squall ahead of you",
   "entity.rustling_leaves.autumn_bomb": "Autumn Bomb",
-  "rustling_leaves.configuration.litterDistance": "Litter View Distance"
+  "rustling_leaves.configuration.litterDistance": "Litter View Distance",
+  "rustling_leaves.configuration.seasons": "Seasons",
+  "rustling_leaves.configuration.seasonsEnabled": "Leaf Fall Follows the Seasons",
+  "rustling_leaves.configuration.autumnFallRate": "Fall Rate in Late Autumn",
+  "rustling_leaves.configuration.winterFallRate": "Fall Rate in Winter",
+  "rustling_leaves.configuration.seasonAutumnColors": "Autumn Colors in Late Autumn"
 }

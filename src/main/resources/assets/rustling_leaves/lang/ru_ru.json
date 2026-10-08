@@ -32,5 +32,10 @@
   "item.rustling_leaves.wind_staff.tooltip": "ПКМ: вызвать листовой вихрь туда, куда смотрите",
   "item.rustling_leaves.wind_staff.tooltip_squall": "Shift + ПКМ: пустить шквал перед собой",
   "entity.rustling_leaves.autumn_bomb": "Осенняя бомба",
-  "rustling_leaves.configuration.litterDistance": "Дальность отображения листвы"
+  "rustling_leaves.configuration.litterDistance": "Дальность отображения листвы",
+  "rustling_leaves.configuration.seasons": "Времена года",
+  "rustling_leaves.configuration.seasonsEnabled": "Листопад по временам года",
+  "rustling_leaves.configuration.autumnFallRate": "Листопад поздней осенью",
+  "rustling_leaves.configuration.winterFallRate": "Листопад зимой",
+  "rustling_leaves.configuration.seasonAutumnColors": "Осенние цвета поздней осенью"
 }
