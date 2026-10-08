@@ -4,8 +4,10 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ComposterBlock;
+import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.SlabBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.SlabType;
@@ -23,8 +25,11 @@ import com.pockyl.rustling_leaves.sim.LeafPool;
 import com.pockyl.rustling_leaves.sim.LeafSettings;
 import com.pockyl.rustling_leaves.sim.LeafShape;
 import com.pockyl.rustling_leaves.sim.LeafSimulation;
+import com.pockyl.rustling_leaves.sim.LeafSpawner;
 import com.pockyl.rustling_leaves.sim.LitterChunk;
 import com.pockyl.rustling_leaves.sim.LitterField;
+import com.pockyl.rustling_leaves.sim.SeasonCurve;
+import com.pockyl.rustling_leaves.sim.TreeLeaves;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -62,6 +67,83 @@ public final class ModGameTests {
         for (LeafShape shape : LeafShape.values()) {
             helper.assertTrue(settings.shedRate(shape) == 1.0F, "with the option off every tree sheds alike");
         }
+        helper.succeed();
+    }
+
+    /** Sub-season middles: positions in sub-seasons since the start of early spring. */
+    private static final float MID_SPRING = 1.5F;
+    private static final float MID_SUMMER = 4.5F;
+    private static final float EARLY_AUTUMN = 6.5F;
+    private static final float MID_AUTUMN = 7.5F;
+    private static final float LATE_AUTUMN = 8.5F;
+    private static final float MID_WINTER = 10.5F;
+
+    @GameTest(template = "empty")
+    public static void seasonCurveFollowsTheYear(GameTestHelper helper) {
+        LeafSettings settings = new LeafSettings();
+        SeasonCurve.apply(settings, MID_SUMMER);
+        helper.assertTrue(settings.seasonFallRate == 1.0F && settings.seasonPetalRate == 1.0F && settings.seasonAutumnColors == 1.0F,
+                "summer changes nothing");
+        float summerShare = settings.autumnShare();
+        SeasonCurve.apply(settings, EARLY_AUTUMN);
+        float early = settings.seasonFallRate;
+        float earlyShare = settings.autumnShare();
+        SeasonCurve.apply(settings, MID_AUTUMN);
+        float mid = settings.seasonFallRate;
+        float midShare = settings.autumnShare();
+        SeasonCurve.apply(settings, LATE_AUTUMN);
+        helper.assertTrue(1.0F < early && early < mid && mid < settings.seasonFallRate, "leaf fall does not grow through autumn");
+        helper.assertTrue(settings.seasonFallRate == settings.autumnFallRate, "late autumn fall rate " + settings.seasonFallRate);
+        helper.assertTrue(summerShare < earlyShare && earlyShare < midShare && midShare < settings.autumnShare(),
+                "autumn colors do not grow through autumn");
+        helper.assertTrue(settings.autumnShare() == 1.0F, "late autumn share " + settings.autumnShare());
+        helper.assertTrue(settings.seasonPetalRate == 1.0F, "autumn changes cherry petals");
+        SeasonCurve.apply(settings, MID_WINTER);
+        helper.assertTrue(settings.seasonFallRate == settings.winterFallRate && settings.seasonPetalRate == settings.winterFallRate,
+                "winter fall rate " + settings.seasonFallRate);
+        SeasonCurve.apply(settings, MID_SPRING);
+        helper.assertTrue(settings.seasonFallRate < 1.0F && settings.seasonPetalRate > 1.0F, "spring: few leaves, more petals");
+        // No jumps: across every sub-season boundary (and the turn of the year) the values change only a little.
+        for (int boundary = 0; boundary < SeasonCurve.SUB_SEASONS; boundary++) {
+            SeasonCurve.apply(settings, Math.floorMod(boundary - 1, SeasonCurve.SUB_SEASONS) + 0.999F);
+            float fall = settings.seasonFallRate;
+            float colors = settings.seasonAutumnColors;
+            SeasonCurve.apply(settings, boundary + 0.001F);
+            helper.assertTrue(Math.abs(settings.seasonFallRate - fall) < 0.02F && Math.abs(settings.seasonAutumnColors - colors) < 0.02F,
+                    "season jumps at sub-season " + boundary);
+        }
+        // The season multiplies the configured options instead of replacing them.
+        settings.autumnColors = 0.0F;
+        SeasonCurve.apply(settings, LATE_AUTUMN);
+        helper.assertTrue(settings.autumnShare() == 0.0F, "autumn colors appear although they are off");
+        SeasonCurve.clear(settings);
+        helper.assertTrue(settings.seasonFallRate == 1.0F && settings.seasonPetalRate == 1.0F && settings.seasonAutumnColors == 1.0F,
+                "no season is not neutral");
+        helper.succeed();
+    }
+
+    @GameTest(template = "box", skyAccess = true)
+    public static void winterTreesShedFarFewerLeaves(GameTestHelper helper) {
+        canopy(helper);
+        int summer = shed(helper, MID_SUMMER, 400, null);
+        int winter = shed(helper, MID_WINTER, 400, null);
+        int autumn = shed(helper, LATE_AUTUMN, 400, null);
+        helper.assertTrue(summer > 100, "only " + summer + " leaves fell in summer");
+        helper.assertTrue(winter * 5 < summer, winter + " leaves fell in winter, " + summer + " in summer");
+        helper.assertTrue(autumn > summer * 2, autumn + " leaves fell in late autumn, " + summer + " in summer");
+        helper.succeed();
+    }
+
+    @GameTest(template = "box", skyAccess = true)
+    public static void lateAutumnLeavesFallInAutumnColors(GameTestHelper helper) {
+        canopy(helper);
+        int[] summer = new int[2];
+        shed(helper, MID_SUMMER, 100, summer);
+        int[] autumn = new int[2];
+        shed(helper, LATE_AUTUMN, 100, autumn);
+        helper.assertTrue(summer[1] > 20 && autumn[1] > 20, "too few falling leaves to compare");
+        helper.assertTrue(summer[0] < summer[1] * 0.6F, summer[0] + " of " + summer[1] + " leaves in autumn colors in summer");
+        helper.assertTrue(autumn[0] == autumn[1], autumn[0] + " of " + autumn[1] + " leaves in autumn colors in late autumn");
         helper.succeed();
     }
 
@@ -575,6 +657,51 @@ public final class ModGameTests {
         helper.assertTrue(chunk.count[index] == 0, "scoop left leaves behind");
         run(sim, helper, 20);
         return armful;
+    }
+
+    /** A floor and a flat crown of oak leaves under the ceiling of the box (open to the sky, for the heightmap). */
+    private static void canopy(GameTestHelper helper) {
+        floor(helper);
+        fill(helper, 0, 0, 6, 6, 5, Blocks.OAK_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true));
+    }
+
+    /**
+     * Lets the crown from {@link #canopy} shed leaves for {@code ticks} ticks at a point in the year and returns how
+     * many fell. With {@code colors}, it also counts the moving leaves at the end in autumn colors (into [0]) and all of
+     * them (into [1]): the tree is pure green, so any red in a leaf is an autumn color.
+     */
+    private static int shed(GameTestHelper helper, float season, int ticks, int[] colors) {
+        LeafSimulation sim = simulation(helper, 4096, LeafListener.NONE);
+        sim.settings().spawnRadius = 4;
+        SeasonCurve.apply(sim.settings(), season);
+        int[] fallen = new int[1];
+        LeafSpawner spawner = new LeafSpawner(new TreeLeaves() {
+            @Override
+            public int color(BlockState state, Level level, BlockPos pos) {
+                fallen[0]++;
+                return 0x00FF00;
+            }
+
+            @Override
+            public LeafShape shape(BlockState state) {
+                return LeafShape.BROAD;
+            }
+        });
+        BlockPos center = helper.absolutePos(new BlockPos(3, 1, 3));
+        for (int t = 0; t < ticks; t++) {
+            sim.tick(helper.getLevel(), center.getX() + 0.5, center.getY(), center.getZ() + 0.5);
+            spawner.tick(helper.getLevel(), sim, center.getX() + 0.5, center.getZ() + 0.5);
+        }
+        if (colors != null) {
+            LeafPool pool = sim.pool();
+            for (int i = 0; i < pool.highWater(); i++) {
+                if (pool.state[i] != LeafPool.FREE) {
+                    colors[0] += (pool.color[i] >> 16 & 0xFF) > 0 ? 1 : 0;
+                    colors[1]++;
+                }
+            }
+        }
+        return fallen[0];
     }
 
     /** A simulation without wind and with the litter chunks around the test loaded. */

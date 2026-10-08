@@ -21,6 +21,13 @@ sourceSets.main.resources {
 }
 
 repositories {
+    maven {
+        name = 'Glitchfiend (Serene Seasons)'
+        url = 'https://maven.minecraftforge.net/'
+        content {
+            includeGroup 'com.github.glitchfiend'
+        }
+    }
 }
 
 neoForge {
@@ -76,6 +83,12 @@ configurations {
 }
 
 dependencies {
+    // Optional: leaf fall follows the seasons when Serene Seasons is installed.
+    compileOnly "com.github.glitchfiend:SereneSeasons-neoforge:${minecraft_version}-${serene_seasons_version}"
+    localRuntime "com.github.glitchfiend:SereneSeasons-neoforge:${minecraft_version}-${serene_seasons_version}"
+    // Its config classes (for the dimension whitelist) extend GlitchCore's.
+    compileOnly "com.github.glitchfiend:GlitchCore-neoforge:${minecraft_version}-${glitchcore_version}"
+    localRuntime "com.github.glitchfiend:GlitchCore-neoforge:${minecraft_version}-${glitchcore_version}"
 }
 
 var generateModMetadata = tasks.register('generateModMetadata', ProcessResources) {

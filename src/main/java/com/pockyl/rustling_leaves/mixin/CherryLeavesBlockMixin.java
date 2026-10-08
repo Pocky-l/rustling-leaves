@@ -15,8 +15,8 @@ import com.pockyl.rustling_leaves.client.LeafManager;
 
 /**
  * Cherry leaves drop vanilla petal particles that ignore everything; each one becomes a simulated petal at the same
- * spot instead, so cherry trees shed exactly as often as in vanilla. Only applied on the client, where animateTick runs.
- * There is no event for block particles, hence the mixin.
+ * spot instead, so cherry trees shed as often as in vanilla (times the fall rate and the season). Only applied on the
+ * client, where animateTick runs. There is no event for block particles, hence the mixin.
  */
 @Mixin(CherryLeavesBlock.class)
 abstract class CherryLeavesBlockMixin {
