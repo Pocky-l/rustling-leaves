@@ -83,6 +83,28 @@ public final class Config {
             .define("raking", true);
 
     static {
+        BUILDER.pop().translation("rustling_leaves.configuration.seasons").push("seasons");
+    }
+
+    private static final ModConfigSpec.BooleanValue SEASONS = BUILDER
+            .comment("With Serene Seasons installed, leaf fall follows the season: many leaves in autumn, almost none in winter,",
+                    "few in spring. Biomes and dimensions without seasons are not affected.")
+            .translation("rustling_leaves.configuration.seasonsEnabled")
+            .define("enabled", true);
+    private static final ModConfigSpec.DoubleValue AUTUMN_FALL_RATE = BUILDER
+            .comment("How many more leaves fall in late autumn (multiplier of the fall rate; less in early autumn).")
+            .translation("rustling_leaves.configuration.autumnFallRate")
+            .defineInRange("autumnFallRate", 3.0, 0.0, 10.0);
+    private static final ModConfigSpec.DoubleValue WINTER_FALL_RATE = BUILDER
+            .comment("How many leaves still fall in winter (multiplier of the fall rate, 0 = none).")
+            .translation("rustling_leaves.configuration.winterFallRate")
+            .defineInRange("winterFallRate", 0.05, 0.0, 1.0);
+    private static final ModConfigSpec.DoubleValue SEASON_AUTUMN_COLORS = BUILDER
+            .comment("How the share of autumn colors grows towards late autumn (multiplier of leaves.autumnColors, capped at all leaves).")
+            .translation("rustling_leaves.configuration.seasonAutumnColors")
+            .defineInRange("autumnColors", 3.0, 0.0, 10.0);
+
+    static {
         BUILDER.pop().translation("rustling_leaves.configuration.sound").push("sound");
     }
 
@@ -118,5 +140,9 @@ public final class Config {
         settings.entityStrength = ENTITY_STRENGTH.get().floatValue();
         settings.explosionStrength = EXPLOSION_STRENGTH.get().floatValue();
         settings.rustleVolume = RUSTLE_VOLUME.get().floatValue();
+        settings.seasons = SEASONS.get();
+        settings.autumnFallRate = AUTUMN_FALL_RATE.get().floatValue();
+        settings.winterFallRate = WINTER_FALL_RATE.get().floatValue();
+        settings.autumnColorBoost = SEASON_AUTUMN_COLORS.get().floatValue();
     }
 }

@@ -4,6 +4,16 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - Unreleased
+### Added
+- Seasons with [Serene Seasons](https://www.curseforge.com/minecraft/mc-mods/serene-seasons): in autumn many more leaves fall and more and more of them turn yellow, orange and red, until by
+  late autumn nearly every falling leaf does; in winter hardly a leaf falls (the litter on the ground stays); in
+  spring only a few leaves fall, while blooming cherry trees shed a few more petals; summer stays as before. Leaf fall
+  changes gradually through the sub-seasons. Biomes and dimensions without seasons (tropical biomes, dimensions not
+  whitelisted in Serene Seasons) are not affected.
+- New client config section `seasons`: turn the season effect off, or set how many leaves fall in late autumn and in
+  winter and how strongly the autumn colors grow. These multiply the existing fall rate and autumn color options.
+
 ## [1.1.0] - 2026-10-07
 ### Added
 - Every tree sheds its own way: birches drop leaves more often, spruces and other conifers hardly ever lose a needle.

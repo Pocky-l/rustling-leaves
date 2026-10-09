@@ -48,6 +48,11 @@ Physically simulated leaves: falling leaves, leaf piles you can wade through, ra
   litter on the ground looks a bit more aged. Oak, birch, spruce and cherry trees drop different shapes.
 - **Every tree sheds its own way**: birches drop leaves more often, spruces and other conifers hardly ever lose a
   needle. Cherry trees drop simulated petals instead of the vanilla petal particles, exactly as many as vanilla does.
+- **Seasons** (with [Serene Seasons](https://www.curseforge.com/minecraft/mc-mods/serene-seasons)): leaf fall follows the season - in autumn many more leaves come down, more and more of
+  them yellow, orange and red until by late autumn nearly every leaf is; in winter the trees are almost bare and hardly
+  a leaf falls (the litter stays); in spring only a few leaves fall and cherry blossoms shed a few more petals; summer
+  is unchanged. The change is gradual, without jumps between sub-seasons. Biomes and dimensions without seasons are
+  not affected.
 - **Built for huge numbers of leaves**: lying leaves are stored as stacks per quarter block and only the visible ones
   are drawn from cached GPU meshes - a pile of thousands of leaves costs a few hundred quads. Far away the litter
   switches to a simplified layer (one mesh per chunk), so the forest floor stays visible out to the render distance
@@ -61,12 +66,14 @@ Physically simulated leaves: falling leaves, leaf piles you can wade through, ra
 
 Everything can be tuned in the in-game config screen: number of leaves, fall rate, radius, time on the ground,
 carpet thickness, leaf size, autumn colors, wind, squalls and whirlwinds, footstep and explosion strength,
-raking, rustle volume.
+raking, rustle volume, and how strongly the seasons change leaf fall.
 
 ## Compatibility
 
 - **Shader packs** ([Iris](https://modrinth.com/mod/iris), Oculus): falling leaves and the litter are drawn with the pack's terrain program, so they
   are lit and shaded like the blocks around them. Switching a pack on or off in game rebuilds the leaf meshes.
+- [Serene Seasons](https://www.curseforge.com/minecraft/mc-mods/serene-seasons): leaf fall and autumn colors follow the season (see Features); tune or turn it off in the `seasons`
+  config section.
 - [Sodium](https://modrinth.com/mod/sodium) works.
 
 ## Requirements

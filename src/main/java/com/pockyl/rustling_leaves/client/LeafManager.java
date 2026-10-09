@@ -31,6 +31,7 @@ import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.CustomizeGuiOverlayEvent;
@@ -41,6 +42,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 import com.pockyl.rustling_leaves.Config;
 import com.pockyl.rustling_leaves.RustlingLeaves;
+import com.pockyl.rustling_leaves.client.compat.SereneSeasons;
 import com.pockyl.rustling_leaves.item.BagContents;
 import com.pockyl.rustling_leaves.item.LeafBagItem;
 import com.pockyl.rustling_leaves.item.LeafBlowerItem;
@@ -50,9 +52,13 @@ import com.pockyl.rustling_leaves.sim.Armful;
 import com.pockyl.rustling_leaves.sim.LeafListener;
 import com.pockyl.rustling_leaves.sim.LeafPool;
 import com.pockyl.rustling_leaves.sim.LeafSettings;
+import com.pockyl.rustling_leaves.sim.LeafShape;
 import com.pockyl.rustling_leaves.sim.LeafSimulation;
+import com.pockyl.rustling_leaves.sim.LeafSpawner;
 import com.pockyl.rustling_leaves.sim.LitterChunk;
 import com.pockyl.rustling_leaves.sim.LitterField;
+import com.pockyl.rustling_leaves.sim.SeasonCurve;
+import com.pockyl.rustling_leaves.sim.TreeLeaves;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -72,10 +78,13 @@ public final class LeafManager {
     private static final int SAVE_INTERVAL = 20 * 30;
     private static final float RAKE_RADIUS = 2.0F;
     private static final long SEED_BUDGET_NANOS = 4_000_000L;
+    /** Seasons change slowly; once a second is plenty (also to follow the biome under the camera). */
+    private static final int SEASON_INTERVAL = 20;
+    private static final boolean SERENE_SEASONS = ModList.get().isLoaded(SereneSeasons.MOD_ID);
 
     private static final LeafSettings SETTINGS = new LeafSettings();
     private static final LeafColors COLORS = new LeafColors();
-    private static final LeafSpawner SPAWNER = new LeafSpawner(COLORS);
+    private static final LeafSpawner SPAWNER = new LeafSpawner(new Trees());
     private static final LitterSeeder SEEDER = new LitterSeeder(COLORS);
     /** Vertical movement of each entity in the previous tick, to detect landings. */
     private static final Int2FloatOpenHashMap LAST_FALL = new Int2FloatOpenHashMap();
@@ -87,6 +96,7 @@ public final class LeafManager {
     private static LitterStorage storage;
     private static ClientLevel level;
     private static int ticks;
+    private static int nextSeasonCheck;
     private static int burstsThisTick;
     private static int soundsThisTick;
     private static int disturbingEntity;
@@ -106,6 +116,7 @@ public final class LeafManager {
             configChanged = false;
             int capacity = SETTINGS.maxLeaves;
             Config.apply(SETTINGS);
+            nextSeasonCheck = ticks;
             if (capacity != SETTINGS.maxLeaves) {
                 reset();
             }
@@ -131,6 +142,10 @@ public final class LeafManager {
         simulation.beginTick(level, camera.x, camera.y, camera.z);
         disturbByEntities(camera);
         simulation.finishTick();
+        if (ticks >= nextSeasonCheck) {
+            nextSeasonCheck = ticks + SEASON_INTERVAL;
+            updateSeason(camera);
+        }
         SPAWNER.tick(level, simulation, camera.x, camera.z);
         if (ticks % SAVE_INTERVAL == 0) {
             save(camera);
@@ -264,7 +279,7 @@ public final class LeafManager {
     /** Hooked into block updates of the client level. */
     /**
      * Called instead of a vanilla cherry petal particle under the cherry leaves at {@code pos}: drops a simulated petal
-     * there (scaled by the fall rate). Returns false when the simulation is off, so the vanilla particle shows.
+     * there (scaled by the fall rate and the season). Returns false when the simulation is off, so the vanilla particle shows.
      */
     public static boolean replaceCherryPetal(Level particleLevel, BlockPos pos, BlockState state) {
         if (simulation == null || particleLevel != level) {
@@ -435,6 +450,14 @@ public final class LeafManager {
         }
     }
 
+    private static void updateSeason(Vec3 camera) {
+        if (SERENE_SEASONS && SETTINGS.seasons) {
+            SereneSeasons.update(level, BlockPos.containing(camera), SETTINGS);
+        } else {
+            SeasonCurve.clear(SETTINGS);
+        }
+    }
+
     private static Vec3 cameraPosition(Minecraft minecraft) {
         Camera camera = minecraft.gameRenderer.getMainCamera();
         if (camera.isInitialized()) {
@@ -458,9 +481,23 @@ public final class LeafManager {
             renderer = null;
         }
         simulation = null;
+        nextSeasonCheck = 0;
         LAST_FALL.clear();
         SOUND_READY.clear();
         COLORS.clear();
+    }
+
+    /** Trees look like their blocks: colors from the block tint and texture, shapes from the block id. */
+    private static final class Trees implements TreeLeaves {
+        @Override
+        public int color(BlockState state, Level level, BlockPos pos) {
+            return COLORS.base(state, level, pos);
+        }
+
+        @Override
+        public LeafShape shape(BlockState state) {
+            return LeafShapes.of(state.getBlock());
+        }
     }
 
     private static final class Listener implements LeafListener {

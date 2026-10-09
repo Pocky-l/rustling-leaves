@@ -1,4 +1,4 @@
-package com.pockyl.rustling_leaves.client;
+package com.pockyl.rustling_leaves.sim;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.tags.BlockTags;
@@ -9,39 +9,37 @@ import net.minecraft.world.level.block.CherryLeavesBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 
-import com.pockyl.rustling_leaves.sim.LeafPalette;
-import com.pockyl.rustling_leaves.sim.LeafSettings;
-import com.pockyl.rustling_leaves.sim.LeafShape;
-import com.pockyl.rustling_leaves.sim.LeafSimulation;
-import com.pockyl.rustling_leaves.sim.Wind;
-
 /**
  * Drops leaves from tree canopies around the camera. Each tick a fixed number of random columns is probed through the
  * heightmap (one lookup each), so the cost does not depend on how many trees there are. Gusts shake more leaves off;
- * a passing squall strips trees in a band that sweeps across the forest.
+ * a passing squall strips trees in a band that sweeps across the forest. The season scales how many leaves fall.
  */
-final class LeafSpawner {
+public final class LeafSpawner {
     private static final int SAMPLES = 48;
     private static final float CHANCE = 0.04F;
     private static final int MAX_CANOPY_DEPTH = 10;
 
-    private final LeafColors colors;
+    private final TreeLeaves trees;
     private final RandomSource random = RandomSource.createNewThreadLocalInstance();
     private final BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
 
-    LeafSpawner(LeafColors colors) {
-        this.colors = colors;
+    public LeafSpawner(TreeLeaves trees) {
+        this.trees = trees;
     }
 
-    void tick(Level level, LeafSimulation simulation, double cameraX, double cameraZ) {
+    public void tick(Level level, LeafSimulation simulation, double cameraX, double cameraZ) {
         LeafSettings settings = simulation.settings();
-        if (settings.fallRate <= 0.0F || simulation.pool().free() < 32) {
+        float season = Math.max(settings.seasonFallRate, settings.seasonPetalRate);
+        float rate = settings.fallRate * season;
+        if (rate <= 0.0F || simulation.pool().free() < 32) {
             return;
         }
         Wind wind = simulation.wind();
         boolean squall = wind.squall(cameraX, cameraZ) > 0.0F || wind.speed(cameraX, 64, cameraZ) > 0.15F;
-        int samples = Math.round(SAMPLES * Math.min(1.0F, settings.fallRate)) * (squall ? 3 : 1);
-        float chance = CHANCE * Math.max(1.0F, settings.fallRate) * (0.6F + wind.rain() * 0.5F);
+        // Low rates probe fewer columns (rounded at random, so winter's trickle does not round down to nothing).
+        float budget = SAMPLES * Math.min(1.0F, rate);
+        int samples = (Mth.floor(budget) + (random.nextFloat() < Mth.frac(budget) ? 1 : 0)) * (squall ? 3 : 1);
+        float chance = CHANCE * Math.max(1.0F, rate) * (0.6F + wind.rain() * 0.5F);
         float radius = settings.spawnRadius;
         for (int s = 0; s < samples; s++) {
             float angle = random.nextFloat() * Mth.TWO_PI;
@@ -61,7 +59,9 @@ final class LeafSpawner {
             float windHere = wind.speed(x, top, z);
             float calm = state.getBlock() instanceof CherryLeavesBlock ? 0.0F : 1.0F;
             float local = chance * (calm + windHere * 12.0F + wind.squall(x, z) * 10.0F);
-            if (random.nextFloat() >= local * settings.shedRate(LeafShapes.of(state.getBlock()))) {
+            // The sampling budget is set by the busiest season multiplier (leaves or petals); each tree gets its own share.
+            LeafShape shape = trees.shape(state);
+            if (random.nextFloat() >= local * settings.shedRate(shape) * settings.seasonRate(shape) / season) {
                 continue;
             }
             int bottom = top;
@@ -110,11 +110,12 @@ final class LeafSpawner {
 
     /**
      * One leaf from under the leaves block at {@code pos}, where vanilla spawns its cherry petal particle; the fall
-     * rate scales how many come (rate 2 = two leaves, 0.5 = every other one).
+     * rate and the season scale how many come (rate 2 = two leaves, 0.5 = every other one).
      */
-    void dropBelow(Level level, LeafSimulation simulation, BlockState state, BlockPos pos) {
+    public void dropBelow(Level level, LeafSimulation simulation, BlockState state, BlockPos pos) {
         LeafSettings settings = simulation.settings();
-        int count = Mth.floor(settings.fallRate) + (random.nextFloat() < Mth.frac(settings.fallRate) ? 1 : 0);
+        float rate = settings.fallRate * settings.seasonRate(trees.shape(state));
+        int count = Mth.floor(rate) + (random.nextFloat() < Mth.frac(rate) ? 1 : 0);
         Wind wind = simulation.wind();
         float push = wind.speed(pos.getX(), pos.getY(), pos.getZ()) * 0.8F;
         for (int n = 0; n < count && simulation.pool().free() > 0; n++) {
@@ -124,7 +125,7 @@ final class LeafSpawner {
     }
 
     /** A leaves block was broken or decayed: a burst of its leaves flies out of it. */
-    void burst(Level level, LeafSimulation simulation, BlockPos pos, BlockState state) {
+    public void burst(Level level, LeafSimulation simulation, BlockPos pos, BlockState state) {
         int count = simulation.settings().leavesPerBreak;
         for (int n = 0; n < count; n++) {
             float vx = (random.nextFloat() - 0.5F) * 0.24F;
@@ -138,9 +139,9 @@ final class LeafSpawner {
     private int spawn(Level level, LeafSimulation simulation, BlockState state, BlockPos colorPos, double x, double y, double z, float vx,
             float vy, float vz, boolean natural) {
         LeafSettings settings = simulation.settings();
-        LeafShape shape = LeafShapes.of(state.getBlock());
-        int base = colors.base(state, level, colorPos);
-        int color = LeafPalette.vary(base, random.nextLong(), settings.autumnColors, shape);
+        LeafShape shape = trees.shape(state);
+        int base = trees.color(state, level, colorPos);
+        int color = LeafPalette.vary(base, random.nextLong(), settings.autumnShare(), shape);
         int sprite = shape.firstSprite + random.nextInt(shape.variants);
         float size = LeafShape.BASE_SIZE * shape.size * settings.leafSize * (0.8F + random.nextFloat() * 0.45F);
         return simulation.spawn(x, y, z, vx, vy, vz, color, base, shape, sprite, size, natural);
