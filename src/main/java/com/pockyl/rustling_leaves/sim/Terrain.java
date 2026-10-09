@@ -12,10 +12,23 @@ import net.minecraft.world.level.block.state.BlockState;
  * solid for leaves, they drift through it.
  */
 final class Terrain {
+    private static final double[] NO_BOXES = new double[0];
+    /** A leaf pile block that is not drawn as litter is a layer of 1..8 eighths of a block, like its outline. */
+    private static final double[][] PILE_BOXES = new double[9][];
+
+    static {
+        for (int layers = 1; layers <= 8; layers++) {
+            PILE_BOXES[layers] = new double[] {0.0, 0.0, 0.0, 1.0, layers / 8.0, 1.0};
+        }
+    }
+
     private final ShapeCache shapes = new ShapeCache();
     private final BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
     private final BlockPos.MutableBlockPos lightCursor = new BlockPos.MutableBlockPos();
     Level level;
+    PileBlocks piles = PileBlocks.NONE;
+    /** Pile blocks drawn as litter are not solid: their leaves are the litter on the ground under them. */
+    boolean drawPiles;
 
     BlockPos.MutableBlockPos cursor() {
         return cursor;
@@ -33,7 +46,7 @@ final class Terrain {
 
     /** Like {@link #solidTop} for the block at {@link #cursor}, which must contain the point. */
     double topAt(BlockState state, double x, double y, double z) {
-        double[] boxes = shapes.boxes(state, level, cursor);
+        double[] boxes = boxes(state);
         double lx = x - cursor.getX();
         double ly = y - cursor.getY();
         double lz = z - cursor.getZ();
@@ -69,7 +82,7 @@ final class Terrain {
             if (!state.getFluidState().isEmpty()) {
                 return Double.NaN;
             }
-            double[] boxes = shapes.boxes(state, level, cursor);
+            double[] boxes = boxes(state);
             double best = Double.NEGATIVE_INFINITY;
             double limit = y - by + 1.0E-6;
             for (int b = 0; b < boxes.length; b += 6) {
@@ -83,6 +96,17 @@ final class Terrain {
             }
         }
         return Double.NaN;
+    }
+
+    /** Collision boxes of the block at {@link #cursor}. */
+    private double[] boxes(BlockState state) {
+        if (piles != PileBlocks.NONE) {
+            int layers = piles.layers(state);
+            if (layers > 0) {
+                return drawPiles ? NO_BOXES : PILE_BOXES[Math.min(layers, 8)];
+            }
+        }
+        return shapes.boxes(state, level, cursor);
     }
 
     boolean canSeeSky(double x, double y, double z) {

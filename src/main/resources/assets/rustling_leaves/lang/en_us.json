@@ -21,6 +21,7 @@
   "rustling_leaves.configuration.naturalPiles": "Natural Drifts and Piles",
   "rustling_leaves.configuration.windEvents": "Squalls and Whirlwinds",
   "rustling_leaves.configuration.raking": "Raking with Hoe or Shovel",
+  "rustling_leaves.configuration.immersiveWeatheringPiles": "Immersive Weathering Piles as Litter",
   "item.rustling_leaves.leaf_blower": "Leaf Blower",
   "item.rustling_leaves.leaf_blower.tooltip": "Hold right click to blow leaves away",
   "item.rustling_leaves.leaf_bag": "Leaf Bag",

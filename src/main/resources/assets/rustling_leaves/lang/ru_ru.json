@@ -21,6 +21,7 @@
   "rustling_leaves.configuration.naturalPiles": "Естественные наносы и кучи",
   "rustling_leaves.configuration.windEvents": "Шквалы и вихри",
   "rustling_leaves.configuration.raking": "Грабли (мотыга или лопата)",
+  "rustling_leaves.configuration.immersiveWeatheringPiles": "Кучи Immersive Weathering как листва",
   "item.rustling_leaves.leaf_blower": "Воздуходувка",
   "item.rustling_leaves.leaf_blower.tooltip": "Зажмите ПКМ, чтобы сдувать листья",
   "item.rustling_leaves.leaf_bag": "Мешок для листьев",

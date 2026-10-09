@@ -27,12 +27,18 @@ public final class LitterChunk {
     /** Exact pose of the top leaf (see {@link LitterField#encodeTop}), 0 if the top leaf uses the hashed pose. */
     public final long[] top = new long[AREA];
     public final int[] topColor = new int[AREA];
+    /**
+     * Leaves at the bottom of a stack that stand for a leaf pile block of another mod (see {@link PileBlocks}): they
+     * stay as long as the block does and are never saved (the block brings them back).
+     */
+    public final short[] pinned = new short[AREA];
     /** Incremented whenever a cell of the tile (or a neighbor that affects its look) changes. */
     public final int[] tileRevision = new int[TILES * TILES];
 
     int total;
     boolean seeded;
     boolean dirty;
+    boolean pilesScanned;
 
     public LitterChunk(int x, int z) {
         this.x = x;
@@ -54,6 +60,16 @@ public final class LitterChunk {
             sum += tileRevision[t];
         }
         return sum;
+    }
+
+    /** Leaves of a cell that can be moved (not pinned by a pile block). */
+    public int loose(int index) {
+        return count[index] - pinned[index];
+    }
+
+    /** Whether the pile blocks of this chunk have been turned into pinned litter. */
+    public boolean pilesScanned() {
+        return pilesScanned;
     }
 
     public int total() {
@@ -104,15 +120,15 @@ public final class LitterChunk {
         out.writeBoolean(seeded);
         int cells = 0;
         for (int i = 0; i < AREA; i++) {
-            if (count[i] > 0) {
+            if (loose(i) > 0) {
                 cells++;
             }
         }
         out.writeShort(cells);
         for (int i = 0; i < AREA; i++) {
-            if (count[i] > 0) {
+            if (loose(i) > 0) {
                 out.writeShort(i);
-                out.writeShort(count[i]);
+                out.writeShort(loose(i));
                 out.writeFloat(base[i]);
                 out.writeInt(color[i]);
                 out.writeByte(shape[i]);
