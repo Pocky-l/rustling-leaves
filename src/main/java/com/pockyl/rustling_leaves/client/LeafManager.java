@@ -42,6 +42,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 import com.pockyl.rustling_leaves.Config;
 import com.pockyl.rustling_leaves.RustlingLeaves;
+import com.pockyl.rustling_leaves.client.compat.ImmersiveWeathering;
 import com.pockyl.rustling_leaves.client.compat.SereneSeasons;
 import com.pockyl.rustling_leaves.item.BagContents;
 import com.pockyl.rustling_leaves.item.LeafBagItem;
@@ -57,6 +58,7 @@ import com.pockyl.rustling_leaves.sim.LeafSimulation;
 import com.pockyl.rustling_leaves.sim.LeafSpawner;
 import com.pockyl.rustling_leaves.sim.LitterChunk;
 import com.pockyl.rustling_leaves.sim.LitterField;
+import com.pockyl.rustling_leaves.sim.PileBlocks;
 import com.pockyl.rustling_leaves.sim.SeasonCurve;
 import com.pockyl.rustling_leaves.sim.TreeLeaves;
 
@@ -78,13 +80,17 @@ public final class LeafManager {
     private static final int SAVE_INTERVAL = 20 * 30;
     private static final float RAKE_RADIUS = 2.0F;
     private static final long SEED_BUDGET_NANOS = 4_000_000L;
+    /** Litter chunks per tick whose leaf pile blocks are turned into litter. */
+    private static final int PILE_SCANS_PER_TICK = 16;
     /** Seasons change slowly; once a second is plenty (also to follow the biome under the camera). */
     private static final int SEASON_INTERVAL = 20;
     private static final boolean SERENE_SEASONS = ModList.get().isLoaded(SereneSeasons.MOD_ID);
+    private static final PileBlocks PILES = ModList.get().isLoaded(ImmersiveWeathering.MOD_ID) ? ImmersiveWeathering.piles() : PileBlocks.NONE;
 
     private static final LeafSettings SETTINGS = new LeafSettings();
     private static final LeafColors COLORS = new LeafColors();
-    private static final LeafSpawner SPAWNER = new LeafSpawner(new Trees());
+    private static final Trees TREES = new Trees();
+    private static final LeafSpawner SPAWNER = new LeafSpawner(TREES);
     private static final LitterSeeder SEEDER = new LitterSeeder(COLORS);
     /** Vertical movement of each entity in the previous tick, to detect landings. */
     private static final Int2FloatOpenHashMap LAST_FALL = new Int2FloatOpenHashMap();
@@ -119,7 +125,10 @@ public final class LeafManager {
             nextSeasonCheck = ticks;
             if (capacity != SETTINGS.maxLeaves) {
                 reset();
+            } else if (simulation != null) {
+                simulation.setPiles(PILES, TREES, SETTINGS.drawPileBlocks);
             }
+            updatePileModels(minecraft);
         }
         if (minecraft.level != level) {
             reset();
@@ -131,6 +140,7 @@ public final class LeafManager {
         if (simulation == null) {
             simulation = new LeafSimulation(SETTINGS, SETTINGS.maxLeaves, new Listener());
             simulation.setLevel(level);
+            simulation.setPiles(PILES, TREES, SETTINGS.drawPileBlocks);
             renderer = new LeafRenderer(simulation);
             storage = new LitterStorage(storageDirectory(minecraft, level));
         }
@@ -294,6 +304,9 @@ public final class LeafManager {
             return;
         }
         simulation.blockChanged(pos);
+        if (PILES.layers(oldState) > 0 || PILES.layers(newState) > 0) {
+            simulation.pileChanged(pos, PILES.layers(newState) == 0);
+        }
         if (oldState.is(BlockTags.LEAVES) && !newState.is(BlockTags.LEAVES) && burstsThisTick < MAX_BURSTS_PER_TICK) {
             burstsThisTick++;
             SPAWNER.burst(level, simulation, pos.immutable(), oldState);
@@ -362,11 +375,15 @@ public final class LeafManager {
             }
         }
         // Seed new ground nearest first, within a time budget per tick, once a chunk's neighbors are there for the
-        // canopy around it: fast enough to keep ahead of a player flying over a forest.
+        // canopy around it: fast enough to keep ahead of a player flying over a forest. Leaf pile blocks of other
+        // mods join the litter once the chunk is seeded.
         List<LitterChunk> unseeded = new ArrayList<>();
+        int pileScans = simulation.drawsPiles() ? PILE_SCANS_PER_TICK : 0;
         for (LitterChunk chunk : field.chunks()) {
             if (!chunk.seeded() && neighborsLoaded(chunk.x, chunk.z)) {
                 unseeded.add(chunk);
+            } else if (chunk.seeded() && !chunk.pilesScanned() && pileScans > 0 && simulation.scanPiles(chunk)) {
+                pileScans--;
             }
         }
         if (unseeded.isEmpty()) {
@@ -379,6 +396,20 @@ public final class LeafManager {
             chunk.markSeeded();
             if (System.nanoTime() > deadline) {
                 break;
+            }
+        }
+    }
+
+    /**
+     * Hides the models of leaf pile blocks while the litter draws them and shows them again when it stops; the chunk
+     * meshes are rebuilt when that changes.
+     */
+    private static void updatePileModels(Minecraft minecraft) {
+        boolean hide = PILES != PileBlocks.NONE && SETTINGS.drawPileBlocks && SETTINGS.maxLeaves > 0;
+        if (hide != ImmersiveWeathering.hidden() && PILES != PileBlocks.NONE) {
+            ImmersiveWeathering.setHidden(hide);
+            if (minecraft.level != null) {
+                minecraft.levelRenderer.allChanged();
             }
         }
     }

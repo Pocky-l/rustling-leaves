@@ -26,6 +26,8 @@ public final class LeafSettings {
     public float rustleVolume = 0.6F;
     /** Rake leaves into piles with a hoe or shovel. */
     public boolean raking = true;
+    /** Draw the leaf pile blocks of other mods (Immersive Weathering) as litter instead of their own models. */
+    public boolean drawPileBlocks = true;
 
     /** Whether leaf fall follows the seasons of a season mod. */
     public boolean seasons = true;

@@ -9,6 +9,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ComposterBlock;
 import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.SlabBlock;
+import net.minecraft.world.level.block.SnowLayerBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.SlabType;
 import net.neoforged.neoforge.gametest.GameTestHolder;
@@ -28,6 +29,7 @@ import com.pockyl.rustling_leaves.sim.LeafSimulation;
 import com.pockyl.rustling_leaves.sim.LeafSpawner;
 import com.pockyl.rustling_leaves.sim.LitterChunk;
 import com.pockyl.rustling_leaves.sim.LitterField;
+import com.pockyl.rustling_leaves.sim.PileBlocks;
 import com.pockyl.rustling_leaves.sim.SeasonCurve;
 import com.pockyl.rustling_leaves.sim.TreeLeaves;
 
@@ -620,6 +622,164 @@ public final class ModGameTests {
         helper.assertTrue((contents.color() & 0xFF) > 0 && (contents.color() >> 16 & 0xFF) > 0, "colors did not mix");
         helper.assertTrue(contents.remove(5000).count() == 0, "removing too much went negative");
         helper.succeed();
+    }
+
+    /** Snow layers stand in for Immersive Weathering's leaf piles in tests: a block with 1..8 layers. */
+    private static final PileBlocks SNOW_PILES = state -> state.is(Blocks.SNOW) ? state.getValue(SnowLayerBlock.LAYERS) : 0;
+    private static final TreeLeaves PILE_LOOK = new TreeLeaves() {
+        @Override
+        public int color(BlockState state, Level level, BlockPos pos) {
+            return 0x8A6A2A;
+        }
+
+        @Override
+        public LeafShape shape(BlockState state) {
+            return LeafShape.BROAD;
+        }
+    };
+
+    @GameTest(template = "box")
+    public static void pileBlockBecomesPinnedLitter(GameTestHelper helper) {
+        floor(helper);
+        helper.setBlock(3, 1, 3, Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, 4));
+        LeafSimulation sim = pileSimulation(helper, true);
+        int[] middle = cellAt(helper, 3.4, 3.4);
+        int[] corner = cellAt(helper, 3.1, 3.1);
+        int pinned = pinnedIn(sim, helper, 3, 3);
+        helper.assertTrue(sim.field().count(middle[0], middle[1]) > 25, "the middle of the pile holds " + sim.field().count(middle[0], middle[1]));
+        helper.assertTrue(sim.field().count(corner[0], corner[1]) < sim.field().count(middle[0], middle[1]), "the pile does not slope to its edge");
+        helper.assertTrue(pinned == boxTotal(sim, helper), "pinned " + pinned + " of " + boxTotal(sim, helper) + " leaves");
+        assertAllBases(sim, helper, 1.0);
+        // Feet, a blower-like blast and a bag move nothing of it: the pile is there as long as the block.
+        BlockPos center = helper.absolutePos(new BlockPos(3, 1, 3));
+        for (int t = 0; t < 20; t++) {
+            sim.beginTick(helper.getLevel(), center.getX(), center.getY(), center.getZ());
+            sim.disturb(center.getX() + 0.2 + t * 0.03, center.getY(), center.getZ() + 0.5, 0.25, 0.0, 0.0, 0.6F, 1.8F, false, 0.0F);
+            sim.finishTick();
+        }
+        sim.explode(center.getX() + 0.5, center.getY() + 0.3, center.getZ() + 0.5, 1.2F, true);
+        Armful bag = new Armful();
+        sim.beginTick(helper.getLevel(), center.getX(), center.getY(), center.getZ());
+        sim.vacuum(center.getX() + 0.5, center.getY() + 0.8, center.getZ() + 0.5, 0.0F, -1.0F, 0.0F, 24, bag);
+        sim.finishTick();
+        run(sim, helper, 100);
+        helper.assertTrue(bag.count() == 0 && sim.pool().count() == 0, "pinned leaves were moved");
+        helper.assertTrue(pinnedIn(sim, helper, 3, 3) == pinned && boxTotal(sim, helper) == pinned, "the pile changed");
+        // Loose leaves on top still behave as usual.
+        int[] cell = cellAt(helper, 3.5, 3.5);
+        for (int n = 0; n < 6; n++) {
+            sim.field().add(cell[0], cell[1], 0.0, 0x6A8F3A, 0, 0L, 0);
+        }
+        sim.beginTick(helper.getLevel(), center.getX(), center.getY(), center.getZ());
+        sim.disturb(center.getX() + 0.5, center.getY(), center.getZ() + 0.5, 0.3, 0.0, 0.0, 0.6F, 1.8F, false, 0.0F);
+        sim.finishTick();
+        helper.assertTrue(boxTotal(sim, helper) + sim.pool().count() == pinned + 6, "leaves were lost");
+        helper.assertTrue(sim.field().loose(cell[0], cell[1]) < 6, "loose leaves on the pile did not move");
+        helper.succeed();
+    }
+
+    @GameTest(template = "box")
+    public static void pileLitterFollowsTheBlock(GameTestHelper helper) {
+        floor(helper);
+        BlockPos pos = new BlockPos(3, 1, 3);
+        helper.setBlock(pos, Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, 4));
+        LeafSimulation sim = pileSimulation(helper, true);
+        int four = pinnedIn(sim, helper, 3, 3);
+        BlockPos at = helper.absolutePos(pos);
+        helper.setBlock(pos, Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, 6));
+        sim.pileChanged(at, false);
+        int six = pinnedIn(sim, helper, 3, 3);
+        helper.assertTrue(six > four, "the pile did not grow: " + four + " -> " + six);
+        helper.setBlock(pos, Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, 2));
+        sim.pileChanged(at, false);
+        int two = pinnedIn(sim, helper, 3, 3);
+        helper.assertTrue(two < four && boxTotal(sim, helper) == two && sim.pool().count() == 0,
+                "a rotting pile did not just shrink: " + four + " -> " + two + ", " + boxTotal(sim, helper) + " in the box");
+        // A neighboring pile joins: the shared edge rises instead of sloping down to the ground.
+        int[] edge = cellAt(helper, 3.9, 3.5);
+        int alone = sim.field().count(edge[0], edge[1]);
+        helper.setBlock(new BlockPos(4, 1, 3), Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, 2));
+        sim.pileChanged(helper.absolutePos(new BlockPos(4, 1, 3)), false);
+        helper.assertTrue(sim.field().count(edge[0], edge[1]) > alone, "piles next to each other do not merge");
+        helper.setBlock(new BlockPos(4, 1, 3), Blocks.AIR.defaultBlockState());
+        sim.pileChanged(helper.absolutePos(new BlockPos(4, 1, 3)), false);
+        // Broken: a few leaves fly up and land as loose litter, the rest goes with the block.
+        helper.setBlock(pos, Blocks.AIR.defaultBlockState());
+        sim.pileChanged(at, true);
+        int flying = sim.pool().count();
+        helper.assertTrue(flying > 10 && flying <= 16 * 3, flying + " leaves flew up from the broken pile");
+        run(sim, helper, 300);
+        helper.assertTrue(pinnedIn(sim, helper, 3, 3) == 0 && boxTotal(sim, helper) + sim.pool().count() == flying, "leaves are left pinned or lost");
+        helper.succeed();
+    }
+
+    @GameTest(template = "box")
+    public static void pinnedLeavesAreNotSaved(GameTestHelper helper) throws IOException {
+        floor(helper);
+        helper.setBlock(3, 1, 3, Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, 3));
+        LeafSimulation sim = pileSimulation(helper, true);
+        int[] cell = cellAt(helper, 3.5, 3.5);
+        for (int n = 0; n < 5; n++) {
+            sim.field().add(cell[0], cell[1], 0.0, 0x6A8F3A, 0, 0L, 0);
+        }
+        LitterChunk chunk = sim.field().chunkAtCell(cell[0], cell[1]);
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        chunk.write(new DataOutputStream(bytes));
+        LitterChunk read = LitterChunk.read(new DataInputStream(new ByteArrayInputStream(bytes.toByteArray())));
+        helper.assertTrue(read.total() == 5, "saved " + read.total() + " leaves instead of the 5 loose ones");
+        // Turning the option off drops the pinned leaves and makes the block solid for falling leaves again.
+        sim.setPiles(SNOW_PILES, PILE_LOOK, false);
+        helper.assertTrue(boxTotal(sim, helper) == 5 && pinnedIn(sim, helper, 3, 3) == 0, "pinned leaves stayed: " + boxTotal(sim, helper));
+        helper.succeed();
+    }
+
+    @GameTest(template = "box")
+    public static void leafLandsOnUndrawnPile(GameTestHelper helper) {
+        floor(helper);
+        helper.setBlock(3, 1, 3, Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, 4));
+        LeafSimulation sim = pileSimulation(helper, false);
+        helper.assertTrue(sim.field().total() == 0, "an undrawn pile became litter");
+        spawn(sim, helper, 3.5, 3.0, 3.5);
+        run(sim, helper, 200);
+        double base = baseOfOnlyCell(sim, helper);
+        helper.assertTrue(Math.abs(base - 1.5) < EPSILON, "the leaf landed at " + base + ", not on top of the pile");
+        helper.succeed();
+    }
+
+    /** A simulation that knows {@link #SNOW_PILES}, with the piles in the box already scanned. */
+    private static LeafSimulation pileSimulation(GameTestHelper helper, boolean draw) {
+        LeafSimulation sim = simulation(helper, 512, LeafListener.NONE);
+        sim.setLevel(helper.getLevel());
+        sim.setPiles(SNOW_PILES, PILE_LOOK, draw);
+        for (LitterChunk chunk : sim.field().chunks()) {
+            sim.scanPiles(chunk);
+        }
+        return sim;
+    }
+
+    /** Leaves in the litter of the box (other tests run next to it). */
+    private static int boxTotal(LeafSimulation sim, GameTestHelper helper) {
+        int[] corner = cellAt(helper, -1.0, -1.0);
+        int sum = 0;
+        for (int dx = 0; dx < 9 * 4; dx++) {
+            for (int dz = 0; dz < 9 * 4; dz++) {
+                sum += sim.field().count(corner[0] + dx, corner[1] + dz);
+            }
+        }
+        return sum;
+    }
+
+    /** Pinned leaves in the cells of a block of the box. */
+    private static int pinnedIn(LeafSimulation sim, GameTestHelper helper, int x, int z) {
+        int[] corner = cellAt(helper, x, z);
+        int sum = 0;
+        for (int a = 0; a < 4; a++) {
+            for (int b = 0; b < 4; b++) {
+                LitterChunk chunk = sim.field().chunkAtCell(corner[0] + a, corner[1] + b);
+                sum += chunk.pinned[LitterField.index(corner[0] + a, corner[1] + b)];
+            }
+        }
+        return sum;
     }
 
     @GameTest(template = "empty")

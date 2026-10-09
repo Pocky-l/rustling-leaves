@@ -4,6 +4,16 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - Unreleased
+### Added
+- Compatibility with [Immersive Weathering](https://modrinth.com/mod/immersive-weather-renewed) (1.21.1 port): its leaf piles are now drawn as Rustling
+  Leaves litter instead of flat blocks - soft, rounded piles that blend into the forest floor and into each other, in
+  the color of the tree they came from. A pile stays as long as its block: it grows and rots away as Immersive
+  Weathering decides, and breaking it throws up a handful of leaves. Leaves falling onto a pile stay on top and are
+  blown and kicked around as anywhere else.
+- New client option `leaves.immersiveWeatheringPiles` to keep Immersive Weathering's own leaf pile look instead;
+  falling leaves then land on top of the piles instead of sinking into them.
+
 ## [1.2.0] - 2026-10-09
 ### Added
 - Seasons with [Serene Seasons](https://www.curseforge.com/minecraft/mc-mods/serene-seasons): in autumn many more leaves fall and more and more of them turn yellow, orange and red, until by

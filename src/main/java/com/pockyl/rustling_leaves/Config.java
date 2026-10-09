@@ -51,6 +51,12 @@ public final class Config {
                     "Beyond about 70 blocks they are drawn as a cheap simplified layer.")
             .translation("rustling_leaves.configuration.litterDistance")
             .defineInRange("litterDistance", 128, 48, 256);
+    private static final ModConfigSpec.BooleanValue PILE_BLOCKS = BUILDER
+            .comment("With Immersive Weathering installed, its leaf piles are drawn as leaf litter of this mod: they look like",
+                    "its leaf piles and the leaves on top react to wind and footsteps (the pile itself stays as long as the block).",
+                    "Off: the piles keep their own look and falling leaves land on top of them.")
+            .translation("rustling_leaves.configuration.immersiveWeatheringPiles")
+            .define("immersiveWeatheringPiles", true);
     private static final ModConfigSpec.IntValue LEAVES_PER_BREAK = BUILDER
             .comment("Leaves released when a leaves block is broken or decays.")
             .translation("rustling_leaves.configuration.leavesPerBreak")
@@ -132,6 +138,7 @@ public final class Config {
         settings.naturalPiles = NATURAL_PILES.get();
         settings.windEvents = WIND_EVENTS.get().floatValue();
         settings.raking = RAKING.get();
+        settings.drawPileBlocks = PILE_BLOCKS.get();
         settings.leafSize = LEAF_SIZE.get().floatValue();
         settings.autumnColors = AUTUMN_COLORS.get().floatValue();
         settings.leavesPerBreak = LEAVES_PER_BREAK.get();

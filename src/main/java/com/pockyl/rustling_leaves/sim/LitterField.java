@@ -180,7 +180,7 @@ public final class LitterField {
         return true;
     }
 
-    /** Takes the top leaf of a cell; fills {@code out} with its pose if given. */
+    /** Takes the top leaf of a cell; fills {@code out} with its pose if given. Pinned leaves stay. */
     public boolean take(int cellX, int cellZ, Pose out) {
         LitterChunk chunk = chunkAtCell(cellX, cellZ);
         if (chunk == null) {
@@ -188,7 +188,7 @@ public final class LitterField {
         }
         int i = index(cellX, cellZ);
         int n = chunk.count[i];
-        if (n == 0) {
+        if (n <= chunk.pinned[i]) {
             return false;
         }
         if (out != null) {
@@ -199,6 +199,63 @@ public final class LitterField {
         chunk.total--;
         touch(chunk, cellX, cellZ);
         return true;
+    }
+
+    /** Leaves of a cell that can be moved (not pinned by a pile block), 0 if empty or not loaded. */
+    public int loose(int cellX, int cellZ) {
+        LitterChunk chunk = chunkAtCell(cellX, cellZ);
+        return chunk == null ? 0 : chunk.loose(index(cellX, cellZ));
+    }
+
+    /**
+     * Sets how many leaves of a cell stand for a leaf pile block. Leaves are added under the loose ones (on
+     * {@code base} if the cell is empty) or removed from the top to match.
+     *
+     * @return how many leaves are left over to remove when the pile shrank (the caller takes them, perhaps as a burst)
+     */
+    int pin(int cellX, int cellZ, int target, double base, int baseColor, int shape) {
+        LitterChunk chunk = chunkAtCell(cellX, cellZ);
+        if (chunk == null) {
+            return 0;
+        }
+        int i = index(cellX, cellZ);
+        int pinned = chunk.pinned[i];
+        if (target <= pinned) {
+            chunk.pinned[i] = (short) target;
+            return Math.min(pinned - target, chunk.count[i] - target);
+        }
+        int n = chunk.count[i];
+        int added = Math.min(target - pinned, MAX_LAYERS - n);
+        if (n == 0) {
+            chunk.base[i] = (float) base;
+            chunk.color[i] = baseColor;
+            chunk.shape[i] = (byte) shape;
+            chunk.top[i] = 0L;
+        } else {
+            chunk.color[i] = LeafPalette.lerp(chunk.color[i], baseColor, added / (float) (n + added));
+        }
+        chunk.count[i] = (short) (n + added);
+        chunk.pinned[i] = (short) (pinned + added);
+        chunk.total += added;
+        touch(chunk, cellX, cellZ);
+        return 0;
+    }
+
+    /** Drops every pinned leaf (pile blocks are no longer drawn as litter); the loose leaves stay. */
+    void unpinAll() {
+        for (LitterChunk chunk : chunks.values()) {
+            chunk.pilesScanned = false;
+            for (int i = 0; i < LitterChunk.AREA; i++) {
+                int pinned = chunk.pinned[i];
+                if (pinned > 0) {
+                    chunk.pinned[i] = 0;
+                    chunk.count[i] -= (short) pinned;
+                    chunk.total -= pinned;
+                    chunk.top[i] = chunk.count[i] == 0 ? 0L : chunk.top[i];
+                    touch(chunk, (chunk.x << 6) + (i & 63), (chunk.z << 6) + (i >> 6));
+                }
+            }
+        }
     }
 
     /** Moves the whole stack of a cell to a new surface height (its support moved). */
@@ -236,7 +293,7 @@ public final class LitterField {
         }
         int i = index(fromX, fromZ);
         int j = index(toX, toZ);
-        if (from.count[i] == 0 || to.count[j] >= MAX_LAYERS || to.count[j] == 0 && Double.isNaN(targetBase)) {
+        if (from.loose(i) <= 0 || to.count[j] >= MAX_LAYERS || to.count[j] == 0 && Double.isNaN(targetBase)) {
             return false;
         }
         int color = from.color[i];

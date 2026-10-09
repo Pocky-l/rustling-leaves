@@ -36,5 +36,13 @@ displayTest="IGNORE_SERVER_VERSION"
     ordering="NONE"
     side="CLIENT"
 
+# Its leaf piles are drawn as leaf litter.
+[[dependencies.${mod_id}]]
+    modId="immersive_weathering"
+    type="optional"
+    versionRange="*"
+    ordering="NONE"
+    side="CLIENT"
+
 [[mixins]]
 config="${mod_id}.mixins.json"

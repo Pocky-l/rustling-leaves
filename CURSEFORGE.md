@@ -53,6 +53,10 @@ Physically simulated leaves: falling leaves, leaf piles you can wade through, ra
   a leaf falls (the litter stays); in spring only a few leaves fall and cherry blossoms shed a few more petals; summer
   is unchanged. The change is gradual, without jumps between sub-seasons. Biomes and dimensions without seasons are
   not affected.
+- **Immersive Weathering leaf piles** (with [Immersive Weathering](https://modrinth.com/mod/immersive-weather-renewed) for 1.21.1): its leaf piles are drawn as
+  Rustling Leaves litter - soft, rounded piles that merge with the forest floor, in the color of their tree. The pile
+  stays as long as its block does: it grows and rots away with Immersive Weathering, and breaking it throws up a
+  handful of leaves. Leaves that fall onto it stay on top and react to wind and footsteps as everywhere else.
 - **Built for huge numbers of leaves**: lying leaves are stored as stacks per quarter block and only the visible ones
   are drawn from cached GPU meshes - a pile of thousands of leaves costs a few hundred quads. Far away the litter
   switches to a simplified layer (one mesh per chunk), so the forest floor stays visible out to the render distance
@@ -66,7 +70,8 @@ Physically simulated leaves: falling leaves, leaf piles you can wade through, ra
 
 Everything can be tuned in the in-game config screen: number of leaves, fall rate, radius, time on the ground,
 carpet thickness, leaf size, autumn colors, wind, squalls and whirlwinds, footstep and explosion strength,
-raking, rustle volume, and how strongly the seasons change leaf fall.
+raking, rustle volume, how strongly the seasons change leaf fall, and whether Immersive Weathering's leaf piles are
+drawn as leaf litter.
 
 ## Compatibility
 
@@ -74,6 +79,8 @@ raking, rustle volume, and how strongly the seasons change leaf fall.
   are lit and shaded like the blocks around them. Switching a pack on or off in game rebuilds the leaf meshes.
 - [Serene Seasons](https://www.curseforge.com/minecraft/mc-mods/serene-seasons): leaf fall and autumn colors follow the season (see Features); tune or turn it off in the `seasons`
   config section.
+- [Immersive Weathering](https://modrinth.com/mod/immersive-weather-renewed): its leaf piles are drawn as this mod's leaf litter (see Features); turn it off with
+  `leaves.immersiveWeatheringPiles` to keep their own look (falling leaves then land on top of them).
 - [Sodium](https://modrinth.com/mod/sodium) works.
 
 ## Requirements
