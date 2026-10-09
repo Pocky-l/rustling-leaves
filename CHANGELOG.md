@@ -4,7 +4,7 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.3.0] - Unreleased
+## [1.3.0] - 2026-10-10
 ### Added
 - Compatibility with [Immersive Weathering](https://modrinth.com/mod/immersive-weather-renewed) (1.21.1 port): its leaf piles are now drawn as Rustling
   Leaves litter instead of flat blocks - soft, rounded piles that blend into the forest floor and into each other, in
