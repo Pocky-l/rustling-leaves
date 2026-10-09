@@ -73,6 +73,13 @@ public final class LeafSimulation {
     private static final float LEAVES_PER_PILE_LAYER = 0.125F / LAYER;
     /** Leaves per cell that fly up when a pile block is broken; the rest of its leaves go with the block. */
     private static final int PILE_BURST = 3;
+    /** Leaves per tick that fall onto growing piles (one per pile and tick). */
+    private static final int PILE_LEAVES_PER_TICK = 6;
+    private static final int MAX_GROWING_PILES = 64;
+    /** Ticks a growing pile waits for its leaves to land before it counts what it still lacks. */
+    private static final int PILE_SETTLE_TICKS = 20 * 10;
+    /** Extra rounds of leaves for a growing pile that the wind keeps blowing them off. */
+    private static final int PILE_ROUNDS = 3;
 
     private final LeafSettings settings;
     private final LeafPool pool;
@@ -91,6 +98,7 @@ public final class LeafSimulation {
     private final LitterField.Spill spill = this::spill;
     private final BlockPos.MutableBlockPos pileProbe = new BlockPos.MutableBlockPos();
     private TreeLeaves pileLook;
+    private final List<GrowingPile> growingPiles = new ArrayList<>();
     private int tick;
     private int cascadeBudget;
     private double cameraX;
@@ -177,6 +185,9 @@ public final class LeafSimulation {
                 default -> {
                 }
             }
+        }
+        if (!growingPiles.isEmpty()) {
+            feedPiles();
         }
         cascadeBudget = CASCADE_PARTICLES;
         field.relax(spill);
@@ -303,6 +314,7 @@ public final class LeafSimulation {
             }
         }
         shockwaves.clear();
+        growingPiles.clear();
         field.clear();
         wind.reset();
     }
@@ -556,7 +568,9 @@ public final class LeafSimulation {
             return;
         }
         double base = n > 0 ? chunk.base[c] : ground;
-        if ((n + 1) * LAYER > LitterField.REPOSE + LAYER || n + 1 >= LitterField.MAX_LAYERS) {
+        // A growing pile block holds its leaves in shape; elsewhere a leaf on too steep a pile slides down.
+        boolean filling = chunk.pinned[c] < chunk.pileTarget[c];
+        if (!filling && ((n + 1) * LAYER > LitterField.REPOSE + LAYER || n + 1 >= LitterField.MAX_LAYERS)) {
             double newTop = base + (n + 1) * LAYER;
             double lowest = field.lowestNeighbor(cx, cz, newTop, direction);
             if (Math.min(newTop - lowest, (n + 1) * LAYER) > LitterField.REPOSE + LAYER || n + 1 >= LitterField.MAX_LAYERS) {
@@ -570,7 +584,7 @@ public final class LeafSimulation {
         if ((pool.flags[i] & LeafPool.FLAG_WET) != 0) {
             pool.color[i] = LeafPalette.scale(pool.color[i], WET_SHADE);
         }
-        if ((pool.flags[i] & LeafPool.FLAG_NATURAL) != 0 && n >= settings.carpetDepth && n > 0) {
+        if ((pool.flags[i] & LeafPool.FLAG_NATURAL) != 0 && n >= settings.carpetDepth && n > 0 && !filling) {
             field.replaceTop(cx, cz, top, pool.color[i]);
         } else {
             field.add(cx, cz, base, pool.baseColor[i], pool.shape[i], top, pool.color[i]);
@@ -1874,6 +1888,7 @@ public final class LeafSimulation {
         pileLook = look;
         if (wasDrawn && !drawsPiles()) {
             field.unpinAll();
+            growingPiles.clear();
         }
     }
 
@@ -1883,8 +1898,8 @@ public final class LeafSimulation {
     }
 
     /**
-     * Turns every leaf pile block in the column of a litter chunk into pinned litter. Returns false if that is not
-     * possible yet (the level chunk is not loaded).
+     * Turns every leaf pile in the column of a litter chunk into pinned litter at once (the piles are already there).
+     * Returns false if that is not possible yet (the level chunk is not loaded).
      */
     public boolean scanPiles(LitterChunk chunk) {
         if (!drawsPiles() || level == null) {
@@ -1905,8 +1920,11 @@ public final class LeafSimulation {
             for (int y = 0; y < 16; y++) {
                 for (int z = 0; z < 16; z++) {
                     for (int x = 0; x < 16; x++) {
-                        if (blocks.layers(section.getBlockState(x, y, z)) > 0) {
-                            pinPile((chunk.x << 4) + x, minY + y, (chunk.z << 4) + z, false);
+                        int bx = (chunk.x << 4) + x;
+                        int bz = (chunk.z << 4) + z;
+                        // A pile stacked on a full pile belongs to the column below it.
+                        if (blocks.layers(section.getBlockState(x, y, z)) > 0 && pileLayers(bx, minY + y - 1, bz) == 0) {
+                            pinPile(bx, minY + y, bz, false, true);
                         }
                     }
                 }
@@ -1917,30 +1935,31 @@ public final class LeafSimulation {
     }
 
     /**
-     * A leaf pile block appeared, grew, shrank or went away. Its cells follow, and so do the edges of the piles next
-     * to it. A removed pile throws a few of its leaves up; a shrinking one (rotting away) just loses them.
+     * A leaf pile block appeared, grew, shrank or went away. Its column of pile blocks follows, and so do the edges of
+     * the piles next to it. A removed pile throws a few of its leaves up; a shrinking one (rotting away) just loses
+     * them. A growing pile fills up with leaves that fall onto it, unless {@code instant} (a pile placed by hand).
      */
-    public void pileChanged(BlockPos pos, boolean removed) {
+    public void pileChanged(BlockPos pos, boolean removed, boolean instant) {
         if (!drawsPiles() || level == null) {
             return;
         }
         int x = pos.getX();
         int y = pos.getY();
         int z = pos.getZ();
-        pinPile(x, y, z, removed);
-        pinPile(x + 1, y, z, false);
-        pinPile(x - 1, y, z, false);
-        pinPile(x, y, z + 1, false);
-        pinPile(x, y, z - 1, false);
+        pinPile(x, pileBottom(x, y, z), z, removed, instant);
+        pinPile(x + 1, pileBottom(x + 1, y, z), z, false, true);
+        pinPile(x - 1, pileBottom(x - 1, y, z), z, false, true);
+        pinPile(x, pileBottom(x, y, z + 1), z + 1, false, true);
+        pinPile(x, pileBottom(x, y, z - 1), z - 1, false, true);
     }
 
     /**
-     * Pins as many leaves in each cell of a block as its pile is high there. The pile is flat in the middle and slopes
-     * down to the ground at open edges (or to the height of a neighboring pile), so piles next to each other merge
-     * into one carpet.
+     * Pins as many leaves in each cell of a pile column as it is high there. The pile is flat in the middle and slopes
+     * down to the ground at open edges (or to the height of a neighboring pile), so piles next to each other merge into
+     * one carpet. Leaves a growing pile still lacks are dropped onto it from above ({@link #feedPiles}).
      */
-    private void pinPile(int x, int y, int z, boolean burst) {
-        int layers = pileLayers(x, y, z);
+    private void pinPile(int x, int y, int z, boolean burst, boolean instant) {
+        int layers = pileHeight(x, y, z);
         int east = 0;
         int west = 0;
         int south = 0;
@@ -1948,14 +1967,15 @@ public final class LeafSimulation {
         int color = 0;
         int shape = 0;
         if (layers > 0) {
-            east = pileLayers(x + 1, y, z);
-            west = pileLayers(x - 1, y, z);
-            south = pileLayers(x, y, z + 1);
-            north = pileLayers(x, y, z - 1);
+            east = neighborPileHeight(x + 1, y, z);
+            west = neighborPileHeight(x - 1, y, z);
+            south = neighborPileHeight(x, y, z + 1);
+            north = neighborPileHeight(x, y, z - 1);
             BlockState state = level.getBlockState(pileProbe.set(x, y, z));
             color = pileLook.color(state, level, pileProbe);
             shape = pileLook.shape(state).ordinal();
         }
+        int missing = 0;
         for (int a = 0; a < 4; a++) {
             for (int b = 0; b < 4; b++) {
                 int cx = x * 4 + a;
@@ -1970,17 +1990,17 @@ public final class LeafSimulation {
                 if (layers > 0) {
                     float alongX = pileEdge(layers, a < 2 ? west : east, a == 0 || a == 3);
                     float alongZ = pileEdge(layers, b < 2 ? north : south, b == 0 || b == 3);
-                    target = Math.max(1, Math.round((alongX + alongZ - layers) * LEAVES_PER_PILE_LAYER));
+                    target = Math.min(LitterField.MAX_LAYERS, Math.max(1, Math.round((alongX + alongZ - layers) * LEAVES_PER_PILE_LAYER)));
                     ground = terrain.groundBelow((cx + 0.5) * CELL, y + 0.01, (cz + 0.5) * CELL, 1);
                     // No ground under the pile, or loose litter on another level in this cell: leave it alone.
                     if (Double.isNaN(ground) || chunk.loose(c) > 0 && Math.abs(chunk.base[c] - ground) > 0.3) {
                         target = 0;
                     }
                 }
-                if (target == chunk.pinned[c]) {
+                if (target == chunk.pileTarget[c] && target == chunk.pinned[c]) {
                     continue;
                 }
-                int surplus = field.pin(cx, cz, target, ground, color, shape);
+                int surplus = field.pin(cx, cz, target, ground, color, shape, instant);
                 for (int k = 0; k < surplus; k++) {
                     if (burst && k < PILE_BURST && pool.free() > 0) {
                         int i = release(cx, cz, LeafPool.FALLING, (random.next() - 0.5F) * 0.12F, 0.06F + random.next() * 0.12F,
@@ -1992,9 +2012,110 @@ public final class LeafSimulation {
                     }
                     field.take(cx, cz, null);
                 }
+                missing += chunk.pileTarget[c] - chunk.pinned[c];
                 field.queueRelax(cx, cz);
             }
         }
+        if (missing > 0) {
+            growPile(x, y, z, missing, color, shape);
+        }
+    }
+
+    private void growPile(int x, int y, int z, int missing, int color, int shape) {
+        for (GrowingPile pile : growingPiles) {
+            if (pile.x == x && pile.z == z) {
+                pile.y = y;
+                pile.remaining = missing;
+                pile.color = color;
+                pile.shape = shape;
+                pile.rounds = 0;
+                return;
+            }
+        }
+        if (growingPiles.size() < MAX_GROWING_PILES) {
+            growingPiles.add(new GrowingPile(x, y, z, missing, color, shape));
+        }
+    }
+
+    /**
+     * Leaves fall onto growing piles, one per pile and tick: from the crown above (or from a little above the pile in the
+     * open), so the pile is seen filling up the way leaves pile up anywhere else. Leaves the wind carries off land
+     * elsewhere; after they had time to land, a pile still short of leaves gets a few more rounds.
+     */
+    private void feedPiles() {
+        int budget = PILE_LEAVES_PER_TICK;
+        for (Iterator<GrowingPile> it = growingPiles.iterator(); it.hasNext() && budget > 0; ) {
+            GrowingPile pile = it.next();
+            if (pile.wait > 0) {
+                pile.wait--;
+                continue;
+            }
+            if (pile.remaining <= 0) {
+                int missing = pileMissing(pile.x, pile.z);
+                if (missing <= 4 || ++pile.rounds > PILE_ROUNDS) {
+                    it.remove();
+                } else {
+                    pile.remaining = missing;
+                }
+                continue;
+            }
+            if (pool.free() < 32) {
+                return;
+            }
+            // Above a cell that still lacks leaves (piles are lower at their edges), a little off its middle.
+            int cell = pileCellToFill(pile.x, pile.z);
+            double x = (pile.x * 4 + (cell & 3) + 0.2 + random.next() * 0.6) * CELL;
+            double z = (pile.z * 4 + (cell >> 2) + 0.2 + random.next() * 0.6) * CELL;
+            double y = pile.y + 2.5 + random.next();
+            for (int up = 1; up <= 16; up++) {
+                if (level.getBlockState(pileProbe.set(pile.x, pile.y + up, pile.z)).is(BlockTags.LEAVES)) {
+                    y = pile.y + up - 0.05;
+                    break;
+                }
+            }
+            LeafShape shape = LeafShape.byId(pile.shape);
+            long hash = (long) (random.next() * Integer.MAX_VALUE) << 20 ^ (long) (random.next() * Integer.MAX_VALUE);
+            int sprite = shape.firstSprite + Math.min(shape.variants - 1, (int) (random.next() * shape.variants));
+            float size = LeafShape.BASE_SIZE * shape.size * settings.leafSize * (0.8F + random.next() * 0.45F);
+            spawn(x, y, z, 0.0F, 0.0F, 0.0F, LeafPalette.vary(pile.color, hash, settings.autumnShare(), shape), pile.color, shape, sprite,
+                    size, false);
+            budget--;
+            if (--pile.remaining == 0) {
+                pile.wait = PILE_SETTLE_TICKS;
+            }
+        }
+    }
+
+    /** A random cell of a pile block (a + 4 b), chosen in proportion to how many leaves it still lacks. */
+    private int pileCellToFill(int x, int z) {
+        int missing = pileMissing(x, z);
+        int pick = (int) (random.next() * missing);
+        for (int cell = 0; cell < 16; cell++) {
+            LitterChunk chunk = field.chunkAtCell(x * 4 + (cell & 3), z * 4 + (cell >> 2));
+            if (chunk != null) {
+                int c = LitterField.index(x * 4 + (cell & 3), z * 4 + (cell >> 2));
+                pick -= Math.max(0, chunk.pileTarget[c] - chunk.pinned[c]);
+                if (pick < 0) {
+                    return cell;
+                }
+            }
+        }
+        return (int) (random.next() * 16);
+    }
+
+    /** Leaves a pile block's cells still lack. */
+    private int pileMissing(int x, int z) {
+        int missing = 0;
+        for (int a = 0; a < 4; a++) {
+            for (int b = 0; b < 4; b++) {
+                LitterChunk chunk = field.chunkAtCell(x * 4 + a, z * 4 + b);
+                if (chunk != null) {
+                    int c = LitterField.index(x * 4 + a, z * 4 + b);
+                    missing += Math.max(0, chunk.pileTarget[c] - chunk.pinned[c]);
+                }
+            }
+        }
+        return missing;
     }
 
     /**
@@ -2006,8 +2127,58 @@ public final class LeafSimulation {
         return edge + (layers - edge) * (outer ? 0.25F : 0.75F);
     }
 
+    /** Lowest pile block of the column through (x, y, z) or just under it; y if there is none. */
+    private int pileBottom(int x, int y, int z) {
+        int bottom = pileLayers(x, y, z) == 0 && pileLayers(x, y - 1, z) > 0 ? y - 1 : y;
+        while (pileLayers(x, bottom, z) > 0 && pileLayers(x, bottom - 1, z) > 0) {
+            bottom--;
+        }
+        return bottom;
+    }
+
+    /** Height in eighths of a block of the pile column standing on (x, y, z): full piles carry the next one. */
+    private int pileHeight(int x, int y, int z) {
+        int height = 0;
+        for (int top = y; ; top++) {
+            int layers = pileLayers(x, top, z);
+            height += layers;
+            if (layers < 8) {
+                return height;
+            }
+        }
+    }
+
+    /** Height of a neighboring pile column above the level y, in eighths of a block. */
+    private int neighborPileHeight(int x, int y, int z) {
+        if (pileLayers(x, y, z) == 0) {
+            return 0;
+        }
+        int bottom = pileBottom(x, y, z);
+        return Math.max(0, pileHeight(x, bottom, z) - (y - bottom) * 8);
+    }
+
     private int pileLayers(int x, int y, int z) {
         return terrain.piles.layers(level.getBlockState(pileProbe.set(x, y, z)));
+    }
+
+    private static final class GrowingPile {
+        final int x;
+        final int z;
+        int y;
+        int remaining;
+        int color;
+        int shape;
+        int rounds;
+        int wait;
+
+        GrowingPile(int x, int y, int z, int remaining, int color, int shape) {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            this.remaining = remaining;
+            this.color = color;
+            this.shape = shape;
+        }
     }
 
     // ------------------------------------------------------------------------------------------------------------

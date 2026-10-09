@@ -687,11 +687,11 @@ public final class ModGameTests {
         int four = pinnedIn(sim, helper, 3, 3);
         BlockPos at = helper.absolutePos(pos);
         helper.setBlock(pos, Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, 6));
-        sim.pileChanged(at, false);
+        sim.pileChanged(at, false, true);
         int six = pinnedIn(sim, helper, 3, 3);
         helper.assertTrue(six > four, "the pile did not grow: " + four + " -> " + six);
         helper.setBlock(pos, Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, 2));
-        sim.pileChanged(at, false);
+        sim.pileChanged(at, false, true);
         int two = pinnedIn(sim, helper, 3, 3);
         helper.assertTrue(two < four && boxTotal(sim, helper) == two && sim.pool().count() == 0,
                 "a rotting pile did not just shrink: " + four + " -> " + two + ", " + boxTotal(sim, helper) + " in the box");
@@ -699,17 +699,62 @@ public final class ModGameTests {
         int[] edge = cellAt(helper, 3.9, 3.5);
         int alone = sim.field().count(edge[0], edge[1]);
         helper.setBlock(new BlockPos(4, 1, 3), Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, 2));
-        sim.pileChanged(helper.absolutePos(new BlockPos(4, 1, 3)), false);
+        sim.pileChanged(helper.absolutePos(new BlockPos(4, 1, 3)), false, true);
         helper.assertTrue(sim.field().count(edge[0], edge[1]) > alone, "piles next to each other do not merge");
         helper.setBlock(new BlockPos(4, 1, 3), Blocks.AIR.defaultBlockState());
-        sim.pileChanged(helper.absolutePos(new BlockPos(4, 1, 3)), false);
+        sim.pileChanged(helper.absolutePos(new BlockPos(4, 1, 3)), false, true);
         // Broken: a few leaves fly up and land as loose litter, the rest goes with the block.
         helper.setBlock(pos, Blocks.AIR.defaultBlockState());
-        sim.pileChanged(at, true);
+        sim.pileChanged(at, true, true);
         int flying = sim.pool().count();
         helper.assertTrue(flying > 10 && flying <= 16 * 3, flying + " leaves flew up from the broken pile");
         run(sim, helper, 300);
         helper.assertTrue(pinnedIn(sim, helper, 3, 3) == 0 && boxTotal(sim, helper) + sim.pool().count() == flying, "leaves are left pinned or lost");
+        helper.succeed();
+    }
+
+    @GameTest(template = "box")
+    public static void growingPileFillsWithFallingLeaves(GameTestHelper helper) {
+        floor(helper);
+        BlockPos pos = new BlockPos(3, 1, 3);
+        helper.setBlock(pos, Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, 2));
+        LeafSimulation sim = pileSimulation(helper, true);
+        int before = pinnedIn(sim, helper, 3, 3);
+        helper.setBlock(pos, Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, 5));
+        sim.pileChanged(helper.absolutePos(pos), false, false);
+        helper.assertTrue(pinnedIn(sim, helper, 3, 3) == before, "the grown pile got its leaves out of nowhere");
+        run(sim, helper, 20);
+        helper.assertTrue(sim.pool().count() > 0, "no leaves fall onto the growing pile");
+        run(sim, helper, 600);
+        int after = pinnedIn(sim, helper, 3, 3);
+        helper.setBlock(pos, Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, 2));
+        sim.pileChanged(helper.absolutePos(pos), false, true);
+        helper.setBlock(pos, Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, 5));
+        sim.pileChanged(helper.absolutePos(pos), false, true);
+        int full = pinnedIn(sim, helper, 3, 3);
+        helper.assertTrue(after > before + (full - before) * 0.8, "the pile filled up to " + after + " of " + full + " leaves (from " + before + ")");
+        helper.succeed();
+    }
+
+    @GameTest(template = "box")
+    public static void stackedPileBlocksMakeOneTallPile(GameTestHelper helper) {
+        floor(helper);
+        helper.setBlock(3, 1, 3, Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, 8));
+        helper.setBlock(3, 2, 3, Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, 4));
+        LeafSimulation sim = pileSimulation(helper, true);
+        int[] middle = cellAt(helper, 3.4, 3.4);
+        int count = sim.field().count(middle[0], middle[1]);
+        helper.assertTrue(count > 80, "the middle of a pile 1.5 blocks high holds only " + count + " leaves");
+        assertAllBases(sim, helper, 1.0);
+        // The top block grows: the same column, now taller.
+        helper.setBlock(3, 2, 3, Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, 6));
+        sim.pileChanged(helper.absolutePos(new BlockPos(3, 2, 3)), false, true);
+        helper.assertTrue(sim.field().count(middle[0], middle[1]) > count, "the upper pile block did not raise the pile");
+        // The top block goes: the pile is one block high again.
+        helper.setBlock(3, 2, 3, Blocks.AIR.defaultBlockState());
+        sim.pileChanged(helper.absolutePos(new BlockPos(3, 2, 3)), false, true);
+        helper.assertTrue(sim.field().count(middle[0], middle[1]) < count, "the pile did not lose its upper block");
+        helper.assertTrue(pinnedIn(sim, helper, 3, 3) > 0, "the lower pile block was lost too");
         helper.succeed();
     }
 
@@ -736,7 +781,7 @@ public final class ModGameTests {
     @GameTest(template = "box")
     public static void leafLandsOnUndrawnPile(GameTestHelper helper) {
         floor(helper);
-        helper.setBlock(3, 1, 3, Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, 4));
+        fill(helper, 2, 2, 4, 4, 1, Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, 4));
         LeafSimulation sim = pileSimulation(helper, false);
         helper.assertTrue(sim.field().total() == 0, "an undrawn pile became litter");
         spawn(sim, helper, 3.5, 3.0, 3.5);

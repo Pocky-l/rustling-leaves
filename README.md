@@ -64,8 +64,9 @@
   not affected.
 - **Immersive Weathering leaf piles** (with [Immersive Weathering](https://modrinth.com/mod/immersive-weather-renewed) for 1.21.1): its leaf piles are drawn as
   Rustling Leaves litter - soft, rounded piles that merge with the forest floor, in the color of their tree. The pile
-  stays as long as its block does: it grows and rots away with Immersive Weathering, and breaking it throws up a
-  handful of leaves. Leaves that fall onto it stay on top and react to wind and footsteps as everywhere else.
+  stays as long as its block does: when it grows, leaves fall onto it from the tree above and it fills up with them;
+  it rots away with Immersive Weathering, and breaking it throws up a handful of leaves. Leaves that fall onto it stay
+  on top and react to wind and footsteps as everywhere else.
 - **Built for huge numbers of leaves**: lying leaves are stored as stacks per quarter block and only the visible ones
   are drawn from cached GPU meshes - a pile of thousands of leaves costs a few hundred quads. Far away the litter
   switches to a simplified layer (one mesh per chunk), so the forest floor stays visible out to the render distance

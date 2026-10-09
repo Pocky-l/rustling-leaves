@@ -32,6 +32,11 @@ public final class LitterChunk {
      * stay as long as the block does and are never saved (the block brings them back).
      */
     public final short[] pinned = new short[AREA];
+    /**
+     * How many leaves the pile block over a cell stands for. A growing pile is below it: leaves that land in the cell
+     * are pinned until it is reached, so the pile fills up with leaves that fell there.
+     */
+    public final short[] pileTarget = new short[AREA];
     /** Incremented whenever a cell of the tile (or a neighbor that affects its look) changes. */
     public final int[] tileRevision = new int[TILES * TILES];
 
