@@ -21,7 +21,7 @@ public final class LitterField {
     public static final float LAYER = 0.012F;
     /** Maximum height difference between neighboring cells (about 38 degrees). */
     public static final float REPOSE = 0.2F;
-    public static final int MAX_LAYERS = 160;
+    public static final int MAX_LAYERS = 360;
     /**
      * Stacks of at least this many leaves are part of a pile body: their visible leaves lie on the smooth pile
      * surface (see {@link #cornerHeight}) instead of exactly on their own stack.
@@ -173,11 +173,25 @@ public final class LitterField {
             chunk.color[i] = LeafPalette.lerp(chunk.color[i], baseColor, 1.0F / (n + 1));
         }
         chunk.count[i] = (short) (n + 1);
+        if (chunk.pinned[i] < chunk.pileTarget[i]) {
+            // A growing pile block keeps the leaves that land on it.
+            chunk.pinned[i]++;
+        }
         chunk.top[i] = topPose;
         chunk.topColor[i] = topColor;
         chunk.total++;
         touch(chunk, cellX, cellZ);
         return true;
+    }
+
+    /** Whether a cell lies under a pile block that is still filling up with leaves. */
+    public boolean filling(int cellX, int cellZ) {
+        LitterChunk chunk = chunkAtCell(cellX, cellZ);
+        if (chunk == null) {
+            return false;
+        }
+        int i = index(cellX, cellZ);
+        return chunk.pinned[i] < chunk.pileTarget[i];
     }
 
     /** Takes the top leaf of a cell; fills {@code out} with its pose if given. Pinned leaves stay. */
@@ -208,21 +222,28 @@ public final class LitterField {
     }
 
     /**
-     * Sets how many leaves of a cell stand for a leaf pile block. Leaves are added under the loose ones (on
-     * {@code base} if the cell is empty) or removed from the top to match.
+     * Sets how many leaves of a cell stand for a leaf pile block. A shrinking pile loses leaves from the top. A growing
+     * one either gets its leaves at once, under the loose ones (on {@code base} if the cell is empty) - for piles that
+     * are already there - or keeps the leaves already lying in the cell and then fills up with the leaves that land in
+     * it (see {@link #add}).
      *
      * @return how many leaves are left over to remove when the pile shrank (the caller takes them, perhaps as a burst)
      */
-    int pin(int cellX, int cellZ, int target, double base, int baseColor, int shape) {
+    int pin(int cellX, int cellZ, int target, double base, int baseColor, int shape, boolean instant) {
         LitterChunk chunk = chunkAtCell(cellX, cellZ);
         if (chunk == null) {
             return 0;
         }
         int i = index(cellX, cellZ);
         int pinned = chunk.pinned[i];
+        chunk.pileTarget[i] = (short) target;
         if (target <= pinned) {
             chunk.pinned[i] = (short) target;
             return Math.min(pinned - target, chunk.count[i] - target);
+        }
+        if (!instant) {
+            chunk.pinned[i] = (short) Math.max(pinned, Math.min(target, chunk.count[i]));
+            return 0;
         }
         int n = chunk.count[i];
         int added = Math.min(target - pinned, MAX_LAYERS - n);
@@ -246,6 +267,7 @@ public final class LitterField {
         for (LitterChunk chunk : chunks.values()) {
             chunk.pilesScanned = false;
             for (int i = 0; i < LitterChunk.AREA; i++) {
+                chunk.pileTarget[i] = 0;
                 int pinned = chunk.pinned[i];
                 if (pinned > 0) {
                     chunk.pinned[i] = 0;

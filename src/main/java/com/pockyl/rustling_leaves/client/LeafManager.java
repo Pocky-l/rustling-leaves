@@ -21,6 +21,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
@@ -313,7 +314,7 @@ public final class LeafManager {
         }
         simulation.blockChanged(pos);
         if (PILES.layers(oldState) > 0 || PILES.layers(newState) > 0) {
-            simulation.pileChanged(pos, PILES.layers(newState) == 0);
+            simulation.pileChanged(pos, PILES.layers(newState) == 0, placedByHand(pos));
         }
         if (oldState.is(BlockTags.LEAVES) && !newState.is(BlockTags.LEAVES) && burstsThisTick < MAX_BURSTS_PER_TICK) {
             burstsThisTick++;
@@ -329,6 +330,23 @@ public final class LeafManager {
                 }
             }
         }
+    }
+
+    /**
+     * Whether the local player probably just placed the pile block at {@code pos}: such piles appear at once, piles
+     * that grow on their own fill up with falling leaves.
+     */
+    private static boolean placedByHand(BlockPos pos) {
+        Player player = Minecraft.getInstance().player;
+        if (player == null || player.distanceToSqr(pos.getCenter()) > 8.0 * 8.0) {
+            return false;
+        }
+        for (InteractionHand hand : InteractionHand.values()) {
+            if (player.getItemInHand(hand).getItem() instanceof BlockItem item && PILES.layers(item.getBlock().defaultBlockState()) > 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
