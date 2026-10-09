@@ -1,5 +1,6 @@
 package com.pockyl.rustling_leaves.client.compat;
 
+import com.mojang.logging.LogUtils;
 import net.minecraft.client.renderer.block.BlockModelShaper;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.RenderType;
@@ -15,6 +16,7 @@ import net.neoforged.neoforge.client.event.ModelEvent;
 import net.neoforged.neoforge.client.model.BakedModelWrapper;
 import net.neoforged.neoforge.client.model.data.ModelData;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
 
 import com.pockyl.rustling_leaves.sim.PileBlocks;
 
@@ -31,9 +33,11 @@ public final class ImmersiveWeathering implements PileBlocks {
     public static final String MOD_ID = "immersive_weathering";
     private static final String PILE_CLASS = "com.ordana.immersive_weathering.blocks.LeafPileBlock";
 
-    private static ImmersiveWeathering instance;
+    private static volatile ImmersiveWeathering instance;
     /** Whether the pile models are hidden (read by chunk meshing threads). */
     private static volatile boolean hidden;
+
+    private static final Logger LOGGER = LogUtils.getLogger();
 
     private final Map<Block, IntegerProperty> piles = new IdentityHashMap<>();
 
@@ -45,12 +49,19 @@ public final class ImmersiveWeathering implements PileBlocks {
         }
     }
 
-    /** The leaf piles of the installed mod (registries must be complete). */
-    public static synchronized ImmersiveWeathering piles() {
-        if (instance == null) {
-            instance = new ImmersiveWeathering();
+    /** The leaf piles of the installed mod; only call it once the blocks are registered (it is cached). */
+    public static ImmersiveWeathering piles() {
+        ImmersiveWeathering piles = instance;
+        if (piles == null) {
+            synchronized (ImmersiveWeathering.class) {
+                if (instance == null) {
+                    instance = new ImmersiveWeathering();
+                    LOGGER.info("Drawing {} Immersive Weathering leaf pile blocks as leaf litter", instance.piles.size());
+                }
+                piles = instance;
+            }
         }
-        return instance;
+        return piles;
     }
 
     @Override
@@ -72,13 +83,16 @@ public final class ImmersiveWeathering implements PileBlocks {
     public static void wrapModels(ModelEvent.ModifyBakingResult event) {
         Map<ModelResourceLocation, BakedModel> models = event.getModels();
         ImmersiveWeathering piles = piles();
+        int wrapped = 0;
         for (Block block : piles.piles.keySet()) {
             for (BlockState state : block.getStateDefinition().getPossibleStates()) {
-                if (piles.layers(state) > 0) {
-                    models.computeIfPresent(BlockModelShaper.stateToModelLocation(state), (location, model) -> new HiddenModel(model));
+                if (piles.layers(state) > 0
+                        && models.computeIfPresent(BlockModelShaper.stateToModelLocation(state), (location, model) -> new HiddenModel(model)) != null) {
+                    wrapped++;
                 }
             }
         }
+        LOGGER.info("Wrapped {} Immersive Weathering leaf pile models", wrapped);
     }
 
     private static boolean isPile(Class<?> type) {

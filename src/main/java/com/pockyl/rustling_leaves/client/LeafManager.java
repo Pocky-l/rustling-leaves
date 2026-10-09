@@ -85,7 +85,10 @@ public final class LeafManager {
     /** Seasons change slowly; once a second is plenty (also to follow the biome under the camera). */
     private static final int SEASON_INTERVAL = 20;
     private static final boolean SERENE_SEASONS = ModList.get().isLoaded(SereneSeasons.MOD_ID);
-    private static final PileBlocks PILES = ModList.get().isLoaded(ImmersiveWeathering.MOD_ID) ? ImmersiveWeathering.piles() : PileBlocks.NONE;
+    /** Looked up on use: this class loads with the config, before the pile blocks are registered. */
+    private static final PileBlocks PILES = ModList.get().isLoaded(ImmersiveWeathering.MOD_ID)
+            ? state -> ImmersiveWeathering.piles().layers(state)
+            : PileBlocks.NONE;
 
     private static final LeafSettings SETTINGS = new LeafSettings();
     private static final LeafColors COLORS = new LeafColors();
