@@ -309,6 +309,29 @@ public final class ModGameTests {
     }
 
     @GameTest(template = "box")
+    public static void pileSurfaceStaysLevelAtASlab(GameTestHelper helper) {
+        floor(helper);
+        helper.setBlock(3, 1, 3, Blocks.STONE_SLAB.defaultBlockState().setValue(SlabBlock.TYPE, SlabType.BOTTOM));
+        LeafSimulation sim = simulation(helper, 64, LeafListener.NONE);
+        int[] onSlab = cellAt(helper, 3.1, 3.4);
+        int[] onFloor = cellAt(helper, 2.9, 3.4);
+        double slabTop = absoluteY(helper, 1.5);
+        double floorTop = absoluteY(helper, 1.0);
+        for (int n = 0; n < 10; n++) {
+            sim.field().add(onSlab[0], onSlab[1], slabTop, 0x6A8F3A, 0, 0L, 0);
+            sim.field().add(onFloor[0], onFloor[1], floorTop, 0x6A8F3A, 0, 0L, 0);
+        }
+        double slabPile = slabTop + 10 * LAYER;
+        double floorPile = floorTop + 10 * LAYER;
+        // The corner between the two cells, seen from each: the surface must not bend over the half-block step.
+        double fromSlab = sim.field().cornerHeight(onSlab[0], onSlab[1], slabTop, slabPile);
+        double fromFloor = sim.field().cornerHeight(onSlab[0], onSlab[1], floorTop, floorPile);
+        helper.assertTrue(fromSlab >= slabTop, "the pile on the slab dips towards the floor: " + (fromSlab - slabTop));
+        helper.assertTrue(fromFloor <= floorPile + 1.0E-6, "the pile on the floor climbs the slab: " + (fromFloor - floorPile));
+        helper.succeed();
+    }
+
+    @GameTest(template = "box")
     public static void pileSlumpsToItsAngleOfRepose(GameTestHelper helper) {
         floor(helper);
         LeafSimulation sim = simulation(helper, 512, LeafListener.NONE);

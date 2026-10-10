@@ -4,6 +4,15 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - Unreleased
+### Fixed
+- Leaf carpets and piles on slabs, stairs and other non-full blocks no longer stretch into slanted sheets over the
+  step: the layer stays level up to the edge of the block it lies on.
+- Leaves on the ground no longer flicker in the distance. Far away the litter is drawn in a simplified, solid form
+  (patches of leaves lying a little above the ground) instead of a layer with holes, and halfway out carpets and piles
+  show their leaf layer without tiny single leaves on top.
+- The leaf layer of carpets and piles no longer repeats the same pattern block by block.
+
 ## [1.4.0] - 2026-10-10
 ### Added
 - Fallen leaves rot away. Leaves on the ground no longer stay forever: they thin out slowly, leaf by leaf, and near
