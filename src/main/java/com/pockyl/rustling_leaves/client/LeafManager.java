@@ -85,6 +85,11 @@ public final class LeafManager {
     private static final int PILE_SCANS_PER_TICK = 16;
     /** Seasons change slowly; once a second is plenty (also to follow the biome under the camera). */
     private static final int SEASON_INTERVAL = 20;
+    /**
+     * Ground that was seeded this many ticks ago gets its natural litter topped up again (one day), unless it lies where
+     * trees around the camera keep it covered with falling leaves anyway.
+     */
+    private static final long REFRESH_TICKS = 24000L;
     private static final boolean SERENE_SEASONS = ModList.get().isLoaded(SereneSeasons.MOD_ID);
     /** Looked up on use: this class loads with the config, before the pile blocks are registered. */
     private static final PileBlocks PILES = ModList.get().isLoaded(ImmersiveWeathering.MOD_ID)
@@ -152,14 +157,15 @@ public final class LeafManager {
         burstsThisTick = 0;
         soundsThisTick = 0;
         Vec3 camera = cameraPosition(minecraft);
-        updateLitterChunks(camera);
-        simulation.beginTick(level, camera.x, camera.y, camera.z);
-        disturbByEntities(camera);
-        simulation.finishTick();
+        // The season goes first: it decides how much litter new ground gets.
         if (ticks >= nextSeasonCheck) {
             nextSeasonCheck = ticks + SEASON_INTERVAL;
             updateSeason(camera);
         }
+        updateLitterChunks(camera);
+        simulation.beginTick(level, camera.x, camera.y, camera.z);
+        disturbByEntities(camera);
+        simulation.finishTick();
         SPAWNER.tick(level, simulation, camera.x, camera.z);
         if (ticks % SAVE_INTERVAL == 0) {
             save(camera);
@@ -371,11 +377,17 @@ public final class LeafManager {
         int reach = Mth.ceil(radius / 16.0) + 1;
         double keepSq = (radius + 24.0) * (radius + 24.0);
         double loadSq = (radius + 8.0) * (radius + 8.0);
+        long now = level.getGameTime();
+        boolean refresh = SETTINGS.decayRate() > 0.0F || SETTINGS.seasonLitter != 1.0F;
         if (ticks % 10 == 0) {
+            double shedding = SETTINGS.spawnRadius + 16.0;
             List<LitterChunk> far = new ArrayList<>();
             for (LitterChunk chunk : field.chunks()) {
-                if (chunkDistanceSq(chunk.x, chunk.z, camera) > keepSq) {
+                double distanceSq = chunkDistanceSq(chunk.x, chunk.z, camera);
+                if (distanceSq > keepSq) {
                     far.add(chunk);
+                } else if (refresh && distanceSq > shedding * shedding && refreshDue(chunk, now)) {
+                    chunk.unseed();
                 }
             }
             for (LitterChunk chunk : far) {
@@ -391,7 +403,16 @@ public final class LeafManager {
                         continue;
                     }
                     LitterChunk chunk = storage.load(cx, cz);
-                    field.put(chunk != null ? chunk : new LitterChunk(cx, cz));
+                    if (chunk == null) {
+                        field.put(new LitterChunk(cx, cz));
+                        continue;
+                    }
+                    // The litter rotted while nobody was here, and the trees kept shedding.
+                    field.put(chunk);
+                    simulation.decay(chunk, now);
+                    if (refresh && refreshDue(chunk, now)) {
+                        chunk.unseed();
+                    }
                 }
             }
         }
@@ -414,7 +435,7 @@ public final class LeafManager {
         long deadline = System.nanoTime() + SEED_BUDGET_NANOS;
         for (LitterChunk chunk : unseeded) {
             SEEDER.seed(level, simulation, chunk);
-            chunk.markSeeded();
+            chunk.markSeeded(now);
             if (System.nanoTime() > deadline) {
                 break;
             }
@@ -433,6 +454,10 @@ public final class LeafManager {
                 minecraft.levelRenderer.allChanged();
             }
         }
+    }
+
+    private static boolean refreshDue(LitterChunk chunk, long now) {
+        return chunk.seeded() && chunk.seededAt() != LitterChunk.NEVER && now - chunk.seededAt() >= REFRESH_TICKS;
     }
 
     private static boolean neighborsLoaded(int chunkX, int chunkZ) {

@@ -19,6 +19,7 @@
   "rustling_leaves.configuration.rustleVolume": "Громкость шороха",
   "rustling_leaves.configuration.carpetDepth": "Толщина ковра листвы",
   "rustling_leaves.configuration.naturalPiles": "Естественные наносы и кучи",
+  "rustling_leaves.configuration.litterLifetime": "Дней до перегнивания листвы",
   "rustling_leaves.configuration.windEvents": "Шквалы и вихри",
   "rustling_leaves.configuration.raking": "Грабли (мотыга или лопата)",
   "rustling_leaves.configuration.immersiveWeatheringPiles": "Кучи Immersive Weathering как листва",
@@ -36,7 +37,9 @@
   "rustling_leaves.configuration.litterDistance": "Дальность отображения листвы",
   "rustling_leaves.configuration.seasons": "Времена года",
   "rustling_leaves.configuration.seasonsEnabled": "Листопад по временам года",
-  "rustling_leaves.configuration.autumnFallRate": "Листопад поздней осенью",
+  "rustling_leaves.configuration.autumnFallRate": "Листопад в разгар осени",
   "rustling_leaves.configuration.winterFallRate": "Листопад зимой",
-  "rustling_leaves.configuration.seasonAutumnColors": "Осенние цвета поздней осенью"
+  "rustling_leaves.configuration.springSummerFallRate": "Листопад весной и летом",
+  "rustling_leaves.configuration.seasonAutumnColors": "Осенние цвета поздней осенью",
+  "rustling_leaves.configuration.seasonalDecay": "Гниение листвы поздней осенью и зимой"
 }

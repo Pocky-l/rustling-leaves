@@ -34,6 +34,14 @@ public final class Config {
                     "Falling leaves stop thickening it beyond this; piles you make are not limited.")
             .translation("rustling_leaves.configuration.carpetDepth")
             .defineInRange("carpetDepth", 4, 0, 40);
+    private static final ModConfigSpec.DoubleValue LITTER_LIFETIME = BUILDER
+            .comment("How many in-game days fallen leaves lie on the ground before they have rotted away. They thin out",
+                    "gradually, leaf by leaf; thick piles last longer than a thin carpet. Under trees new leaves keep falling,",
+                    "so the forest floor stays covered. 0 keeps leaves until something moves them. Snow clears leaves anyway;",
+                    "with Serene Seasons they also rot faster in late autumn and winter (seasons.seasonalDecay).",
+                    "Leaf piles of Immersive Weathering rot only with their block.")
+            .translation("rustling_leaves.configuration.litterLifetime")
+            .defineInRange("litterLifetime", 10.0, 0.0, 100.0);
     private static final ModConfigSpec.BooleanValue NATURAL_PILES = BUILDER
             .comment("Whether forests start with leaves banked against walls and trunks and the odd leaf pile.")
             .translation("rustling_leaves.configuration.naturalPiles")
@@ -93,22 +101,36 @@ public final class Config {
     }
 
     private static final ModConfigSpec.BooleanValue SEASONS = BUILDER
-            .comment("With Serene Seasons installed, leaf fall follows the season: many leaves in autumn, almost none in winter,",
-                    "few in spring. Biomes and dimensions without seasons are not affected.")
+            .comment("With Serene Seasons installed, leaf fall follows the season: leaves fall in autumn (from early autumn,",
+                    "most in mid and late autumn, the last ones in early winter) and hardly at all in winter, spring and summer;",
+                    "cherry trees shed their blossom in spring. The litter on the ground rots away before the snow comes, and new",
+                    "ground gets a thick carpet of leaves only in autumn. Biomes and dimensions without seasons are not affected.")
             .translation("rustling_leaves.configuration.seasonsEnabled")
             .define("enabled", true);
     private static final ModConfigSpec.DoubleValue AUTUMN_FALL_RATE = BUILDER
-            .comment("How many more leaves fall in late autumn (multiplier of the fall rate; less in early autumn).")
+            .comment("How many leaves fall at the peak of autumn, in mid and late autumn (multiplier of leaves.fallRate;",
+                    "about a third of it in early autumn, a few in early winter).")
             .translation("rustling_leaves.configuration.autumnFallRate")
             .defineInRange("autumnFallRate", 3.0, 0.0, 10.0);
     private static final ModConfigSpec.DoubleValue WINTER_FALL_RATE = BUILDER
-            .comment("How many leaves still fall in winter (multiplier of the fall rate, 0 = none).")
+            .comment("How many leaves still fall in mid and late winter (multiplier of leaves.fallRate, 0 = none).")
             .translation("rustling_leaves.configuration.winterFallRate")
-            .defineInRange("winterFallRate", 0.05, 0.0, 1.0);
+            .defineInRange("winterFallRate", 0.0, 0.0, 1.0);
+    private static final ModConfigSpec.DoubleValue OFF_SEASON_FALL_RATE = BUILDER
+            .comment("How many leaves fall in spring and summer (multiplier of leaves.fallRate, 0 = none).",
+                    "Cherry blossom petals in spring are not affected.")
+            .translation("rustling_leaves.configuration.springSummerFallRate")
+            .defineInRange("springSummerFallRate", 0.02, 0.0, 1.0);
     private static final ModConfigSpec.DoubleValue SEASON_AUTUMN_COLORS = BUILDER
             .comment("How the share of autumn colors grows towards late autumn (multiplier of leaves.autumnColors, capped at all leaves).")
             .translation("rustling_leaves.configuration.seasonAutumnColors")
             .defineInRange("autumnColors", 3.0, 0.0, 10.0);
+    private static final ModConfigSpec.DoubleValue SEASONAL_DECAY = BUILDER
+            .comment("How fast lying leaves rot in late autumn and winter, in natural leaf carpets per sub-season, on top of",
+                    "leaves.litterLifetime. At 1 the autumn litter is gone early in winter, before the snow builds up, however",
+                    "long the seasons are. 0: leaves rot at the same pace all year.")
+            .translation("rustling_leaves.configuration.seasonalDecay")
+            .defineInRange("seasonalDecay", 1.0, 0.0, 5.0);
 
     static {
         BUILDER.pop().translation("rustling_leaves.configuration.sound").push("sound");
@@ -136,6 +158,7 @@ public final class Config {
         settings.spawnRadius = SPAWN_RADIUS.get();
         settings.carpetDepth = CARPET_DEPTH.get();
         settings.naturalPiles = NATURAL_PILES.get();
+        settings.litterLifetime = LITTER_LIFETIME.get().floatValue();
         settings.windEvents = WIND_EVENTS.get().floatValue();
         settings.raking = RAKING.get();
         settings.drawPileBlocks = PILE_BLOCKS.get();
@@ -150,6 +173,8 @@ public final class Config {
         settings.seasons = SEASONS.get();
         settings.autumnFallRate = AUTUMN_FALL_RATE.get().floatValue();
         settings.winterFallRate = WINTER_FALL_RATE.get().floatValue();
+        settings.offSeasonFallRate = OFF_SEASON_FALL_RATE.get().floatValue();
+        settings.seasonalDecay = SEASONAL_DECAY.get().floatValue();
         settings.autumnColorBoost = SEASON_AUTUMN_COLORS.get().floatValue();
     }
 }

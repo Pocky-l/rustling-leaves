@@ -29,20 +29,35 @@ public final class LeafSettings {
     /** Draw the leaf pile blocks of other mods (Immersive Weathering) as litter instead of their own models. */
     public boolean drawPileBlocks = true;
 
+    /**
+     * In-game days a natural carpet of leaves lies before it has rotted away (thicker piles last longer); 0 keeps the
+     * leaves until something moves them. Snow clears them anyway.
+     */
+    public float litterLifetime = 10.0F;
+
     /** Whether leaf fall follows the seasons of a season mod. */
     public boolean seasons = true;
-    /** Season options: fall rate in late autumn and in winter, autumn color share in late autumn (multipliers). */
+    /**
+     * Season options (multipliers of the fall rate): leaf fall at the autumn peak, in spring and summer and in mid and
+     * late winter; the autumn color share in late autumn; how fast the litter rots in late autumn and winter.
+     */
     public float autumnFallRate = 3.0F;
-    public float winterFallRate = 0.05F;
+    public float offSeasonFallRate = 0.02F;
+    public float winterFallRate = 0.0F;
     public float autumnColorBoost = 3.0F;
+    public float seasonalDecay = 1.0F;
 
     /**
-     * Multipliers of the current season (1 = no season): how often trees drop leaves, how often cherries drop petals
-     * and how many leaves fall in autumn colors. The client sets them through {@link SeasonCurve} from the season mod.
+     * Multipliers of the current season (1 = no season): how often trees drop leaves, how often cherries drop petals,
+     * how many leaves fall in autumn colors and how thick the natural litter on newly seen ground is. The client sets
+     * them through {@link SeasonCurve} from the season mod.
      */
     public float seasonFallRate = 1.0F;
     public float seasonPetalRate = 1.0F;
     public float seasonAutumnColors = 1.0F;
+    public float seasonLitter = 1.0F;
+    /** Extra rot of the litter in the current season, in natural carpets per tick (0 = no season). */
+    public float seasonDecay = 0.0F;
 
     /** How often trees with leaves of this shape drop them, relative to the base fall rate. */
     public float shedRate(LeafShape shape) {
@@ -57,6 +72,12 @@ public final class LeafSettings {
     /** Share of newly fallen leaves in autumn colors: the configured share, raised or lowered by the season. */
     public float autumnShare() {
         return Math.min(1.0F, autumnColors * seasonAutumnColors);
+    }
+
+    /** How fast the litter rots now, in natural carpets per tick: its own pace plus the season's. */
+    public float decayRate() {
+        float own = litterLifetime > 0.0F ? 1.0F / (litterLifetime * 24000.0F) : 0.0F;
+        return own + seasonDecay;
     }
 
     /** Moving leaves farther than this (horizontally) from the camera are dropped. */

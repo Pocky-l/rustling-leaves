@@ -16,7 +16,10 @@ public final class LitterChunk {
     /** Render tiles are 16x16 cells (4x4 blocks). */
     public static final int TILE = 16;
     public static final int TILES = SIZE / TILE;
-    private static final int FORMAT = 1;
+    /** 2: game times of the last decay and of the last seeding. Format 1 is still read. */
+    private static final int FORMAT = 2;
+    /** A game time that was never set. */
+    public static final long NEVER = Long.MIN_VALUE;
 
     public final int x;
     public final int z;
@@ -42,6 +45,10 @@ public final class LitterChunk {
 
     int total;
     boolean seeded;
+    /** Game time up to which the rot of the litter has been applied ({@link #NEVER} until the chunk is first seen). */
+    long decayedAt = NEVER;
+    /** Game time when the natural litter was last seeded or topped up ({@link #NEVER} before the first seeding). */
+    long seededAt = NEVER;
     boolean dirty;
     boolean pilesScanned;
 
@@ -89,6 +96,26 @@ public final class LitterChunk {
         return seeded;
     }
 
+    /** Game time up to which the rot of the litter has been applied, {@link #NEVER} if not yet. */
+    public long decayedAt() {
+        return decayedAt;
+    }
+
+    /** Sets when the rot was last applied: the next decay applies everything since then (also used by tests). */
+    public void setDecayedAt(long gameTime) {
+        decayedAt = gameTime;
+    }
+
+    /** Game time of the last natural seeding of this chunk, {@link #NEVER} if it was never seeded. */
+    public long seededAt() {
+        return seededAt;
+    }
+
+    /** Lets the next seeding top up the natural litter of this chunk (the trees shed while nobody watched). */
+    public void unseed() {
+        seeded = false;
+    }
+
     /** Fills an empty cell when the chunk is first seen (natural carpet, drifts, piles). */
     public void seedCell(int index, int leaves, float surface, int treeColor, int leafShape) {
         if (count[index] > 0 || leaves <= 0) {
@@ -103,7 +130,30 @@ public final class LitterChunk {
         total += n;
     }
 
-    public void markSeeded() {
+    /**
+     * Tops a cell up to {@code leaves} natural leaves: an empty cell is seeded, a thinner stack on the same surface gets
+     * the missing leaves. Thicker stacks and the cells of pile blocks stay as they are.
+     */
+    public void topUpCell(int index, int leaves, float surface, int treeColor, int leafShape) {
+        int n = count[index];
+        if (n == 0) {
+            seedCell(index, leaves, surface, treeColor, leafShape);
+            return;
+        }
+        int target = Math.min(leaves, LitterField.MAX_LAYERS);
+        if (n >= target || pinned[index] > 0 || pileTarget[index] > 0 || Math.abs(base[index] - surface) > 0.05F) {
+            return;
+        }
+        color[index] = LeafPalette.lerp(color[index], treeColor, (target - n) / (float) target);
+        count[index] = (short) target;
+        total += target - n;
+    }
+
+    public void markSeeded(long gameTime) {
+        seededAt = gameTime;
+        if (decayedAt == NEVER) {
+            decayedAt = gameTime;
+        }
         for (int t = 0; t < tileRevision.length; t++) {
             tileRevision[t]++;
         }
@@ -123,6 +173,8 @@ public final class LitterChunk {
         out.writeInt(x);
         out.writeInt(z);
         out.writeBoolean(seeded);
+        out.writeLong(decayedAt);
+        out.writeLong(seededAt);
         int cells = 0;
         for (int i = 0; i < AREA; i++) {
             if (loose(i) > 0) {
@@ -145,11 +197,15 @@ public final class LitterChunk {
 
     public static LitterChunk read(DataInput in) throws IOException {
         int format = in.readByte();
-        if (format != FORMAT) {
+        if (format != 1 && format != FORMAT) {
             throw new IOException("Unknown litter format " + format);
         }
         LitterChunk chunk = new LitterChunk(in.readInt(), in.readInt());
         chunk.seeded = in.readBoolean();
+        if (format >= 2) {
+            chunk.decayedAt = in.readLong();
+            chunk.seededAt = in.readLong();
+        }
         int cells = in.readUnsignedShort();
         for (int n = 0; n < cells; n++) {
             int i = in.readUnsignedShort() & (AREA - 1);

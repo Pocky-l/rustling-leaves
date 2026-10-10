@@ -4,7 +4,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 
@@ -17,7 +16,12 @@ import com.pockyl.rustling_leaves.sim.LeafSimulation;
 /**
  * Gives ground that is seen for the first time the litter a forest floor would have: a carpet under and around tree
  * crowns (thicker where the canopy is dense, patchy), leaves banked against walls and trunks, and now and then a
- * proper leaf pile. Runs once per chunk; the result is saved with the rest of the litter.
+ * proper leaf pile. The result is saved with the rest of the litter.
+ *
+ * <p>The litter rots away over time, so ground that has not been seeded for a while is seeded again: cells that have
+ * thinned out are topped up to the natural carpet (the trees kept shedding while nobody watched), anything thicker
+ * stays as it is. With seasons the natural carpet follows the year: a thin scatter of leaves in spring and summer, a
+ * carpet that grows through autumn, nothing in winter.
  */
 final class LitterSeeder {
     /** How far (in blocks) leaves land from the crown they fell from. */
@@ -71,9 +75,11 @@ final class LitterSeeder {
     void seed(Level level, LeafSimulation simulation, LitterChunk chunk) {
         LeafSettings settings = simulation.settings();
         int carpet = settings.carpetDepth;
-        if (carpet <= 0 && !settings.naturalPiles) {
+        float season = settings.seasonLitter;
+        if (carpet <= 0 && !settings.naturalPiles || season <= 0.0F) {
             return;
         }
+        boolean first = chunk.seededAt() == LitterChunk.NEVER;
         int originX = chunk.x * 16;
         int originZ = chunk.z * 16;
         // Canopy: the top block of every column (with a margin into neighbor chunks) if it is foliage.
@@ -160,19 +166,19 @@ final class LitterSeeder {
                     ground[b * 16 + c] = surface;
                     // Soft patches of a few blocks, with a little grain inside them.
                     float pattern = 0.7F * patchNoise(cx, cz) + 0.3F * unit(LeafPalette.hash(cellX, cellZ, 0x5EED));
-                    int leaves = Math.round(d * terrain * carpet * 2.4F * (pattern - 0.38F));
+                    int leaves = Math.round(d * terrain * carpet * 2.4F * (pattern - 0.38F) * season);
                     if (leaves <= 0) {
-                        // Away from the patches only the odd stray leaf.
-                        leaves = unit(LeafPalette.hash(cellZ, cellX, 0x57A7)) < d * 0.3F ? 1 : 0;
+                        // Away from the patches only the odd stray leaf (out of season, nearly all there is).
+                        leaves = unit(LeafPalette.hash(cellZ, cellX, 0x57A7)) < d * 0.3F * Math.min(1.0F, season * 3.0F) ? 1 : 0;
                     }
-                    leaves += wallDrift(walls, c & 3, c >> 2, d);
-                    chunk.seedCell(LitterField.index(cellX, cellZ), leaves, (float) surface, color, shape);
+                    leaves += Math.round(wallDrift(walls, c & 3, c >> 2, d) * season);
+                    chunk.topUpCell(LitterField.index(cellX, cellZ), leaves, (float) surface, color, shape);
                 }
             }
         }
-        if (settings.naturalPiles && densitySum / 256.0F > 0.3F) {
+        if (first && settings.naturalPiles && densitySum / 256.0F > 0.3F) {
             long chunkHash = LeafPalette.hash(chunk.x, chunk.z, 0x9113);
-            int piles = unit(chunkHash) < 0.12F ? 1 : 0;
+            int piles = unit(chunkHash) < 0.12F * season ? 1 : 0;
             for (int p = 0; p < piles; p++) {
                 addPile(chunk, originX, originZ, LeafPalette.hash(chunk.x, chunk.z, p));
             }
@@ -211,11 +217,11 @@ final class LitterSeeder {
         return t * t * (3.0F - 2.0F * t);
     }
 
-    /** Litter lies on solid natural or built ground, not on top of logs or on snow. */
+    /** Litter lies on solid natural or built ground, not on top of logs, not on snow and not under a thin snow layer. */
     private boolean litterGround(Level level, double x, double surface, double z) {
         BlockState below = level.getBlockState(cursor.set(Mth.floor(x), Mth.floor(surface - 0.01), Mth.floor(z)));
-        return !below.is(BlockTags.LOGS) && !below.is(Blocks.SNOW) && !below.is(Blocks.SNOW_BLOCK) && !below.is(Blocks.POWDER_SNOW)
-                && !below.is(BlockTags.ICE);
+        BlockState at = level.getBlockState(cursor.set(Mth.floor(x), Mth.floor(surface + 0.01), Mth.floor(z)));
+        return !below.is(BlockTags.LOGS) && !below.is(BlockTags.SNOW) && !below.is(BlockTags.ICE) && !at.is(BlockTags.SNOW);
     }
 
     /** Which sides of a block column have a wall or trunk at ground level: bits east, west, south, north. */

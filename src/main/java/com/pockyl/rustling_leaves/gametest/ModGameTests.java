@@ -38,7 +38,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * In-game tests, run headless by {@code gradlew runGameTestServer}. The simulation only needs a {@code Level}, so it
@@ -78,73 +80,92 @@ public final class ModGameTests {
     private static final float EARLY_AUTUMN = 6.5F;
     private static final float MID_AUTUMN = 7.5F;
     private static final float LATE_AUTUMN = 8.5F;
+    private static final float EARLY_WINTER = 9.5F;
     private static final float MID_WINTER = 10.5F;
 
     @GameTest(template = "empty")
     public static void seasonCurveFollowsTheYear(GameTestHelper helper) {
         LeafSettings settings = new LeafSettings();
         SeasonCurve.apply(settings, MID_SUMMER);
-        helper.assertTrue(settings.seasonFallRate == 1.0F && settings.seasonPetalRate == 1.0F && settings.seasonAutumnColors == 1.0F,
-                "summer changes nothing");
+        helper.assertTrue(settings.seasonFallRate == settings.offSeasonFallRate && settings.seasonFallRate < 0.05F,
+                "summer fall rate " + settings.seasonFallRate);
+        helper.assertTrue(settings.seasonLitter < 0.25F && settings.seasonDecay == 0.0F, "summer litter " + settings.seasonLitter);
         float summerShare = settings.autumnShare();
         SeasonCurve.apply(settings, EARLY_AUTUMN);
         float early = settings.seasonFallRate;
         float earlyShare = settings.autumnShare();
+        float earlyLitter = settings.seasonLitter;
         SeasonCurve.apply(settings, MID_AUTUMN);
         float mid = settings.seasonFallRate;
         float midShare = settings.autumnShare();
         SeasonCurve.apply(settings, LATE_AUTUMN);
-        helper.assertTrue(1.0F < early && early < mid && mid < settings.seasonFallRate, "leaf fall does not grow through autumn");
+        helper.assertTrue(0.5F < early && early < mid && mid < settings.seasonFallRate, "leaf fall does not grow through autumn");
         helper.assertTrue(settings.seasonFallRate == settings.autumnFallRate, "late autumn fall rate " + settings.seasonFallRate);
         helper.assertTrue(summerShare < earlyShare && earlyShare < midShare && midShare < settings.autumnShare(),
                 "autumn colors do not grow through autumn");
         helper.assertTrue(settings.autumnShare() == 1.0F, "late autumn share " + settings.autumnShare());
-        helper.assertTrue(settings.seasonPetalRate == 1.0F, "autumn changes cherry petals");
+        helper.assertTrue(earlyLitter < settings.seasonLitter && settings.seasonLitter == 1.0F, "late autumn litter " + settings.seasonLitter);
+        helper.assertTrue(settings.seasonDecay > 0.0F, "the litter does not rot faster in late autumn");
+        float lateDecay = settings.seasonDecay;
+        SeasonCurve.apply(settings, EARLY_WINTER);
+        helper.assertTrue(0.0F < settings.seasonFallRate && settings.seasonFallRate < early, "early winter fall rate " + settings.seasonFallRate);
+        helper.assertTrue(settings.seasonDecay > lateDecay, "the litter does not rot faster in winter");
         SeasonCurve.apply(settings, MID_WINTER);
         helper.assertTrue(settings.seasonFallRate == settings.winterFallRate && settings.seasonPetalRate == settings.winterFallRate,
                 "winter fall rate " + settings.seasonFallRate);
+        helper.assertTrue(settings.seasonLitter == 0.0F, "new ground gets litter in winter");
         SeasonCurve.apply(settings, MID_SPRING);
-        helper.assertTrue(settings.seasonFallRate < 1.0F && settings.seasonPetalRate > 1.0F, "spring: few leaves, more petals");
+        helper.assertTrue(settings.seasonFallRate < 0.05F && settings.seasonPetalRate > 1.0F, "spring: no leaves, more petals");
+        // The season's rot follows the length of the sub-seasons: twice as long, half as fast.
+        SeasonCurve.apply(settings, LATE_AUTUMN, SeasonCurve.DEFAULT_SUB_SEASON_TICKS * 2);
+        helper.assertTrue(Math.abs(settings.seasonDecay * 2.0F - lateDecay) < lateDecay * 0.01F, "rot ignores the sub-season length");
         // No jumps: across every sub-season boundary (and the turn of the year) the values change only a little.
         for (int boundary = 0; boundary < SeasonCurve.SUB_SEASONS; boundary++) {
             SeasonCurve.apply(settings, Math.floorMod(boundary - 1, SeasonCurve.SUB_SEASONS) + 0.999F);
             float fall = settings.seasonFallRate;
             float colors = settings.seasonAutumnColors;
+            float litter = settings.seasonLitter;
             SeasonCurve.apply(settings, boundary + 0.001F);
-            helper.assertTrue(Math.abs(settings.seasonFallRate - fall) < 0.02F && Math.abs(settings.seasonAutumnColors - colors) < 0.02F,
-                    "season jumps at sub-season " + boundary);
+            helper.assertTrue(Math.abs(settings.seasonFallRate - fall) < 0.02F && Math.abs(settings.seasonAutumnColors - colors) < 0.02F
+                    && Math.abs(settings.seasonLitter - litter) < 0.02F, "season jumps at sub-season " + boundary);
         }
         // The season multiplies the configured options instead of replacing them.
         settings.autumnColors = 0.0F;
         SeasonCurve.apply(settings, LATE_AUTUMN);
         helper.assertTrue(settings.autumnShare() == 0.0F, "autumn colors appear although they are off");
+        settings.seasonalDecay = 0.0F;
+        SeasonCurve.apply(settings, MID_WINTER);
+        helper.assertTrue(settings.seasonDecay == 0.0F, "the litter rots in winter although seasonal rot is off");
         SeasonCurve.clear(settings);
-        helper.assertTrue(settings.seasonFallRate == 1.0F && settings.seasonPetalRate == 1.0F && settings.seasonAutumnColors == 1.0F,
-                "no season is not neutral");
+        helper.assertTrue(settings.seasonFallRate == 1.0F && settings.seasonPetalRate == 1.0F && settings.seasonAutumnColors == 1.0F
+                && settings.seasonLitter == 1.0F && settings.seasonDecay == 0.0F, "no season is not neutral");
         helper.succeed();
     }
 
     @GameTest(template = "box", skyAccess = true)
-    public static void winterTreesShedFarFewerLeaves(GameTestHelper helper) {
+    public static void leavesFallOnlyInAutumn(GameTestHelper helper) {
         canopy(helper);
+        int spring = shed(helper, MID_SPRING, 400, null);
         int summer = shed(helper, MID_SUMMER, 400, null);
         int winter = shed(helper, MID_WINTER, 400, null);
         int autumn = shed(helper, LATE_AUTUMN, 400, null);
-        helper.assertTrue(summer > 100, "only " + summer + " leaves fell in summer");
-        helper.assertTrue(winter * 5 < summer, winter + " leaves fell in winter, " + summer + " in summer");
-        helper.assertTrue(autumn > summer * 2, autumn + " leaves fell in late autumn, " + summer + " in summer");
+        helper.assertTrue(autumn > 200, "only " + autumn + " leaves fell in late autumn");
+        helper.assertTrue(summer * 20 < autumn && spring * 20 < autumn, spring + " leaves fell in spring, " + summer + " in summer, "
+                + autumn + " in late autumn");
+        helper.assertTrue(winter == 0, winter + " leaves fell in winter");
         helper.succeed();
     }
 
     @GameTest(template = "box", skyAccess = true)
     public static void lateAutumnLeavesFallInAutumnColors(GameTestHelper helper) {
         canopy(helper);
-        int[] summer = new int[2];
-        shed(helper, MID_SUMMER, 100, summer);
+        // Without seasons a part of the leaves falls in autumn colors (in summer hardly a leaf falls to compare with).
+        int[] none = new int[2];
+        shed(helper, Float.NaN, 100, none);
         int[] autumn = new int[2];
         shed(helper, LATE_AUTUMN, 100, autumn);
-        helper.assertTrue(summer[1] > 20 && autumn[1] > 20, "too few falling leaves to compare");
-        helper.assertTrue(summer[0] < summer[1] * 0.6F, summer[0] + " of " + summer[1] + " leaves in autumn colors in summer");
+        helper.assertTrue(none[1] > 20 && autumn[1] > 20, "too few falling leaves to compare");
+        helper.assertTrue(none[0] < none[1] * 0.6F, none[0] + " of " + none[1] + " leaves in autumn colors without seasons");
         helper.assertTrue(autumn[0] == autumn[1], autumn[0] + " of " + autumn[1] + " leaves in autumn colors in late autumn");
         helper.succeed();
     }
@@ -725,7 +746,8 @@ public final class ModGameTests {
         helper.assertTrue(pinnedIn(sim, helper, 3, 3) == before, "the grown pile got its leaves out of nowhere");
         run(sim, helper, 20);
         helper.assertTrue(sim.pool().count() > 0, "no leaves fall onto the growing pile");
-        run(sim, helper, 600);
+        // Long enough for every round of leaves the pile asks for: a few of each round slide off its edges.
+        run(sim, helper, 1000);
         int after = pinnedIn(sim, helper, 3, 3);
         helper.setBlock(pos, Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, 2));
         sim.pileChanged(helper.absolutePos(pos), false, true);
@@ -834,15 +856,211 @@ public final class ModGameTests {
         chunk.seedCell(4000, 3, 70.0F, 0x654321, LeafShape.BROAD.ordinal());
         chunk.top[17] = LitterField.encodeTop(0.3F, 0.7F, 1.0F, 0.12F, 4);
         chunk.topColor[17] = 0xABCDEF;
-        chunk.markSeeded();
+        chunk.markSeeded(123456L);
+        chunk.setDecayedAt(234567L);
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         chunk.write(new DataOutputStream(bytes));
         LitterChunk read = LitterChunk.read(new DataInputStream(new ByteArrayInputStream(bytes.toByteArray())));
         helper.assertTrue(read.x == 5 && read.z == -3 && read.seeded() && read.total() == 15, "header differs");
+        helper.assertTrue(read.seededAt() == 123456L && read.decayedAt() == 234567L, "times differ");
         helper.assertTrue(Arrays.equals(read.count, chunk.count) && Arrays.equals(read.base, chunk.base)
                 && Arrays.equals(read.color, chunk.color) && Arrays.equals(read.shape, chunk.shape)
                 && Arrays.equals(read.top, chunk.top) && Arrays.equals(read.topColor, chunk.topColor), "cells differ");
         helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void oldLitterFormatStillLoads(GameTestHelper helper) throws IOException {
+        // A chunk as 1.3 saved it: format 1, without the game times.
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        DataOutputStream out = new DataOutputStream(bytes);
+        out.writeByte(1);
+        out.writeInt(2);
+        out.writeInt(7);
+        out.writeBoolean(true);
+        out.writeShort(1);
+        out.writeShort(100);
+        out.writeShort(6);
+        out.writeFloat(64.0F);
+        out.writeInt(0x6A8F3A);
+        out.writeByte(LeafShape.BROAD.ordinal());
+        out.writeLong(0L);
+        out.writeInt(0);
+        LitterChunk read = LitterChunk.read(new DataInputStream(new ByteArrayInputStream(bytes.toByteArray())));
+        helper.assertTrue(read.x == 2 && read.z == 7 && read.seeded() && read.count[100] == 6 && read.total() == 6, "old chunk differs");
+        helper.assertTrue(read.decayedAt() == LitterChunk.NEVER && read.seededAt() == LitterChunk.NEVER, "old chunk has game times");
+        helper.succeed();
+    }
+
+    /** Game ticks in which a natural carpet rots away with the default settings. */
+    private static final long LIFETIME = (long) (new LeafSettings().litterLifetime * 24000);
+
+    @GameTest(template = "box")
+    public static void litterRotsAwayGradually(GameTestHelper helper) {
+        floor(helper);
+        LeafSimulation sim = simulation(helper, 64, LeafListener.NONE);
+        int total = carpet(sim, helper, 2.5, 4);
+        // A small pile in the middle, low enough not to slump.
+        int[] center = cellAt(helper, 3.5, 3.5);
+        for (int n = 0; n < 14; n++) {
+            sim.field().add(center[0], center[1], absoluteY(helper, 1.0), 0x6A8F3A, 0, 0L, 0);
+        }
+        long now = helper.getLevel().getGameTime();
+        decayAll(sim, now);
+        helper.assertTrue(boxTotal(sim, helper) == total + 14, "leaves rotted without time passing");
+        // A quarter of the lifetime later every cell of the carpet is thinner, but none is bare: leaf by leaf, not cell by cell.
+        decayAll(sim, now + LIFETIME / 4);
+        int[] corner = cellAt(helper, 2.0, 2.0);
+        for (int dx = 0; dx < 6; dx++) {
+            for (int dz = 0; dz < 6; dz++) {
+                int count = sim.field().count(corner[0] + dx, corner[1] + dz);
+                helper.assertTrue(count >= 2 && count <= 3, "a carpet cell holds " + count + " leaves after a quarter of the lifetime");
+            }
+        }
+        int pile = sim.field().count(center[0], center[1]);
+        helper.assertTrue(pile >= 10 && pile < 18, "the pile holds " + pile + " of 18 leaves");
+        // Soon after the lifetime the carpet is gone; the pile lasts longer.
+        decayAll(sim, now + LIFETIME * 3 / 2);
+        helper.assertTrue(boxTotal(sim, helper) == sim.field().count(center[0], center[1]), "the carpet did not rot away");
+        helper.assertTrue(sim.field().count(center[0], center[1]) > 0, "the pile rotted as fast as the carpet");
+        decayAll(sim, now + LIFETIME * 4);
+        helper.assertTrue(boxTotal(sim, helper) == 0, boxTotal(sim, helper) + " leaves are left after four lifetimes");
+        helper.succeed();
+    }
+
+    @GameTest(template = "box")
+    public static void litterCatchesUpOnTheTimeAway(GameTestHelper helper) throws IOException {
+        floor(helper);
+        LeafSimulation sim = simulation(helper, 64, LeafListener.NONE);
+        int total = carpet(sim, helper, 2.0, 4);
+        long now = helper.getLevel().getGameTime();
+        run(sim, helper, 1);
+        List<LitterChunk> chunks = new ArrayList<>(sim.field().chunks());
+        int rotted = 0;
+        for (LitterChunk chunk : chunks) {
+            helper.assertTrue(chunk.decayedAt() == now, "the clock of a loaded chunk did not start");
+            // Saved, then loaded again half a lifetime later: the time away is applied once, when the chunk comes back.
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            chunk.write(new DataOutputStream(bytes));
+            LitterChunk loaded = LitterChunk.read(new DataInputStream(new ByteArrayInputStream(bytes.toByteArray())));
+            helper.assertTrue(loaded.decayedAt() == now, "the clock was not saved");
+            loaded.setDecayedAt(now - LIFETIME / 2);
+            sim.field().put(loaded);
+            rotted += sim.decay(loaded, now);
+            helper.assertTrue(loaded.decayedAt() == now && sim.decay(loaded, now) == 0, "the time away was applied twice");
+        }
+        int left = boxTotal(sim, helper);
+        helper.assertTrue(rotted > total / 4 && left == total - rotted && left > total / 4,
+                rotted + " of " + total + " leaves rotted in half a lifetime, " + left + " are left");
+        // Ticks rot loaded chunks only as game time passes (a leaf the air lifts off the litter still counts).
+        run(sim, helper, 20);
+        helper.assertTrue(boxTotal(sim, helper) + sim.pool().count() == left, "loaded chunks rot again without time passing");
+        // A chunk without a game time (saved by an older version) starts its clock instead of rotting.
+        LitterChunk old = chunks.get(0);
+        old.setDecayedAt(LitterChunk.NEVER);
+        helper.assertTrue(sim.decay(old, now) == 0 && old.decayedAt() == now, "a chunk without a time rotted");
+        helper.succeed();
+    }
+
+    @GameTest(template = "box")
+    public static void snowCoversNoLeaves(GameTestHelper helper) {
+        floor(helper);
+        LeafSimulation sim = simulation(helper, 64, LeafListener.NONE);
+        int total = carpet(sim, helper, 2.5, 4);
+        long now = helper.getLevel().getGameTime();
+        decayAll(sim, now);
+        // Snow falls on a block of the carpet: the leaves under it are gone, the rest stays.
+        BlockPos at = helper.absolutePos(new BlockPos(3, 1, 3));
+        helper.getLevel().setBlockAndUpdate(at, Blocks.SNOW.defaultBlockState());
+        sim.setLevel(helper.getLevel());
+        sim.blockChanged(at);
+        int[] corner = cellAt(helper, 3.0, 3.0);
+        for (int a = 0; a < 4; a++) {
+            for (int b = 0; b < 4; b++) {
+                helper.assertTrue(sim.field().count(corner[0] + a, corner[1] + b) == 0, "leaves lie under the snow");
+            }
+        }
+        helper.assertTrue(boxTotal(sim, helper) == total - 16 * 4, "snow took " + (total - boxTotal(sim, helper)) + " leaves");
+        // Leaves on snow (in a corner the carpet does not reach) rot within minutes, those on the stone stay.
+        helper.setBlock(0, 1, 0, Blocks.SNOW_BLOCK.defaultBlockState());
+        int[] onSnow = cellAt(helper, 0.5, 0.5);
+        helper.assertTrue(sim.field().count(onSnow[0], onSnow[1]) == 0, "the carpet reaches the corner");
+        for (int n = 0; n < 6; n++) {
+            sim.field().add(onSnow[0], onSnow[1], absoluteY(helper, 2.0), 0x6A8F3A, 0, 0L, 0);
+        }
+        int onStone = boxTotal(sim, helper) - 6;
+        decayAll(sim, now + 20 * 60 * 3);
+        helper.assertTrue(sim.field().count(onSnow[0], onSnow[1]) == 0, "leaves still lie on the snow after three minutes");
+        helper.assertTrue(boxTotal(sim, helper) > onStone * 9 / 10, "leaves on stone rotted as fast as on snow: "
+                + boxTotal(sim, helper) + " of " + onStone + " are left");
+        helper.succeed();
+    }
+
+    @GameTest(template = "box")
+    public static void pileBlockLeavesDoNotRot(GameTestHelper helper) {
+        floor(helper);
+        helper.setBlock(3, 1, 3, Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, 4));
+        LeafSimulation sim = pileSimulation(helper, true);
+        int pinned = pinnedIn(sim, helper, 3, 3);
+        helper.assertTrue(pinned > 0, "the pile block did not become litter");
+        int[] cell = cellAt(helper, 3.5, 3.5);
+        LitterChunk chunk = sim.field().chunkAtCell(cell[0], cell[1]);
+        int index = LitterField.index(cell[0], cell[1]);
+        int under = chunk.count[index];
+        for (int n = 0; n < 5; n++) {
+            sim.field().add(cell[0], cell[1], absoluteY(helper, 1.0), 0x6A8F3A, 0, 0L, 0);
+        }
+        long now = helper.getLevel().getGameTime();
+        decayAll(sim, now);
+        // The pile block stands in for snow here, but a pile block is no snow: loose leaves on it rot at the normal pace.
+        decayAll(sim, now + 20 * 60 * 3);
+        helper.assertTrue(chunk.count[index] >= under + 4, "the leaves on the pile rotted as if it were snow");
+        // Only the loose leaves rot; the pile block's own leaves stay as long as the block does.
+        decayAll(sim, now + LIFETIME * 10);
+        helper.assertTrue(pinnedIn(sim, helper, 3, 3) == pinned && boxTotal(sim, helper) == pinned,
+                "after ten lifetimes " + boxTotal(sim, helper) + " leaves are left, the pile block holds " + pinned);
+        helper.succeed();
+    }
+
+    @GameTest(template = "box")
+    public static void autumnLitterIsGoneBeforeWinter(GameTestHelper helper) {
+        // Whatever the length of the seasons (here the default and a short one of two days per sub-season).
+        for (int duration : new int[] {SeasonCurve.DEFAULT_SUB_SEASON_TICKS, 2 * 24000}) {
+            floor(helper);
+            LeafSimulation sim = simulation(helper, 64, LeafListener.NONE);
+            // Only the season rots the leaves here.
+            sim.settings().litterLifetime = 0.0F;
+            int total = carpet(sim, helper, 2.0, 4);
+            long time = helper.getLevel().getGameTime();
+            decayAll(sim, time);
+            int lateAutumn = -1;
+            int earlyWinter = -1;
+            for (float position = MID_AUTUMN; position < MID_WINTER; position += 0.05F) {
+                SeasonCurve.apply(sim.settings(), position, duration);
+                time += (long) (duration * 0.05F);
+                decayAll(sim, time);
+                if (lateAutumn < 0 && position >= LATE_AUTUMN) {
+                    lateAutumn = boxTotal(sim, helper);
+                }
+                if (earlyWinter < 0 && position >= EARLY_WINTER) {
+                    earlyWinter = boxTotal(sim, helper);
+                }
+            }
+            helper.assertTrue(lateAutumn > total / 4 && lateAutumn < total, "in late autumn " + lateAutumn + " of " + total + " leaves are left");
+            helper.assertTrue(earlyWinter < total / 50, earlyWinter + " of " + total + " leaves are left in the middle of early winter");
+            helper.assertTrue(boxTotal(sim, helper) == 0, boxTotal(sim, helper) + " leaves are left in mid winter");
+            // In summer the season adds nothing: the litter lasts.
+            SeasonCurve.apply(sim.settings(), MID_SUMMER, duration);
+            helper.assertTrue(sim.settings().decayRate() == 0.0F, "the litter rots in summer although its lifetime is off");
+        }
+        helper.succeed();
+    }
+
+    /** Lets the litter of every loaded chunk rot up to {@code gameTime} (chunks without a time start their clock). */
+    private static void decayAll(LeafSimulation sim, long gameTime) {
+        for (LitterChunk chunk : sim.field().chunks()) {
+            sim.decay(chunk, gameTime);
+        }
     }
 
     // ------------------------------------------------------------------------------------------------------------
@@ -871,14 +1089,18 @@ public final class ModGameTests {
     }
 
     /**
-     * Lets the crown from {@link #canopy} shed leaves for {@code ticks} ticks at a point in the year and returns how
+     * Lets the crown from {@link #canopy} shed leaves for {@code ticks} ticks at a point in the year (NaN: no seasons) and returns how
      * many fell. With {@code colors}, it also counts the moving leaves at the end in autumn colors (into [0]) and all of
      * them (into [1]): the tree is pure green, so any red in a leaf is an autumn color.
      */
     private static int shed(GameTestHelper helper, float season, int ticks, int[] colors) {
         LeafSimulation sim = simulation(helper, 4096, LeafListener.NONE);
         sim.settings().spawnRadius = 4;
-        SeasonCurve.apply(sim.settings(), season);
+        if (Float.isNaN(season)) {
+            SeasonCurve.clear(sim.settings());
+        } else {
+            SeasonCurve.apply(sim.settings(), season);
+        }
         int[] fallen = new int[1];
         LeafSpawner spawner = new LeafSpawner(new TreeLeaves() {
             @Override

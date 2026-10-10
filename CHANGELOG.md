@@ -4,6 +4,31 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-10-10
+### Added
+- Fallen leaves rot away. Leaves on the ground no longer stay forever: they thin out slowly, leaf by leaf, and near
+  you the last ones crumble away instead of just vanishing. A natural carpet lasts about ten in-game days, thick piles
+  much longer. Under the trees new leaves keep falling and the forest floor fills up again over time, also where you
+  have not been for a while; paths you cleared and piles you raked slowly go back to the forest. Ground you come back
+  to after a long time has rotted for as long as you were away.
+- Snow and leaves do not mix: leaves are gone as soon as snow covers them, and leaves on snow rot within a minute or
+  two. Leaf piles of Immersive Weathering are not affected, they rot only with their block.
+- New client option `leaves.litterLifetime` (in-game days until a carpet of fallen leaves has rotted away, 0 keeps the
+  leaves until something moves them).
+- New client options `seasons.springSummerFallRate` (leaf fall in spring and summer) and `seasons.seasonalDecay` (how
+  fast the litter rots in late autumn and winter).
+
+### Changed
+- With [Serene Seasons](https://www.curseforge.com/minecraft/mc-mods/serene-seasons), leaves fall only when they should: leaf fall is an autumn event now. The first leaves come down
+  in early autumn, most of them in mid and late autumn and the last few brown ones in early winter; in winter, spring
+  and summer the trees keep their leaves (cherry trees still shed their blossom in spring). From late autumn on the
+  leaves on the ground rot faster, so they are gone early in winter, before the snow builds up - in step with the
+  seasons however long they are set in Serene Seasons. Ground you see for the first time gets a thick carpet of leaves
+  only in autumn; in spring and summer just a scatter of old leaves, in winter none. Tropical biomes and dimensions
+  without seasons are not affected.
+- `seasons.autumnFallRate` now sets leaf fall at the peak of autumn (mid and late autumn), and `seasons.winterFallRate`
+  defaults to 0 (no leaves in mid and late winter; a config file from an older version keeps its value).
+
 ## [1.3.0] - 2026-10-10
 ### Added
 - Compatibility with [Immersive Weathering](https://modrinth.com/mod/immersive-weather-renewed) (1.21.1 port): its leaf piles are now drawn as Rustling
