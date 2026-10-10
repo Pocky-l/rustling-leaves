@@ -83,13 +83,15 @@ Immersive Weathering's leaf piles are drawn as leaf litter.
 
 ## Compatibility
 
-- **Shader packs** ([Iris](https://modrinth.com/mod/iris), Oculus): falling leaves and the litter are drawn with the pack's terrain program, so they
-  are lit and shaded like the blocks around them. Switching a pack on or off in game rebuilds the leaf meshes.
-- [Serene Seasons](https://www.curseforge.com/minecraft/mc-mods/serene-seasons): leaf fall, autumn colors and the rot of the litter follow the season (see Features); tune or turn
-  it off in the `seasons` config section.
-- [Immersive Weathering](https://modrinth.com/mod/immersive-weather-renewed): its leaf piles are drawn as this mod's leaf litter (see Features); turn it off with
-  `leaves.immersiveWeatheringPiles` to keep their own look (falling leaves then land on top of them).
-- [Sodium](https://modrinth.com/mod/sodium) works.
+[![Iris](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/compat/iris.png)](https://modrinth.com/mod/iris) ✅ **[Iris](https://modrinth.com/mod/iris)** (shader packs) - falling leaves and the litter are drawn with the pack's terrain program, so they are lit and shaded like the blocks around them. Switching a pack on or off in game rebuilds the leaf meshes.
+
+[![Oculus](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/compat/oculus.png)](https://www.curseforge.com/minecraft/mc-mods/oculus) ✅ **[Oculus](https://www.curseforge.com/minecraft/mc-mods/oculus)** (shader packs on Forge) - the same as with Iris.
+
+[![Sodium](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/compat/sodium.png)](https://modrinth.com/mod/sodium) ✅ **[Sodium](https://modrinth.com/mod/sodium)** - works.
+
+[![Serene Seasons](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/compat/serene-seasons.png)](https://www.curseforge.com/minecraft/mc-mods/serene-seasons) ✅ **[Serene Seasons](https://www.curseforge.com/minecraft/mc-mods/serene-seasons)** (optional) - leaf fall, autumn colors and the rot of the litter follow the season (see Features); tune or turn it off in the `seasons` config section.
+
+[![Immersive Weathering: Renewed](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/compat/immersive-weathering.png)](https://modrinth.com/mod/immersive-weather-renewed) ✅ **[Immersive Weathering: Renewed](https://modrinth.com/mod/immersive-weather-renewed)** (optional) - its leaf piles are drawn as this mod's leaf litter (see Features); turn it off with `leaves.immersiveWeatheringPiles` to keep their own look (falling leaves then land on top of them).
 
 ## Requirements
 
