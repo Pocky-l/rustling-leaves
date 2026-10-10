@@ -29,6 +29,12 @@ public final class LitterField {
     public static final int SURFACE_MIN = 3;
     /** The pile surface lies this much below the averaged stack tops, so the loose leaves rest on it. */
     public static final float SURFACE_DROP = 1.2F * LAYER - 0.003F;
+    /**
+     * Cells whose ground differs by more than this lie on another level: a slab, a stair step, the edge of a block.
+     * The pile surface never blends across such a step (it stretched into a slanted sheet over slabs and stairs);
+     * small differences like a dirt path or a carpet next to a full block still blend smoothly.
+     */
+    public static final double SAME_LEVEL = 0.07;
     private static final int RELAX_BUDGET = 6000;
     private static final int[] DX = {1, -1, 0, 0};
     private static final int[] DZ = {0, 0, 1, -1};
@@ -521,13 +527,15 @@ public final class LitterField {
      * curl up, which gives the pile its fluffy outline.
      */
     private void onSurface(LitterChunk chunk, int cellX, int cellZ, int depth, float offX, float offZ, long hash, boolean exact, Pose out) {
-        double base = chunk.base[index(cellX, cellZ)];
+        int self = index(cellX, cellZ);
+        double base = chunk.base[self];
+        double top = base + chunk.count[self] * LAYER;
         float fx = Mth.clamp(offX, 0.0F, 1.0F);
         float fz = Mth.clamp(offZ, 0.0F, 1.0F);
-        double h00 = cornerHeight(cellX, cellZ, base);
-        double h10 = cornerHeight(cellX + 1, cellZ, base);
-        double h01 = cornerHeight(cellX, cellZ + 1, base);
-        double h11 = cornerHeight(cellX + 1, cellZ + 1, base);
+        double h00 = cornerHeight(cellX, cellZ, base, top);
+        double h10 = cornerHeight(cellX + 1, cellZ, base, top);
+        double h01 = cornerHeight(cellX, cellZ + 1, base, top);
+        double h11 = cornerHeight(cellX + 1, cellZ + 1, base, top);
         double surface = Mth.lerp(fz, Mth.lerp(fx, h00, h10), Mth.lerp(fx, h01, h11)) - SURFACE_DROP;
         out.y = surface + 0.006 - depth * 0.009 + (unit(hash, 50) - 0.5F) * 0.006;
         float gradX = (float) Mth.clamp(((h10 - h00) * (1.0F - fz) + (h11 - h01) * fz) / CELL, -1.5, 1.5);
@@ -553,23 +561,41 @@ public final class LitterField {
     }
 
     /**
-     * Height of the pile surface at a cell corner: the average of the four stacks around it, where empty cells (or
-     * cells on another level) count as the ground at {@code base}. Shared with the renderer's pile body.
+     * Height of the pile surface at a cell corner, seen from a cell with ground {@code base} and stack top
+     * {@code top}: the average of the four cells around it. Empty cells on the same level count as the ground (piles
+     * run down to it), cells on another level (see {@link #SAME_LEVEL}) as this cell's own top, so the surface stays
+     * level at a step instead of bending over it. Shared with the renderer's pile body.
      */
-    public double cornerHeight(int cornerX, int cornerZ, double base) {
+    public double cornerHeight(int cornerX, int cornerZ, double base, double top) {
         double sum = 0.0;
         for (int dz = -1; dz <= 0; dz++) {
             for (int dx = -1; dx <= 0; dx++) {
-                LitterChunk chunk = chunkAtCell(cornerX + dx, cornerZ + dz);
-                int i = index(cornerX + dx, cornerZ + dz);
-                if (chunk != null && chunk.count[i] > 0 && Math.abs(chunk.base[i] - base) < 0.6) {
-                    sum += chunk.base[i] + chunk.count[i] * LAYER;
-                } else {
-                    sum += base;
-                }
+                sum += surfaceNeighbor(cornerX + dx, cornerZ + dz, base, top);
             }
         }
         return sum * 0.25;
+    }
+
+    /** What a neighboring cell adds to a surface corner (see {@link #cornerHeight}). */
+    public double surfaceNeighbor(int cellX, int cellZ, double base, double top) {
+        LitterChunk chunk = chunkAtCell(cellX, cellZ);
+        int i = index(cellX, cellZ);
+        if (chunk != null && chunk.count[i] > 0) {
+            return Math.abs(chunk.base[i] - base) > SAME_LEVEL ? top : chunk.base[i] + chunk.count[i] * LAYER;
+        }
+        return Math.abs(groundAt(cellX, cellZ, base) - base) > SAME_LEVEL ? top : base;
+    }
+
+    /**
+     * Ground under an empty cell near the height {@code near} (empty cells keep no height of their own). Unknown
+     * ground (unloaded, water) counts as {@code near}.
+     */
+    public double groundAt(int cellX, int cellZ, double near) {
+        if (terrain.level == null) {
+            return near;
+        }
+        double ground = terrain.groundBelow((cellX + 0.5) * CELL, near + 0.6, (cellZ + 0.5) * CELL, 2);
+        return Double.isNaN(ground) ? near : ground;
     }
 
     /** Sets {@code pitch} and {@code roll} of a leaf lying in a cell so it follows the slope of the pile. */
@@ -596,7 +622,11 @@ public final class LitterField {
             return self;
         }
         int i = index(cellX, cellZ);
-        if (chunk.count[i] == 0 || Math.abs(chunk.base[i] - base) > 0.6) {
+        if (Math.abs(chunk.base[i] - base) > SAME_LEVEL) {
+            // Another level (a slab, a step): no slope towards it.
+            return self;
+        }
+        if (chunk.count[i] == 0) {
             return base;
         }
         return chunk.base[i] + chunk.count[i] * LAYER;
