@@ -15,6 +15,11 @@ Physically simulated leaves: falling leaves, leaf piles you can wade through, ra
   through, small drifts against walls and trunks, and once in a while a leaf pile. Thin litter is a layer of loose
   leaves, deep piles get a solid body under them. Piles slump to a natural angle of repose and leaves slide down their
   sides. The ground cover is **saved with your world** (per server in multiplayer), so piles stay where they are.
+- **Leaves rot away**: fallen leaves lie for a long time - a natural carpet about ten in-game days, thick piles much
+  longer - and thin out slowly, leaf by leaf; near you the last ones crumble away. Under the trees new leaves keep
+  falling and the forest floor fills up again, also where you have not been for a while, and ground you come back to
+  has rotted for as long as you were away. Leaves never lie under snow: snow that covers them clears them, and leaves on
+  snow rot within minutes.
 - **Wade through piles**: the leaves under your feet are pressed down and stay, part of the pile is pushed aside
   with every step and leaves a trail, some leaves skid over the ground and a few fly up after you (more when
   running).
@@ -48,10 +53,12 @@ Physically simulated leaves: falling leaves, leaf piles you can wade through, ra
   litter on the ground looks a bit more aged. Oak, birch, spruce and cherry trees drop different shapes.
 - **Every tree sheds its own way**: birches drop leaves more often, spruces and other conifers hardly ever lose a
   needle. Cherry trees drop simulated petals instead of the vanilla petal particles, exactly as many as vanilla does.
-- **Seasons** (with [Serene Seasons](https://www.curseforge.com/minecraft/mc-mods/serene-seasons)): leaf fall follows the season - in autumn many more leaves come down, more and more of
-  them yellow, orange and red until by late autumn nearly every leaf is; in winter the trees are almost bare and hardly
-  a leaf falls (the litter stays); in spring only a few leaves fall and cherry blossoms shed a few more petals; summer
-  is unchanged. The change is gradual, without jumps between sub-seasons. Biomes and dimensions without seasons are
+- **Seasons** (with [Serene Seasons](https://www.curseforge.com/minecraft/mc-mods/serene-seasons)): leaf fall is an autumn event - the first leaves come down in early autumn,
+  most of them in mid and late autumn, more and more of them yellow, orange and red until by late autumn nearly every
+  leaf is, and the last few brown ones in early winter. In winter, spring and summer the trees keep their leaves; only
+  cherry blossoms shed their petals in spring. From late autumn on the leaves on the ground rot faster and are gone
+  early in winter, before the snow builds up, however long the seasons are. New ground gets a thick leaf carpet only in
+  autumn. The change is gradual, without jumps between sub-seasons. Tropical biomes and dimensions without seasons are
   not affected.
 - **Immersive Weathering leaf piles** (with [Immersive Weathering](https://modrinth.com/mod/immersive-weather-renewed) for 1.21.1): its leaf piles are drawn as
   Rustling Leaves litter - soft, rounded piles that merge with the forest floor, in the color of their tree. The pile
@@ -69,17 +76,17 @@ Physically simulated leaves: falling leaves, leaf piles you can wade through, ra
 
 ## Configuration
 
-Everything can be tuned in the in-game config screen: number of leaves, fall rate, radius, time on the ground,
-carpet thickness, leaf size, autumn colors, wind, squalls and whirlwinds, footstep and explosion strength,
-raking, rustle volume, how strongly the seasons change leaf fall, and whether Immersive Weathering's leaf piles are
-drawn as leaf litter.
+Everything can be tuned in the in-game config screen: number of leaves, fall rate, radius, how long fallen leaves
+lie before they rot away, carpet thickness, leaf size, autumn colors, wind, squalls and whirlwinds, footstep and
+explosion strength, raking, rustle volume, how leaf fall and the rot of the litter follow the seasons, and whether
+Immersive Weathering's leaf piles are drawn as leaf litter.
 
 ## Compatibility
 
 - **Shader packs** ([Iris](https://modrinth.com/mod/iris), Oculus): falling leaves and the litter are drawn with the pack's terrain program, so they
   are lit and shaded like the blocks around them. Switching a pack on or off in game rebuilds the leaf meshes.
-- [Serene Seasons](https://www.curseforge.com/minecraft/mc-mods/serene-seasons): leaf fall and autumn colors follow the season (see Features); tune or turn it off in the `seasons`
-  config section.
+- [Serene Seasons](https://www.curseforge.com/minecraft/mc-mods/serene-seasons): leaf fall, autumn colors and the rot of the litter follow the season (see Features); tune or turn
+  it off in the `seasons` config section.
 - [Immersive Weathering](https://modrinth.com/mod/immersive-weather-renewed): its leaf piles are drawn as this mod's leaf litter (see Features); turn it off with
   `leaves.immersiveWeatheringPiles` to keep their own look (falling leaves then land on top of them).
 - [Sodium](https://modrinth.com/mod/sodium) works.

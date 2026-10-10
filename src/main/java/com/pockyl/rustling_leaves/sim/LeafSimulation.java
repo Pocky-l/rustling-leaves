@@ -87,6 +87,7 @@ public final class LeafSimulation {
     private final SpatialGrid grid;
     private final Terrain terrain = new Terrain();
     private final LitterField field;
+    private final LitterDecay decay;
     private final Wind wind = new Wind();
     private final List<Shockwave> shockwaves = new ArrayList<>();
     private final IntArrayList nearby = new IntArrayList();
@@ -112,6 +113,7 @@ public final class LeafSimulation {
         pool = new LeafPool(capacity);
         grid = new SpatialGrid(capacity);
         field = new LitterField(settings, terrain);
+        decay = new LitterDecay(settings, field, terrain, random, this::crumble);
     }
 
     public LeafPool pool() {
@@ -189,8 +191,20 @@ public final class LeafSimulation {
         if (!growingPiles.isEmpty()) {
             feedPiles();
         }
+        if (level != null) {
+            decay.tick(level.getGameTime());
+        }
         cascadeBudget = CASCADE_PARTICLES;
         field.relax(spill);
+    }
+
+    /**
+     * Lets the litter of a chunk rot from the game time of its last decay up to {@code gameTime} (for a chunk that was
+     * unloaded or never visited in between). Loaded chunks rot on their own every few seconds. Returns how many leaves
+     * rotted away.
+     */
+    public int decay(LitterChunk chunk, long gameTime) {
+        return decay.catchUp(chunk, gameTime);
     }
 
     /** The highest solid surface at or below y within {@code depth} blocks; NaN if none or water comes first. */
@@ -1783,7 +1797,8 @@ public final class LeafSimulation {
 
     /**
      * A block changed. Moving leaves that were settling on it start over; litter lying on a removed block falls to the
-     * ground below (some leaves visibly), litter inside a placed block ends up on top of it.
+     * ground below (some leaves visibly), litter inside a placed block ends up on top of it, litter that snow covered
+     * is gone.
      */
     public void blockChanged(BlockPos pos) {
         double minX = pos.getX() - 0.05;
@@ -1832,6 +1847,9 @@ public final class LeafSimulation {
     private void resupport(int cx, int cz, double base) {
         double x = (cx + 0.5) * CELL;
         double z = (cz + 0.5) * CELL;
+        if (decay.bury(cx, cz, base)) {
+            return;
+        }
         double inside = terrain.solidTop(x, base + 0.002, z);
         if (!Double.isNaN(inside)) {
             double raised = inside;
@@ -1869,6 +1887,22 @@ public final class LeafSimulation {
             field.setBase(cx, cz, ground);
             field.queueRelax(cx, cz);
         }
+    }
+
+    /** A rotting leaf near the camera shrinks away where it lay instead of just vanishing. */
+    private boolean crumble(int cellX, int cellZ) {
+        double x = (cellX + 0.5) * CELL - cameraX;
+        double z = (cellZ + 0.5) * CELL - cameraZ;
+        double radius = settings.spawnRadius;
+        if (x * x + z * z > radius * radius || pool.free() < 64) {
+            return false;
+        }
+        int i = release(cellX, cellZ, LeafPool.DYING, 0.0F, 0.0F, 0.0F);
+        if (i < 0) {
+            return false;
+        }
+        pool.life[i] = DYING_TICKS;
+        return true;
     }
 
     // ------------------------------------------------------------------------------------------------------------

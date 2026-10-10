@@ -109,6 +109,20 @@ final class Terrain {
         return shapes.boxes(state, level, cursor);
     }
 
+    /**
+     * Whether litter lying on {@code base} at (x, z) is under snow (a snow layer or block where it lies) or on snow.
+     * Leaf pile blocks of other mods are never snow.
+     */
+    boolean snowy(double x, double base, double z) {
+        return snow(x, base + 0.01, z) || snow(x, base - 0.01, z);
+    }
+
+    private boolean snow(double x, double y, double z) {
+        cursor.set(Mth.floor(x), Mth.floor(y), Mth.floor(z));
+        BlockState state = level.getBlockState(cursor);
+        return state.is(BlockTags.SNOW) && piles.layers(state) == 0;
+    }
+
     boolean canSeeSky(double x, double y, double z) {
         cursor.set(Mth.floor(x), Mth.floor(y), Mth.floor(z));
         return level.canSeeSky(cursor);

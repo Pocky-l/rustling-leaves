@@ -29,11 +29,13 @@ public final class SereneSeasons {
             return;
         }
         try {
-            float position = position(level, pos);
-            if (Float.isNaN(position)) {
+            ISeasonState state = state(level, pos);
+            if (state == null) {
                 SeasonCurve.clear(settings);
             } else {
-                SeasonCurve.apply(settings, position);
+                int duration = state.getSubSeasonDuration();
+                float position = (float) Math.floorMod(state.getSeasonCycleTicks(), duration * SeasonCurve.SUB_SEASONS) / duration;
+                SeasonCurve.apply(settings, position, duration);
             }
         } catch (RuntimeException | LinkageError e) {
             // A changed Serene Seasons must not take the leaves down with it; summer all year is a fine fallback.
@@ -43,21 +45,14 @@ public final class SereneSeasons {
         }
     }
 
-    /** Sub-seasons since the start of early spring, or NaN where there are no seasons. */
-    private static float position(Level level, BlockPos pos) {
+    /** The season state at {@code pos} (its sub-season length in ticks is positive), or null where there are no seasons. */
+    private static ISeasonState state(Level level, BlockPos pos) {
         // The whitelist is not part of the API, but outside it the client state reads as early spring instead of none.
         if (ModConfig.seasons == null || !ModConfig.seasons.isDimensionWhitelisted(level.dimension())
                 || SeasonHelper.usesTropicalSeasons(level.getBiome(pos))) {
-            return Float.NaN;
+            return null;
         }
         ISeasonState state = SeasonHelper.getSeasonState(level);
-        if (state == null) {
-            return Float.NaN;
-        }
-        int duration = state.getSubSeasonDuration();
-        if (duration <= 0) {
-            return Float.NaN;
-        }
-        return (float) Math.floorMod(state.getSeasonCycleTicks(), duration * SeasonCurve.SUB_SEASONS) / duration;
+        return state == null || state.getSubSeasonDuration() <= 0 ? null : state;
     }
 }

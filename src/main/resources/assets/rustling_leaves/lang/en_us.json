@@ -19,6 +19,7 @@
   "rustling_leaves.configuration.rustleVolume": "Rustle Volume",
   "rustling_leaves.configuration.carpetDepth": "Leaf Carpet Thickness",
   "rustling_leaves.configuration.naturalPiles": "Natural Drifts and Piles",
+  "rustling_leaves.configuration.litterLifetime": "Days Until Leaves Rot Away",
   "rustling_leaves.configuration.windEvents": "Squalls and Whirlwinds",
   "rustling_leaves.configuration.raking": "Raking with Hoe or Shovel",
   "rustling_leaves.configuration.immersiveWeatheringPiles": "Immersive Weathering Piles as Litter",
@@ -36,7 +37,9 @@
   "rustling_leaves.configuration.litterDistance": "Litter View Distance",
   "rustling_leaves.configuration.seasons": "Seasons",
   "rustling_leaves.configuration.seasonsEnabled": "Leaf Fall Follows the Seasons",
-  "rustling_leaves.configuration.autumnFallRate": "Fall Rate in Late Autumn",
+  "rustling_leaves.configuration.autumnFallRate": "Fall Rate at the Autumn Peak",
   "rustling_leaves.configuration.winterFallRate": "Fall Rate in Winter",
-  "rustling_leaves.configuration.seasonAutumnColors": "Autumn Colors in Late Autumn"
+  "rustling_leaves.configuration.springSummerFallRate": "Fall Rate in Spring and Summer",
+  "rustling_leaves.configuration.seasonAutumnColors": "Autumn Colors in Late Autumn",
+  "rustling_leaves.configuration.seasonalDecay": "Leaf Rot in Late Autumn and Winter"
 }
