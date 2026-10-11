@@ -573,7 +573,8 @@ public final class LeafSimulation {
         int c = LitterField.index(cx, cz);
         int n = chunk.count[c];
         double ground = pool.ground[i];
-        if (n > 0 && (ground < chunk.base[c] - 0.1 || ground > chunk.base[c] + n * LAYER + 0.5)) {
+        if (n > 0 && (ground < chunk.base[c] - 0.1 || ground > chunk.base[c] + n * LAYER + 0.5
+                || ground > chunk.base[c] + n * LAYER + 0.05 && covered(chunk, cx, cz))) {
             // The cell already holds litter on another level (a fence above a carpet, say): the leaf rolls over into
             // a neighboring cell that can take it.
             if (!shiftToCompatibleCell(i, cx, cz, ground)) {
@@ -606,6 +607,11 @@ public final class LeafSimulation {
         pool.release(i);
     }
 
+    /** Whether the litter of a cell lies under a block (a slab or a carpet placed over it). */
+    private boolean covered(LitterChunk chunk, int cx, int cz) {
+        return !Double.isNaN(terrain.solidTop((cx + 0.5) * CELL, chunk.base[LitterField.index(cx, cz)] + 0.002, (cz + 0.5) * CELL));
+    }
+
     private boolean shiftToCompatibleCell(int i, int cx, int cz, double ground) {
         for (int d = 0; d < 8; d++) {
             int nx = cx + NEIGHBOR_X[d];
@@ -617,7 +623,8 @@ public final class LeafSimulation {
             int c = LitterField.index(nx, nz);
             int n = chunk.count[c];
             boolean fits = n == 0 ? !Double.isNaN(terrain.solidTop((nx + 0.5) * CELL, ground - 0.01, (nz + 0.5) * CELL))
-                    : ground >= chunk.base[c] - 0.1 && ground <= chunk.base[c] + n * LAYER + 0.5;
+                    : ground >= chunk.base[c] - 0.1 && ground <= chunk.base[c] + n * LAYER + 0.5
+                            && !(ground > chunk.base[c] + n * LAYER + 0.05 && covered(chunk, nx, nz));
             if (fits) {
                 pool.x[i] = (nx + 0.5) * CELL;
                 pool.z[i] = (nz + 0.5) * CELL;
@@ -1796,9 +1803,9 @@ public final class LeafSimulation {
     }
 
     /**
-     * A block changed. Moving leaves that were settling on it start over; litter lying on a removed block falls to the
-     * ground below (some leaves visibly), litter inside a placed block ends up on top of it, litter that snow covered
-     * is gone.
+     * A block changed. Moving leaves that were settling on it start over (or are smothered by a full block); litter lying on a removed block falls to the
+     * ground below (some leaves visibly), litter under a placed block stays under it unless the block is full (then
+     * it is smothered), litter that snow covered is gone.
      */
     public void blockChanged(BlockPos pos) {
         double minX = pos.getX() - 0.05;
@@ -1813,6 +1820,11 @@ public final class LeafSimulation {
                 double x = pool.x[i];
                 double z = pool.z[i];
                 if (x >= minX && x <= maxX && z >= minZ && z <= maxZ) {
+                    if (level != null && terrain.insideFullBlock(x, pool.y[i] + 0.002, z)) {
+                        // A leaf lying where a full block was placed is smothered.
+                        pool.release(i);
+                        continue;
+                    }
                     pool.flags[i] &= (byte) ~LeafPool.FLAG_SETTLING;
                     pool.state[i] = LeafPool.FALLING;
                 }
@@ -1850,21 +1862,15 @@ public final class LeafSimulation {
         if (decay.bury(cx, cz, base)) {
             return;
         }
-        double inside = terrain.solidTop(x, base + 0.002, z);
-        if (!Double.isNaN(inside)) {
-            double raised = inside;
-            for (int k = 0; k < 3; k++) {
-                double next = terrain.solidTop(x, raised + 0.002, z);
-                if (Double.isNaN(next)) {
-                    break;
-                }
-                raised = next;
+        if (terrain.insideFullBlock(x, base + 0.002, z)) {
+            // Walled in by a full block: the leaves are smothered.
+            while (field.take(cx, cz, null)) {
+                // Drops the whole stack.
             }
-            field.setBase(cx, cz, raised);
-            field.queueRelax(cx, cz);
             return;
         }
-        if (!Double.isNaN(terrain.solidTop(x, base - 0.01, z))) {
+        if (!Double.isNaN(terrain.solidTop(x, base + 0.002, z)) || !Double.isNaN(terrain.solidTop(x, base - 0.01, z))) {
+            // Still supported; under a slab, a carpet or a fence the leaves stay where they are.
             return;
         }
         // Support gone: a few leaves tumble down visibly, the stack drops to the ground below.

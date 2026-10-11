@@ -22,6 +22,9 @@ final class Terrain {
         }
     }
 
+    /** How deep a leaf may have sunk into the floor and still be put back on top of it. */
+    private static final double SINK_LIMIT = 0.08;
+
     private final ShapeCache shapes = new ShapeCache();
     private final BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
     private final BlockPos.MutableBlockPos lightCursor = new BlockPos.MutableBlockPos();
@@ -57,6 +60,16 @@ final class Terrain {
             }
         }
         return Double.NaN;
+    }
+
+    /** Whether the point is inside a block that fills its whole space (leaves there are smothered). */
+    boolean insideFullBlock(double x, double y, double z) {
+        cursor.set(Mth.floor(x), Mth.floor(y), Mth.floor(z));
+        BlockState state = level.getBlockState(cursor);
+        if (state.isAir() || state.is(BlockTags.LEAVES)) {
+            return false;
+        }
+        return ShapeCache.full(boxes(state));
     }
 
     /**
@@ -153,8 +166,9 @@ final class Terrain {
 
     /**
      * Moves a leaf of half-size {@code half} lying at (x, y, z) out of the blocks around it: away from walls next to
-     * it so its edges do not stick into them, and up onto the floor if it sank into it. Returns the corrected position
-     * in {@code out[0..2]}.
+     * it so its edges do not stick into them, and up onto the floor if it sank slightly into it. A leaf deep inside a
+     * block (a slab or a carpet placed over the litter) stays where it is, under the block. Returns the corrected
+     * position in {@code out[0..2]}.
      */
     void keepClear(double x, double y, double z, float half, double[] out) {
         double reach = half * 0.9;
@@ -174,7 +188,7 @@ final class Terrain {
             z = bz + 1.0 - reach;
         }
         double floor = solidTop(x, y, z);
-        if (!Double.isNaN(floor)) {
+        if (!Double.isNaN(floor) && floor - y < SINK_LIMIT) {
             y = floor + 0.004;
         }
         out[0] = x;
