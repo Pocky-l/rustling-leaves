@@ -456,7 +456,7 @@ public final class ModGameTests {
     }
 
     @GameTest(template = "box")
-    public static void placedBlockLiftsLitter(GameTestHelper helper) {
+    public static void fullBlockSmothersLitter(GameTestHelper helper) {
         floor(helper);
         LeafSimulation sim = simulation(helper, 64, LeafListener.NONE);
         int[] cell = cellAt(helper, 3.5, 3.5);
@@ -467,7 +467,44 @@ public final class ModGameTests {
         helper.getLevel().setBlockAndUpdate(at, Blocks.STONE.defaultBlockState());
         sim.setLevel(helper.getLevel());
         sim.blockChanged(at);
-        helper.assertTrue(Math.abs(baseOfOnlyCell(sim, helper) - 2.0) < EPSILON, "litter was not lifted onto the new block");
+        helper.assertTrue(sim.field().total() == 0, "leaves survived inside a full block: " + sim.field().total());
+        helper.succeed();
+    }
+
+    @GameTest(template = "box")
+    public static void litterStaysUnderAPlacedSlab(GameTestHelper helper) {
+        floor(helper);
+        LeafSimulation sim = simulation(helper, 64, LeafListener.NONE);
+        int[] cell = cellAt(helper, 3.5, 3.5);
+        for (int n = 0; n < 4; n++) {
+            sim.field().add(cell[0], cell[1], absoluteY(helper, 1.0), 0x6A8F3A, 0, 0L, 0);
+        }
+        BlockPos at = helper.absolutePos(new BlockPos(3, 1, 3));
+        helper.getLevel().setBlockAndUpdate(at, Blocks.STONE_SLAB.defaultBlockState().setValue(SlabBlock.TYPE, SlabType.BOTTOM));
+        sim.setLevel(helper.getLevel());
+        sim.blockChanged(at);
+        run(sim, helper, 100);
+        helper.assertTrue(sim.field().total() + sim.pool().count() == 4, "leaves were lost under the slab");
+        helper.assertTrue(Math.abs(baseOfOnlyCell(sim, helper) - 1.0) < EPSILON, "litter was lifted onto the slab");
+        LitterField.Pose pose = new LitterField.Pose();
+        sim.field().pose(sim.field().chunkAtCell(cell[0], cell[1]), cell[0], cell[1], 3, pose);
+        helper.assertTrue(relativeY(helper, pose.y) < 1.2, "the drawn leaf climbed onto the slab: " + relativeY(helper, pose.y));
+        helper.succeed();
+    }
+
+    @GameTest(template = "box")
+    public static void fenceIsAsHighAsItIsDrawn(GameTestHelper helper) {
+        floor(helper);
+        helper.setBlock(3, 1, 3, Blocks.OAK_FENCE.defaultBlockState());
+        LeafSimulation sim = simulation(helper, 64, LeafListener.NONE);
+        sim.setLevel(helper.getLevel());
+        BlockPos origin = helper.absolutePos(BlockPos.ZERO);
+        double x = origin.getX() + 3.5;
+        double z = origin.getZ() + 3.5;
+        double top = sim.solidTop(x, absoluteY(helper, 1.9), z);
+        helper.assertTrue(Math.abs(relativeY(helper, top) - 2.0) < EPSILON, "a leaf would rest above the fence post: " + relativeY(helper, top));
+        double ground = sim.groundBelow(x, absoluteY(helper, 4.0), z, 4);
+        helper.assertTrue(Math.abs(relativeY(helper, ground) - 2.0) < EPSILON, "the ground over the fence is not its top: " + relativeY(helper, ground));
         helper.succeed();
     }
 

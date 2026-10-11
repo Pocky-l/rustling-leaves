@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (patches of leaves lying a little above the ground) instead of a layer with holes, and halfway out carpets and piles
   show their leaf layer without tiny single leaves on top.
 - The leaf layer of carpets and piles no longer repeats the same pattern block by block.
+- Leaves no longer hover half a block above fences, walls and fence gates: they lie on the top of the post, where
+  the block is drawn.
+- Placing a block over fallen leaves no longer lifts them on top of it. Under a slab, a carpet, a fence or another
+  partial block the leaves stay where they lie; a full block smothers them.
 
 ## [1.4.0] - 2026-10-10
 ### Added

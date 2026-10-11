@@ -55,7 +55,7 @@
   dies down, a rising column in the middle (and a swirl for wind charges). Leaves ride it out, get lifted, flutter
   down again; some just hop and fall back where they lay.
 - Breaking or decaying leaves releases a burst of leaves; when the block under litter disappears, the litter falls,
-  and a block placed on litter ends up with the leaves on top. Leaves on water stick flat to the surface and darken as they soak; they drift with the current (and down
+  leaves stay under a slab, carpet or fence placed over them, and a full block placed on litter smothers it. Leaves on water stick flat to the surface and darken as they soak; they drift with the current (and down
   waterfalls), turn along the flow and spin where it swirls, gather into rafts and along the banks, get pushed under
   where water pours onto them, and finally sink swaying to the bottom. They burn in lava.
 - **Colors match the tree** in every biome (also modded trees), with a share of autumn yellows, oranges and reds;
