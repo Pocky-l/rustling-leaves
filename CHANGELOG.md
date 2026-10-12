@@ -4,6 +4,11 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.2] - 2026-10-12
+### Fixed
+- With a low render distance, fallen and falling leaves no longer show up beyond it, hanging in the fog where no
+  ground is drawn. Leaves are drawn only over the terrain the game renders.
+
 ## [1.4.1] - 2026-10-11
 ### Fixed
 - Leaf carpets and piles on slabs, stairs and other non-full blocks no longer stretch into slanted sheets over the
