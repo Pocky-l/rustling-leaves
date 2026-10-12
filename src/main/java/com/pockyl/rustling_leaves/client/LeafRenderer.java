@@ -128,6 +128,12 @@ final class LeafRenderer implements AutoCloseable {
     private double currentTop;
     private int frame;
     private int lastTileQuads;
+    /** The terrain the level draws this frame, see {@link #drawnChunk}. */
+    private int viewChunkX;
+    private int viewChunkZ;
+    private int viewDistance;
+    private double viewCamX;
+    private double viewCamZ;
 
     LeafRenderer(LeafSimulation simulation) {
         this.simulation = simulation;
@@ -268,6 +274,11 @@ final class LeafRenderer implements AutoCloseable {
             }
             views.clear();
         }
+        viewDistance = Minecraft.getInstance().options.getEffectiveRenderDistance();
+        viewCamX = cam.x;
+        viewCamZ = cam.z;
+        viewChunkX = Mth.floor(cam.x) >> 4;
+        viewChunkZ = Mth.floor(cam.z) >> 4;
         collectTiles(cam);
         rebuildTiles();
         buildMoving(cam, camera.getLookVector(), partialTick);
@@ -283,6 +294,9 @@ final class LeafRenderer implements AutoCloseable {
         Uniform offset = shader.CHUNK_OFFSET;
         int quads = 0;
         for (ChunkView view : views.values()) {
+            if (!drawnChunk(view.chunk.x, view.chunk.z)) {
+                continue;
+            }
             if (view.drawFar()) {
                 quads += draw(view.far, frustum, offset, cam);
             } else {
@@ -347,6 +361,24 @@ final class LeafRenderer implements AutoCloseable {
             shader.SCREEN_SIZE.set((float) window.getWidth(), (float) window.getHeight());
         }
         RenderSystem.setupShaderLights(shader);
+    }
+
+    /**
+     * Whether the level draws the terrain of this chunk. The client keeps chunks loaded a few chunks beyond the render
+     * distance and the litter reaches at least 48 blocks; leaves there would hang in the fog over missing ground. Both
+     * vanilla's square of chunks and Embeddium's circle (camera to the nearest point of the chunk) count, whichever is
+     * smaller.
+     */
+    private boolean drawnChunk(int chunkX, int chunkZ) {
+        if (Math.abs(chunkX - viewChunkX) > viewDistance || Math.abs(chunkZ - viewChunkZ) > viewDistance) {
+            return false;
+        }
+        double minX = chunkX * 16.0;
+        double minZ = chunkZ * 16.0;
+        double dx = Math.max(0.0, Math.max(minX - viewCamX, viewCamX - (minX + 16.0)));
+        double dz = Math.max(0.0, Math.max(minZ - viewCamZ, viewCamZ - (minZ + 16.0)));
+        double reach = viewDistance * 16.0;
+        return dx * dx + dz * dz < reach * reach;
     }
 
     private static int draw(Mesh mesh, Frustum frustum, Uniform offset, Vec3 cam) {
@@ -826,7 +858,7 @@ final class LeafRenderer implements AutoCloseable {
         builder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
         for (int i = 0, highWater = pool.highWater(); i < highWater; i++) {
             byte state = pool.state[i];
-            if (state == LeafPool.FREE) {
+            if (state == LeafPool.FREE || !drawnChunk(Mth.floor(pool.x[i]) >> 4, Mth.floor(pool.z[i]) >> 4)) {
                 continue;
             }
             float x = (float) (Mth.lerp(partialTick, pool.prevX[i], pool.x[i]) - cam.x);

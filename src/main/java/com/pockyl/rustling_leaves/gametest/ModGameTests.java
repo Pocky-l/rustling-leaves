@@ -1145,6 +1145,20 @@ public final class ModGameTests {
     private static void canopy(GameTestHelper helper) {
         floor(helper);
         fill(helper, 0, 0, 6, 6, 5, Blocks.OAK_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true));
+        // The 1.20.1 test server runs the tests underground in a normal world: open the sky above the crown, the spawner
+        // looks for leaves at the top of each column.
+        BlockPos corner = helper.absolutePos(new BlockPos(0, 6, 0));
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        for (int y = corner.getY(); y < helper.getLevel().getMaxBuildHeight(); y++) {
+            for (int x = 0; x < 7; x++) {
+                for (int z = 0; z < 7; z++) {
+                    pos.set(corner.getX() + x, y, corner.getZ() + z);
+                    if (!helper.getLevel().getBlockState(pos).isAir()) {
+                        helper.getLevel().setBlock(pos, Blocks.AIR.defaultBlockState(), 2);
+                    }
+                }
+            }
+        }
     }
 
     /**

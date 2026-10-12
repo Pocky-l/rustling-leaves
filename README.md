@@ -70,7 +70,7 @@
   early in winter, before the snow builds up, however long the seasons are. New ground gets a thick leaf carpet only in
   autumn. The change is gradual, without jumps between sub-seasons. Tropical biomes and dimensions without seasons are
   not affected.
-- **Immersive Weathering leaf piles** (with [Immersive Weathering](https://modrinth.com/mod/immersive-weather-renewed) for 1.21.1): its leaf piles are drawn as
+- **Immersive Weathering leaf piles** (with [Immersive Weathering](https://www.curseforge.com/minecraft/mc-mods/immersive-weathering)): its leaf piles are drawn as
   Rustling Leaves litter - soft, rounded piles that merge with the forest floor, in the color of their tree. The pile
   stays as long as its block does: when it grows, leaves fall onto it from the tree above and it fills up with them;
   it rots away with Immersive Weathering, and breaking it throws up a handful of leaves. Leaves that fall onto it stay
@@ -154,7 +154,7 @@ Leaf litter is saved in `saves/<world>/rustling_leaves/` (singleplayer) or `rust
   are lit and shaded like the blocks around them. Switching a pack on or off in game rebuilds the leaf meshes.
 - [Serene Seasons](https://www.curseforge.com/minecraft/mc-mods/serene-seasons): leaf fall, autumn colors and the rot of the litter follow the season (see Features); tune or turn
   it off in the `seasons` config section.
-- [Immersive Weathering](https://modrinth.com/mod/immersive-weather-renewed): its leaf piles are drawn as this mod's leaf litter (see Features); turn it off with
+- [Immersive Weathering](https://www.curseforge.com/minecraft/mc-mods/immersive-weathering): its leaf piles are drawn as this mod's leaf litter (see Features); turn it off with
   `leaves.immersiveWeatheringPiles` to keep their own look (falling leaves then land on top of them).
 - [Sodium](https://modrinth.com/mod/sodium) works.
 
