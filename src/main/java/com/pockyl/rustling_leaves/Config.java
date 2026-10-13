@@ -92,7 +92,7 @@ public final class Config {
             .defineInRange("explosionStrength", 1.0, 0.0, 3.0);
 
     private static final ModConfigSpec.BooleanValue RAKING = BUILDER
-            .comment("Right click leaf litter with a hoe or shovel to rake it into a pile (instead of tilling or making a path).")
+            .comment("Sneak + right click leaf litter with a hoe or shovel to rake it into a pile (without sneaking the tool works as usual).")
             .translation("rustling_leaves.configuration.raking")
             .define("raking", true);
 

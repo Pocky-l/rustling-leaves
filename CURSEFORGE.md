@@ -20,7 +20,7 @@ for the leaf tools
   open ground; wind charges and explosions blow rings of leaves away.
 - 🌊 **Leaves on water** - they soak and darken, drift with the current and down waterfalls, gather into rafts and sink.
 - 🧹 **Leaf tools** - Leaf Blower, Leaf Bag (sucks up and pours out up to 1000 leaves, makes compost), Autumn Bomb and
-  Staff of Winds; rake piles together with a hoe or shovel.
+  Staff of Winds; rake piles together with a hoe or shovel while sneaking.
 - 🎨 **Colours of the tree** in every biome, modded trees included, with a share of autumn yellows and reds.
 - ⚡ **Built for huge numbers** - cached GPU meshes and a simplified far layer keep thousands of leaves cheap out to the
   render distance.

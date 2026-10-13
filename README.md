@@ -31,7 +31,7 @@
   open ground; wind charges and explosions blow rings of leaves away.
 - 🌊 **Leaves on water** - they soak and darken, drift with the current and down waterfalls, gather into rafts and sink.
 - 🧹 **Leaf tools** - Leaf Blower, Leaf Bag (sucks up and pours out up to 1000 leaves, makes compost), Autumn Bomb and
-  Staff of Winds; rake piles together with a hoe or shovel.
+  Staff of Winds; rake piles together with a hoe or shovel while sneaking.
 - 🎨 **Colours of the tree** in every biome, modded trees included, with a share of autumn yellows and reds.
 - ⚡ **Built for huge numbers** - cached GPU meshes and a simplified far layer keep thousands of leaves cheap out to the
   render distance.
@@ -45,7 +45,7 @@ No keys. Just play:
 | Walk / sprint through leaves | Pushes them aside and leaves a trench; a few fly up |
 | Sneak | Walk over a thin carpet without disturbing it |
 | Jump into a pile | Leaves splash up around you |
-| Hold right click with a hoe or shovel | Rake the leaves around that spot into a pile |
+| Sneak + hold right click with a hoe or shovel | Rake the leaves around that spot into a pile |
 | Hold right click with the Leaf Blower | Blow leaves away |
 | Hold right click with the Leaf Bag | Suck leaves up; sneak to pour them out |
 | Right click a composter with the Leaf Bag | Compost 32 leaves per layer |
@@ -88,7 +88,7 @@ In creative mode the tools are in the **Pocky Mods** tab (and in Tools & Utiliti
 | `physics.windEvents` | `1.0` | How often squalls and whirlwinds happen (0 = never) |
 | `physics.entityStrength` | `1.0` | How strongly players, mobs and projectiles push leaves |
 | `physics.explosionStrength` | `1.0` | How strongly explosions and wind charges blow leaves |
-| `physics.raking` | `true` | Rake leaves with a hoe or shovel |
+| `physics.raking` | `true` | Rake leaves with a hoe or shovel while sneaking |
 | `seasons.enabled` | `true` | With Serene Seasons: leaves fall in autumn, the litter rots before winter |
 | `seasons.autumnFallRate` | `3.0` | Fall rate multiplier at the autumn peak (mid and late autumn; less in early autumn) |
 | `seasons.winterFallRate` | `0.0` | Fall rate multiplier in mid and late winter (0 = no leaves fall) |

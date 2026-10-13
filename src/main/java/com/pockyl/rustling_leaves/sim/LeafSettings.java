@@ -24,7 +24,7 @@ public final class LeafSettings {
     public float explosionStrength = 1.0F;
     public int leavesPerBreak = 14;
     public float rustleVolume = 0.6F;
-    /** Rake leaves into piles with a hoe or shovel. */
+    /** Rake leaves into piles with a hoe or shovel while sneaking. */
     public boolean raking = true;
     /** Draw the leaf pile blocks of other mods (Immersive Weathering) as litter instead of their own models. */
     public boolean drawPileBlocks = true;
