@@ -201,7 +201,10 @@ public final class LeafManager {
                 renderer.tileQuads(), simulation.wind().whirlwinds().size()));
     }
 
-    /** Right click with a hoe or shovel on leaf litter rakes it together instead of tilling or making a path. */
+    /**
+     * Sneak + right click with a hoe or shovel on leaf litter rakes it together instead of tilling or making a path;
+     * without sneaking the tool works as in vanilla.
+     */
     @SubscribeEvent
     public static void onUseKey(InputEvent.InteractionKeyMappingTriggered event) {
         Minecraft minecraft = Minecraft.getInstance();
@@ -212,7 +215,7 @@ public final class LeafManager {
         if (!SETTINGS.raking || !(minecraft.hitResult instanceof BlockHitResult hit) || hit.getType() != HitResult.Type.BLOCK) {
             return;
         }
-        if (!stack.is(ItemTags.HOES) && !stack.is(ItemTags.SHOVELS)) {
+        if (!minecraft.player.isShiftKeyDown() || !stack.is(ItemTags.HOES) && !stack.is(ItemTags.SHOVELS)) {
             return;
         }
         Vec3 at = hit.getLocation();

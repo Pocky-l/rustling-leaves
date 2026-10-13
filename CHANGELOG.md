@@ -4,6 +4,11 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.3+1.20.1] - 2026-10-13
+### Changed
+- Raking leaves with a hoe or shovel now needs sneaking (sneak + right click). Without sneaking the hoe tills the
+  ground and the shovel makes paths as usual, also where leaves lie.
+
 ## [1.4.2+1.20.1] - 2026-10-12
 ### Changed
 - Brings the 1.20.1 version up to date with 1.4.2: Serene Seasons and Immersive Weathering support, rotting leaf

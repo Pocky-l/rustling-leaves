@@ -36,8 +36,8 @@ Physically simulated leaves: falling leaves, leaf piles you can wade through, ra
   - **Autumn Bomb** - a throwable bundle of leaves that bursts into a swirling cloud of autumn leaves.
   - **Staff of Winds** - right click to raise a leaf whirlwind where you look, sneak + right click to send a squall
     rolling ahead of you.
-- **Rake leaves into piles**: hold right click with a hoe or shovel on leaf litter to sweep the leaves around that
-  spot together (it does not till the ground or make a path while there are leaves).
+- **Rake leaves into piles**: sneak and hold right click with a hoe or shovel on leaf litter to sweep the leaves around that
+  spot together; without sneaking the tool tills the ground and makes paths as usual.
 - **Wind you can see**: gust waves sweep across the forest and skitter loose leaves over the ground until they
   pile up against obstacles; **squalls** - strong gust fronts - roll through and strip a band of trees at once;
   **leaf whirlwinds** wander over open ground, suck up the litter and spin it up in a swirling column.

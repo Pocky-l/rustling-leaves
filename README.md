@@ -46,8 +46,8 @@
   - **Autumn Bomb** - a throwable bundle of leaves that bursts into a swirling cloud of autumn leaves.
   - **Staff of Winds** - right click to raise a leaf whirlwind where you look, sneak + right click to send a squall
     rolling ahead of you.
-- **Rake leaves into piles**: hold right click with a hoe or shovel on leaf litter to sweep the leaves around that
-  spot together (it does not till the ground or make a path while there are leaves).
+- **Rake leaves into piles**: sneak and hold right click with a hoe or shovel on leaf litter to sweep the leaves around that
+  spot together; without sneaking the tool tills the ground and makes paths as usual.
 - **Wind you can see**: gust waves sweep across the forest and skitter loose leaves over the ground until they
   pile up against obstacles; **squalls** - strong gust fronts - roll through and strip a band of trees at once;
   **leaf whirlwinds** wander over open ground, suck up the litter and spin it up in a swirling column.
@@ -93,7 +93,7 @@ No keys. Just play:
 | Walk / sprint through leaves | Pushes them aside and leaves a trench; a few fly up |
 | Sneak | Walk over a thin carpet without disturbing it |
 | Jump into a pile | Leaves splash up around you |
-| Hold right click with a hoe or shovel | Rake the leaves around that spot into a pile |
+| Sneak + hold right click with a hoe or shovel | Rake the leaves around that spot into a pile |
 | Hold right click with the Leaf Blower | Blow leaves away |
 | Hold right click with the Leaf Bag | Suck leaves up; sneak to pour them out |
 | Right click a composter with the Leaf Bag | Compost 32 leaves per layer |
@@ -136,7 +136,7 @@ In creative mode the tools are in the **Pocky Mods** tab (and in Tools & Utiliti
 | `physics.windEvents` | `1.0` | How often squalls and whirlwinds happen (0 = never) |
 | `physics.entityStrength` | `1.0` | How strongly players, mobs and projectiles push leaves |
 | `physics.explosionStrength` | `1.0` | How strongly explosions and wind charges blow leaves |
-| `physics.raking` | `true` | Rake leaves with a hoe or shovel |
+| `physics.raking` | `true` | Rake leaves with a hoe or shovel while sneaking |
 | `seasons.enabled` | `true` | With Serene Seasons: leaves fall in autumn, the litter rots before winter |
 | `seasons.autumnFallRate` | `3.0` | Fall rate multiplier at the autumn peak (mid and late autumn; less in early autumn) |
 | `seasons.winterFallRate` | `0.0` | Fall rate multiplier in mid and late winter (0 = no leaves fall) |
