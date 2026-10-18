@@ -108,6 +108,7 @@ public final class LitterField {
     }
 
     public void put(LitterChunk chunk) {
+        last = null;
         chunks.put(ChunkPos.asLong(chunk.x, chunk.z), chunk);
     }
 
