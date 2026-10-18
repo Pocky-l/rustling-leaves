@@ -5,7 +5,7 @@
 <h1 align="center">Rustling Leaves</h1>
 
 <p align="center">
-  Physically simulated leaves: falling leaves, leaf piles you can wade through, rake and blow away, gusts, whirlwinds and leaf tools.
+  Physically simulated leaves: falling leaves, leaf piles you can wade through, rake into piles, gusts and whirlwinds.
 </p>
 
 <p align="center">
@@ -37,15 +37,6 @@
   Mobs, animals, minecarts and arrows stir leaves too, with a soft rustle.
 - **Leaves behave like a granular material**: piles settle into round cones, leaves trickle down slopes, fill
   hollows, ditches and cauldrons up to the rim and run over the edge.
-- **Leaf tools** (when the mod is also on the server):
-  - **Leaf Blower** - hold right click to blow a cone of air: it clears paths through the litter, heaps the leaves
-    up where the air dies down, throws loose leaves into the air and nudges items and mobs.
-  - **Leaf Bag** - hold right click to suck leaves up (they fly into the bag), sneak + hold right click to pour them
-    out in a stream - fill a hole, heap a pile, shower a friend. Holds 1000 leaves; use it on a composter to
-    turn every 32 leaves into a layer of compost.
-  - **Autumn Bomb** - a throwable bundle of leaves that bursts into a swirling cloud of autumn leaves.
-  - **Staff of Winds** - right click to raise a leaf whirlwind where you look, sneak + right click to send a squall
-    rolling ahead of you.
 - **Rake leaves into piles**: sneak and hold right click with a hoe or shovel on leaf litter to sweep the leaves around that
   spot together; without sneaking the tool tills the ground and makes paths as usual.
 - **Wind you can see**: gust waves sweep across the forest and skitter loose leaves over the ground until they
@@ -81,8 +72,8 @@
   without leaves popping in; only moving leaves are
   simulated in full, and everything that pushes leaves finds them through a spatial grid. The F3 screen shows the
   current numbers.
-- **Works on any server**: the leaves, piles, wind and raking are client-side and work even on vanilla servers.
-  Installed on the server too, the mod adds the leaf tools, and everyone sees each other's tools at work.
+- **Purely client-side**: the mod adds no items or blocks, so it works on any server, with or without the mod,
+  even on vanilla servers.
 
 ## Controls
 
@@ -94,25 +85,9 @@ No keys. Just play:
 | Sneak | Walk over a thin carpet without disturbing it |
 | Jump into a pile | Leaves splash up around you |
 | Sneak + hold right click with a hoe or shovel | Rake the leaves around that spot into a pile |
-| Hold right click with the Leaf Blower | Blow leaves away |
-| Hold right click with the Leaf Bag | Suck leaves up; sneak to pour them out |
-| Right click a composter with the Leaf Bag | Compost 32 leaves per layer |
-| Throw an Autumn Bomb | Burst of autumn leaves |
-| Right click with the Staff of Winds | Whirlwind where you look; sneak for a squall |
 | Throw a wind charge (1.21.1 only) | Blows leaves away in a swirl |
 | Explode TNT | Clears the ground and throws leaves high into the air |
 | Break a leaves block | Releases a burst of leaves |
-
-## Crafting
-
-In creative mode the tools are in the **Pocky Mods** tab (and in Tools & Utilities / Combat).
-
-| Item | Recipe |
-|---|---|
-| Leaf Blower | `  I` / `IBI` / `RI ` - `I` iron ingot, `B` breeze rod (blaze rod on 1.20.1), `R` redstone |
-| Leaf Bag | `S S` / `L L` / ` L ` - `S` string, `L` leather |
-| Autumn Bomb (x2) | shapeless: 2 leaves (any), gunpowder, paper |
-| Staff of Winds | `  W` / ` B ` / `S  ` - `W` wind charge (phantom membrane on 1.20.1), `B` breeze rod (blaze rod on 1.20.1), `S` stick |
 
 ## Configuration
 
@@ -167,7 +142,7 @@ Supported versions:
 
 1. Install [NeoForge](https://neoforged.net) for Minecraft 1.21.1 or [Forge](https://files.minecraftforge.net) for
    Minecraft 1.20.1.
-2. Put this mod into the `mods` folder of your client. For the leaf tools, install it on the server as well.
+2. Put this mod into the `mods` folder of your client. It is client-side only: the server does not need it.
 
 ## Building
 

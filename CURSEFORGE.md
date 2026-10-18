@@ -1,6 +1,6 @@
 # Rustling Leaves
 
-Physically simulated leaves: falling leaves, leaf piles you can wade through, rake and blow away, gusts, whirlwinds and leaf tools.
+Physically simulated leaves: falling leaves, leaf piles you can wade through, rake into piles, gusts and whirlwinds.
 
 ![Leaf litter under the trees and leaves drifting on the water](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/screenshots/forest-floor.jpg)
 
@@ -27,15 +27,6 @@ Physically simulated leaves: falling leaves, leaf piles you can wade through, ra
   Mobs, animals, minecarts and arrows stir leaves too, with a soft rustle.
 - **Leaves behave like a granular material**: piles settle into round cones, leaves trickle down slopes, fill
   hollows, ditches and cauldrons up to the rim and run over the edge.
-- **Leaf tools** (when the mod is also on the server):
-  - **Leaf Blower** - hold right click to blow a cone of air: it clears paths through the litter, heaps the leaves
-    up where the air dies down, throws loose leaves into the air and nudges items and mobs.
-  - **Leaf Bag** - hold right click to suck leaves up (they fly into the bag), sneak + hold right click to pour them
-    out in a stream - fill a hole, heap a pile, shower a friend. Holds 1000 leaves; use it on a composter to
-    turn every 32 leaves into a layer of compost.
-  - **Autumn Bomb** - a throwable bundle of leaves that bursts into a swirling cloud of autumn leaves.
-  - **Staff of Winds** - right click to raise a leaf whirlwind where you look, sneak + right click to send a squall
-    rolling ahead of you.
 - **Rake leaves into piles**: sneak and hold right click with a hoe or shovel on leaf litter to sweep the leaves around that
   spot together; without sneaking the tool tills the ground and makes paths as usual.
 - **Wind you can see**: gust waves sweep across the forest and skitter loose leaves over the ground until they
@@ -71,8 +62,8 @@ Physically simulated leaves: falling leaves, leaf piles you can wade through, ra
   without leaves popping in; only moving leaves are
   simulated in full, and everything that pushes leaves finds them through a spatial grid. The F3 screen shows the
   current numbers.
-- **Works on any server**: the leaves, piles, wind and raking are client-side and work even on vanilla servers.
-  Installed on the server too, the mod adds the leaf tools, and everyone sees each other's tools at work.
+- **Purely client-side**: the mod adds no items or blocks, so it works on any server, with or without the mod,
+  even on vanilla servers.
 
 ## Configuration
 
@@ -93,7 +84,7 @@ Immersive Weathering's leaf piles are drawn as leaf litter.
 
 ## Requirements
 
-[NeoForge](https://neoforged.net) 1.21.1. The leaves work client-side on any server; install the mod on the server too for the leaf tools.
+[NeoForge](https://neoforged.net) 1.21.1. Client-side only: it works on any server, the server does not need it.
 
 ## Screenshots
 
