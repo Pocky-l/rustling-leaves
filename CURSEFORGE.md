@@ -1,12 +1,11 @@
 # Rustling Leaves
 
-**Physically simulated leaves** - falling leaves, a forest floor you can wade through, rake and blow away, gusts,
-whirlwinds and leaf tools.
+**Physically simulated leaves** - falling leaves, a forest floor you can wade through, rake into piles, gusts
+and whirlwinds.
 
 ![Leaf litter under the trees and leaves drifting on the water](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/screenshots/forest-floor.jpg)
 
-📦 **Requires** [NeoForge](https://neoforged.net) 1.21.1 · the leaves work on any server, install it on the server too
-for the leaf tools
+📦 **Requires** [NeoForge](https://neoforged.net) 1.21.1 (21.1.144 or newer) · client-side only, works on any server
 
 ## ✨ Features
 
@@ -19,20 +18,11 @@ for the leaf tools
 - 🌬️ **Wind you can see** - gust waves skitter leaves over the ground, squalls strip trees, leaf whirlwinds wander over
   open ground; wind charges and explosions blow rings of leaves away.
 - 🌊 **Leaves on water** - they soak and darken, drift with the current and down waterfalls, gather into rafts and sink.
-- 🧹 **Leaf tools** - Leaf Blower, Leaf Bag (sucks up and pours out up to 1000 leaves, makes compost), Autumn Bomb and
-  Staff of Winds; rake piles together with a hoe or shovel while sneaking.
+- 🧹 **Rake them into piles** with a hoe or shovel while sneaking.
+- 🖥️ **Purely client-side** - adds no items or blocks, so it works on any server, with or without the mod.
 - 🎨 **Colours of the tree** in every biome, modded trees included, with a share of autumn yellows and reds.
 - ⚡ **Built for huge numbers** - cached GPU meshes and a simplified far layer keep thousands of leaves cheap out to the
   render distance.
-
-## ⛏️ Crafting
-
-- **Leaf Blower** - iron ingots, a breeze rod and redstone
-- **Leaf Bag** - string and leather
-- **Autumn Bomb** (x2) - two leaves, gunpowder and paper
-- **Staff of Winds** - a wind charge, a breeze rod and a stick
-
-Exact shapes in JEI or the recipe book.
 
 ## 🤝 Compatibility
 

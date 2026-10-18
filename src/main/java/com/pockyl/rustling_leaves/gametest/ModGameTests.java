@@ -3,10 +3,8 @@ package com.pockyl.rustling_leaves.gametest;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.ComposterBlock;
 import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.SlabBlock;
 import net.minecraft.world.level.block.SnowLayerBlock;
@@ -16,10 +14,6 @@ import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 import com.pockyl.rustling_leaves.RustlingLeaves;
-import com.pockyl.rustling_leaves.item.BagContents;
-import com.pockyl.rustling_leaves.item.LeafBagItem;
-import com.pockyl.rustling_leaves.registry.ModDataComponents;
-import com.pockyl.rustling_leaves.registry.ModItems;
 import com.pockyl.rustling_leaves.sim.Armful;
 import com.pockyl.rustling_leaves.sim.LeafListener;
 import com.pockyl.rustling_leaves.sim.LeafPool;
@@ -680,28 +674,6 @@ public final class ModGameTests {
         run(sim, helper, 40);
         helper.assertTrue(bag.count() > 60, "the bag took only " + bag.count() + " leaves");
         helper.assertTrue(sim.field().total() + sim.pool().count() + bag.count() == total, "leaves were lost");
-        helper.succeed();
-    }
-
-    @GameTest(template = "box")
-    public static void leafBagFillsAComposter(GameTestHelper helper) {
-        BlockPos pos = new BlockPos(3, 1, 3);
-        helper.setBlock(pos, Blocks.COMPOSTER);
-        ItemStack bag = new ItemStack(ModItems.LEAF_BAG.get());
-        bag.set(ModDataComponents.BAG_CONTENTS.get(), BagContents.EMPTY.add(100, 0x6A8F3A, 0));
-        int layers = LeafBagItem.compost(helper.getLevel(), helper.absolutePos(pos), bag);
-        helper.assertTrue(layers == 3, "composted " + layers + " layers from 100 leaves");
-        helper.assertBlockProperty(pos, ComposterBlock.LEVEL, 3);
-        helper.assertTrue(LeafBagItem.contents(bag).count() == 100 - 3 * LeafBagItem.COMPOST_COST, "wrong leaves left in the bag");
-        helper.succeed();
-    }
-
-    @GameTest(template = "empty")
-    public static void bagContentsMixAndCap(GameTestHelper helper) {
-        BagContents contents = BagContents.EMPTY.add(600, 0xFF0000, 1).add(600, 0x0000FF, 2);
-        helper.assertTrue(contents.count() == BagContents.CAPACITY, "bag holds " + contents.count());
-        helper.assertTrue((contents.color() & 0xFF) > 0 && (contents.color() >> 16 & 0xFF) > 0, "colors did not mix");
-        helper.assertTrue(contents.remove(5000).count() == 0, "removing too much went negative");
         helper.succeed();
     }
 

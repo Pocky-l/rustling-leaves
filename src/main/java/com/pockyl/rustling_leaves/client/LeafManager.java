@@ -19,12 +19,10 @@ import net.minecraft.tags.ItemTags;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.world.phys.BlockHitResult;
@@ -37,20 +35,12 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.CustomizeGuiOverlayEvent;
 import net.neoforged.neoforge.client.event.InputEvent;
-import net.neoforged.neoforge.client.event.MovementInputUpdateEvent;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
-import net.neoforged.neoforge.network.PacketDistributor;
 
 import com.pockyl.rustling_leaves.Config;
 import com.pockyl.rustling_leaves.RustlingLeaves;
 import com.pockyl.rustling_leaves.client.compat.ImmersiveWeathering;
 import com.pockyl.rustling_leaves.client.compat.SereneSeasons;
-import com.pockyl.rustling_leaves.item.BagContents;
-import com.pockyl.rustling_leaves.item.LeafBagItem;
-import com.pockyl.rustling_leaves.item.LeafBlowerItem;
-import com.pockyl.rustling_leaves.network.BagCollectPayload;
-import com.pockyl.rustling_leaves.network.WindSpellPayload;
-import com.pockyl.rustling_leaves.sim.Armful;
 import com.pockyl.rustling_leaves.sim.LeafListener;
 import com.pockyl.rustling_leaves.sim.LeafPool;
 import com.pockyl.rustling_leaves.sim.LeafSettings;
@@ -227,75 +217,6 @@ public final class LeafManager {
                     0.8F + level.random.nextFloat() * 0.2F, false);
             level.playLocalSound(at.x, at.y, at.z, SoundEvents.BRUSH_GENERIC, SoundSource.PLAYERS, volume * 0.5F,
                     0.7F + level.random.nextFloat() * 0.2F, false);
-        }
-    }
-
-    // ------------------------------------------------------------------------------------------------------------
-    // Leaf tools (their items call in through ClientLeafEffects on every client, for every player using them)
-    // ------------------------------------------------------------------------------------------------------------
-
-    static void blow(LivingEntity user, Vec3 nozzle, Vec3 direction) {
-        if (simulation != null && user.level() == level) {
-            simulation.blow(nozzle.x, nozzle.y, nozzle.z, (float) direction.x, (float) direction.y, (float) direction.z,
-                    (float) LeafBlowerItem.RANGE, (float) LeafBlowerItem.SPREAD, 0.55F);
-        }
-    }
-
-    /** The bag of the local player reports what it collected to the server; other players' bags are only drawn. */
-    static void vacuum(LivingEntity user, Vec3 mouth, Vec3 direction) {
-        if (simulation == null || user.level() != level) {
-            return;
-        }
-        Armful collected = new Armful();
-        boolean mine = user == Minecraft.getInstance().player;
-        int taken = simulation.vacuum(mouth.x, mouth.y, mouth.z, (float) direction.x, (float) direction.y, (float) direction.z,
-                BagCollectPayload.MAX_PER_TICK, collected);
-        if (mine && taken > 0) {
-            PacketDistributor.sendToServer(new BagCollectPayload(taken, collected.averageColor(), collected.mainShape()));
-        }
-    }
-
-    static void pour(LivingEntity user, Vec3 mouth, Vec3 direction, int count, BagContents contents) {
-        if (simulation == null || user.level() != level) {
-            return;
-        }
-        Armful leaves = new Armful();
-        leaves.fill(count, contents.color(), contents.shape());
-        simulation.pour(mouth.x, mouth.y, mouth.z, (float) direction.x, (float) direction.y, (float) direction.z, count, leaves);
-    }
-
-    static void burst(double x, double y, double z) {
-        if (simulation == null) {
-            return;
-        }
-        BlockPos pos = BlockPos.containing(x, y, z);
-        int base = COLORS.base(Blocks.OAK_LEAVES.defaultBlockState(), level, pos);
-        simulation.burst(x, y, z, 220, base, Math.max(0.75F, SETTINGS.autumnColors));
-    }
-
-    public static void onWindSpell(WindSpellPayload payload) {
-        if (simulation == null) {
-            return;
-        }
-        if (payload.kind() == WindSpellPayload.SQUALL) {
-            simulation.wind().sendSquall(payload.x(), payload.z(), payload.dirX(), payload.dirZ());
-        } else {
-            double ground = simulation.groundBelow(payload.x(), payload.y() + 1.0, payload.z(), 16);
-            simulation.wind().summonWhirlwind(payload.x(), Double.isNaN(ground) ? payload.y() : ground, payload.z());
-        }
-    }
-
-    /**
-     * Using an item slows the player down to a fifth. Blowing leaves or bagging them while walking slowly would be
-     * tedious, so the leaf tools cancel that out (this runs just before vanilla applies the slowdown).
-     */
-    @SubscribeEvent
-    public static void onMovementInput(MovementInputUpdateEvent event) {
-        Player player = event.getEntity();
-        if (player.isUsingItem() && !player.isPassenger()
-                && (player.getUseItem().getItem() instanceof LeafBlowerItem || player.getUseItem().getItem() instanceof LeafBagItem)) {
-            event.getInput().leftImpulse *= 5.0F;
-            event.getInput().forwardImpulse *= 5.0F;
         }
     }
 

@@ -4,6 +4,18 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-10-18
+### Removed
+- The leaf tools (Leaf Blower, Leaf Bag, Autumn Bomb, Staff of Winds) and their recipes. Rustling Leaves is purely
+  client-side again: it adds no items, entities or network traffic, so it works on any server and with any set of
+  mods. Tools already in a world disappear from it.
+
+### Fixed
+- Opening the creative inventory no longer crashes the game on servers that do not have the mod.
+
+### Changed
+- Works with NeoForge 21.1.144 and newer (it needed 21.1.253 before).
+
 ## [1.4.3] - 2026-10-13
 ### Changed
 - Raking leaves with a hoe or shovel now needs sneaking (sneak + right click). Without sneaking the hoe tills the

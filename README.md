@@ -5,7 +5,7 @@
 <h1 align="center">Rustling Leaves</h1>
 
 <p align="center">
-  <b>Physically simulated leaves</b> - falling leaves, a forest floor you can wade through, rake and blow away, gusts, whirlwinds and leaf tools.
+  <b>Physically simulated leaves</b> - falling leaves, a forest floor you can wade through, rake into piles, gusts and whirlwinds.
 </p>
 
 <p align="center">
@@ -30,8 +30,8 @@
 - 🌬️ **Wind you can see** - gust waves skitter leaves over the ground, squalls strip trees, leaf whirlwinds wander over
   open ground; wind charges and explosions blow rings of leaves away.
 - 🌊 **Leaves on water** - they soak and darken, drift with the current and down waterfalls, gather into rafts and sink.
-- 🧹 **Leaf tools** - Leaf Blower, Leaf Bag (sucks up and pours out up to 1000 leaves, makes compost), Autumn Bomb and
-  Staff of Winds; rake piles together with a hoe or shovel while sneaking.
+- 🧹 **Rake them into piles** with a hoe or shovel while sneaking.
+- 🖥️ **Purely client-side** - adds no items or blocks, so it works on any server, with or without the mod.
 - 🎨 **Colours of the tree** in every biome, modded trees included, with a share of autumn yellows and reds.
 - ⚡ **Built for huge numbers** - cached GPU meshes and a simplified far layer keep thousands of leaves cheap out to the
   render distance.
@@ -46,25 +46,9 @@ No keys. Just play:
 | Sneak | Walk over a thin carpet without disturbing it |
 | Jump into a pile | Leaves splash up around you |
 | Sneak + hold right click with a hoe or shovel | Rake the leaves around that spot into a pile |
-| Hold right click with the Leaf Blower | Blow leaves away |
-| Hold right click with the Leaf Bag | Suck leaves up; sneak to pour them out |
-| Right click a composter with the Leaf Bag | Compost 32 leaves per layer |
-| Throw an Autumn Bomb | Burst of autumn leaves |
-| Right click with the Staff of Winds | Whirlwind where you look; sneak for a squall |
 | Throw a wind charge | Blows leaves away in a swirl |
 | Explode TNT | Clears the ground and throws leaves high into the air |
 | Break a leaves block | Releases a burst of leaves |
-
-## Crafting
-
-In creative mode the tools are in the **Pocky Mods** tab (and in Tools & Utilities / Combat).
-
-| Item | Recipe |
-|---|---|
-| Leaf Blower | `  I` / `IBI` / `RI ` - `I` iron ingot, `B` breeze rod, `R` redstone |
-| Leaf Bag | `S S` / `L L` / ` L ` - `S` string, `L` leather |
-| Autumn Bomb (x2) | shapeless: 2 leaves (any), gunpowder, paper |
-| Staff of Winds | `  W` / ` B ` / `S  ` - `W` wind charge, `B` breeze rod, `S` stick |
 
 ## Configuration
 
@@ -114,8 +98,8 @@ Leaf litter is saved in `saves/<world>/rustling_leaves/` (singleplayer) or `rust
 
 ## Installation
 
-1. Install [NeoForge](https://neoforged.net) for Minecraft 1.21.1.
-2. Put this mod into the `mods` folder of your client. For the leaf tools, install it on the server as well.
+1. Install [NeoForge](https://neoforged.net) 21.1.144 or newer for Minecraft 1.21.1.
+2. Put this mod into the `mods` folder of your client. It is client-side only: the server does not need it.
 
 ## Building
 
