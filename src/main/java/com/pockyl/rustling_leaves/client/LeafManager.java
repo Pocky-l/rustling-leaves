@@ -520,13 +520,5 @@ public final class LeafManager {
         public void onBurn(double x, double y, double z) {
             level.addParticle(ParticleTypes.SMOKE, x, y + 0.1, z, 0.0, 0.03, 0.0);
         }
-
-        @Override
-        public void onWhirl(double x, double y, double z, float intensity) {
-            if (SETTINGS.rustleVolume > 0.0F) {
-                level.playLocalSound(x, y + 1.0, z, SoundEvents.BREEZE_IDLE_GROUND, SoundSource.AMBIENT,
-                        0.25F * intensity * SETTINGS.rustleVolume, 0.6F + level.random.nextFloat() * 0.2F, false);
-            }
-        }
     }
 }

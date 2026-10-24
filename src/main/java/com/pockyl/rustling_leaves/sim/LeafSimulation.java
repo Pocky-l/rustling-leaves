@@ -1053,9 +1053,6 @@ public final class LeafSimulation {
     private void whirlwindsOnLitter() {
         for (Wind.Whirlwind whirlwind : wind.whirlwinds()) {
             float intensity = whirlwind.intensity();
-            if (tick % 20 == 0) {
-                listener.onWhirl(whirlwind.x, whirlwind.y, whirlwind.z, intensity);
-            }
             int lifts = Math.round(4.0F * intensity);
             for (int attempt = 0; attempt < lifts * 3 && lifts > 0; attempt++) {
                 float angle = random.next() * Mth.TWO_PI;
