@@ -16,13 +16,14 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/forest-floor.jpg" alt="Leaf litter under the trees and leaves drifting on the water" width="720">
+  <img src="docs/screenshots/leaf-pile.jpg" alt="A leaf pile under a tree on a river bank, autumn litter all around" width="720">
 </p>
 
 ## Features
 
 - 🍂 **Falling leaves** - they let go of the crowns and come down like real leaves: fluttering, gliding in pendulum
-  swings or tumbling; every tree sheds its own way, cherries drop petals.
+  swings or tumbling; every tree sheds its own way, cherries drop petals. They wear the falling leaf textures of the
+  newest Minecraft versions (the mod's classic leaf shapes are one config switch away).
 - 🌳 **A real forest floor** - patchy litter, drifts against trunks and walls, leaf piles that slump to a natural slope,
   fill hollows and rot away slowly; saved with the world.
 - 👣 **Wade through piles** - steps push leaves aside and leave a trail, a jump into a pile splashes it up, mobs and

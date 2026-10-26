@@ -3,14 +3,15 @@
 **Physically simulated leaves** - falling leaves, a forest floor you can wade through, rake into piles, gusts
 and whirlwinds.
 
-![Leaf litter under the trees and leaves drifting on the water](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/screenshots/forest-floor.jpg)
+![A leaf pile under a tree on a river bank, autumn litter all around](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/screenshots/leaf-pile.jpg)
 
 📦 **Requires** [NeoForge](https://neoforged.net) 1.21.1 (21.1.144 or newer) · client-side, works on any server (optional on the server)
 
 ## ✨ Features
 
 - 🍂 **Falling leaves** - they let go of the crowns and come down like real leaves: fluttering, gliding in pendulum
-  swings or tumbling; every tree sheds its own way, cherries drop petals.
+  swings or tumbling; every tree sheds its own way, cherries drop petals. They wear the falling leaf textures of the
+  newest Minecraft versions (the mod's classic leaf shapes are one config switch away).
 - 🌳 **A real forest floor** - patchy litter, drifts against trunks and walls, leaf piles that slump to a natural slope,
   fill hollows and rot away slowly; saved with the world.
 - 👣 **Wade through piles** - steps push leaves aside and leave a trail, a jump into a pile splashes it up, mobs and
@@ -43,18 +44,18 @@ and whirlwinds.
 
 ## ⚙️ Configuration
 
-The in-game config screen tunes everything: number of leaves, fall rate, how long litter lies, autumn colours, wind,
-whirlwinds, footsteps, raking, rustle volume, the seasons and the other mods it works with.
+The in-game config screen tunes everything: number of leaves, fall rate, leaf textures, how long litter lies,
+autumn colours, wind, whirlwinds, footsteps, raking, rustle volume, the seasons and the other mods it works with.
 
 ## 📸 Screenshots
 
-![A leaf pile you can wade through, rake and blow away](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/screenshots/leaf-pile.jpg)
+![Fallen leaves drifting on a river and lying along its bank](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/screenshots/leaves-on-water.jpg)
 
-*A leaf pile you can wade through, rake and blow away*
+*Fallen leaves drifting on a river and lying along its bank*
 
-![Falling leaves in a birch forest at night](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/screenshots/night-forest.jpg)
+![Petals falling in a cherry grove and covering the grass](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/screenshots/cherry-grove.jpg)
 
-*Falling leaves in a birch forest at night*
+*Petals falling in a cherry grove and covering the grass*
 
 ## 💛 Credits
 
