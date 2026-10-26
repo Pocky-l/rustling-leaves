@@ -4,7 +4,7 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.1.0] - Unreleased
+## [2.1.0] - 2026-10-26
 ### Added
 - Compatibility with [Realistic Waves](https://www.curseforge.com/minecraft/mc-mods/realistic-waves): leaves floating
   on the sea ride its swell and surf instead of lying on the flat water underneath. They rise and sink with every wave,
