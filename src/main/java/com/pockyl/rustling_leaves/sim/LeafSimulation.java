@@ -58,6 +58,14 @@ public final class LeafSimulation {
     public static final double SHADOW_RANGE = 24.0;
     /** Below this height of the sun (sin of its elevation, about 12 degrees) leaves cast no shadow. */
     public static final double SHADOW_MIN_SUN = 0.2;
+    /** See {@link #sunSlope()}. */
+    public static final double SHADOW_MAX_SLOPE = 2.5;
+    /**
+     * Light travelling farther than this from a leaf to the ground leaves no visible shadow: the sun's disc blurs it
+     * away (a real leaf's shadow is sharp only close below it). At sunset the beam is long, so only leaves near the
+     * ground still cast one - next to them, as in nature.
+     */
+    public static final double SHADOW_MAX_BEAM = 3.0;
     /** The surface under a leaf counts as level (the shadow lies flat on it) within this height difference. */
     private static final double SHADOW_LEVEL = 0.06;
     /** Blocks below a falling leaf searched for the ground its shadow falls on. */
@@ -490,6 +498,14 @@ public final class LeafSimulation {
     }
 
     /**
+     * How far a shadow moves sideways per block of height: sun x / sun y, but never more than {@link #SHADOW_MAX_SLOPE}
+     * (as if the sun stood at least ~22 degrees high) - lower down the shadows of leaves stretched into long streaks.
+     */
+    public double sunSlope() {
+        return Mth.clamp(sunX / Math.max(SHADOW_MIN_SUN, sunY), -SHADOW_MAX_SLOPE, SHADOW_MAX_SLOPE);
+    }
+
+    /**
      * Height of the surface a falling leaf near the camera casts its shadow on: where the sunbeam through the leaf
      * meets the ground, or the leaf litter as it is drawn on it. Looked up every tick, so the shadow stays on the ground
      * as the leaf drifts over steps. NaN farther away from the camera than {@link #SHADOW_RANGE}, with the sun too low,
@@ -506,8 +522,12 @@ public final class LeafSimulation {
         if (Double.isNaN(below)) {
             return Float.NaN;
         }
+        double height = y - below;
+        if (height * Math.sqrt(1.0 + sunSlope() * sunSlope()) > SHADOW_MAX_BEAM) {
+            return Float.NaN;
+        }
         // Along the sunbeam: the shadow lands this far to the side of the leaf (east or west).
-        double sx = x - sunX / sunY * (y - below);
+        double sx = x - sunSlope() * height;
         double surface = surfaceBelow(sx, y, z);
         if (Double.isNaN(surface)) {
             return Float.NaN;
