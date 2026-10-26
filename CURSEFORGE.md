@@ -11,7 +11,8 @@ and whirlwinds.
 
 - 🍂 **Falling leaves** - they let go of the crowns and come down like real leaves: fluttering, gliding in pendulum
   swings or tumbling; every tree sheds its own way, cherries drop petals. They wear the falling leaf textures of the
-  newest Minecraft versions (the mod's classic leaf shapes are one config switch away).
+  newest Minecraft versions (the mod's classic leaf shapes are one config switch away) and cast crisp pixel shadows
+  that follow the sun.
 - 🌳 **A real forest floor** - patchy litter, drifts against trunks and walls, leaf piles that slump to a natural slope,
   fill hollows and rot away slowly; saved with the world.
 - 👣 **Wade through piles** - steps push leaves aside and leave a trail, a jump into a pile splashes it up, mobs and
@@ -45,7 +46,8 @@ and whirlwinds.
 ## ⚙️ Configuration
 
 The in-game config screen tunes everything: number of leaves, fall rate, leaf textures, how long litter lies,
-autumn colours, wind, whirlwinds, footsteps, raking, rustle volume, the seasons and the other mods it works with.
+autumn colours, shadows, wind, whirlwinds, footsteps, raking, rustle volume, the seasons and the other mods it works
+with. `/rustlingleaves fallrate <value>` sets how thick the leaf fall is right in game.
 
 ## 📸 Screenshots
 
@@ -56,6 +58,10 @@ autumn colours, wind, whirlwinds, footsteps, raking, rustle volume, the seasons 
 ![Petals falling in a cherry grove and covering the grass](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/screenshots/cherry-grove.jpg)
 
 *Petals falling in a cherry grove and covering the grass*
+
+![Leaves letting go of the birches and drifting down against the sky](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/screenshots/birch-leaf-fall.jpg)
+
+*Leaves letting go of the birches and drifting down against the sky*
 
 ## 💛 Credits
 
