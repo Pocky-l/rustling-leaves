@@ -18,6 +18,8 @@ public final class LitterChunk {
     public static final int TILES = SIZE / TILE;
     /** 2: game times of the last decay and of the last seeding. Format 1 is still read. */
     private static final int FORMAT = 2;
+    /** Color of repaired stacks without any colored stack in their chunk: a plain leaf green. */
+    private static final int FALLBACK_COLOR = 0x5A7F2E;
     /** A game time that was never set. */
     public static final long NEVER = Long.MIN_VALUE;
 
@@ -217,6 +219,42 @@ public final class LitterChunk {
             chunk.topColor[i] = in.readInt();
             chunk.total += chunk.count[i];
         }
+        chunk.repairBlackCells();
         return chunk;
+    }
+
+    /**
+     * Natural piles seeded before 2.2.1 could get no tree color (black, drawn as black leaves): they take the color and
+     * shape of the nearest colored stack of the chunk, their top leaf (colored black as well) is dropped.
+     */
+    private void repairBlackCells() {
+        for (int i = 0; i < AREA; i++) {
+            if (count[i] <= 0 || (color[i] & 0xFFFFFF) != 0) {
+                continue;
+            }
+            int cellX = i & SIZE - 1;
+            int cellZ = i / SIZE;
+            int found = -1;
+            for (int r = 1; r <= SIZE && found < 0; r++) {
+                for (int dz = -r; dz <= r && found < 0; dz++) {
+                    for (int dx = -r; dx <= r; dx++) {
+                        int x = cellX + dx;
+                        int z = cellZ + dz;
+                        if ((Math.abs(dx) == r || Math.abs(dz) == r) && x >= 0 && x < SIZE && z >= 0 && z < SIZE) {
+                            int j = index(x, z);
+                            if (count[j] > 0 && (color[j] & 0xFFFFFF) != 0) {
+                                found = j;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            color[i] = found >= 0 ? color[found] : FALLBACK_COLOR;
+            shape[i] = found >= 0 ? shape[found] : 0;
+            if ((topColor[i] & 0xFFFFFF) == 0) {
+                top[i] = 0L;
+            }
+        }
     }
 }

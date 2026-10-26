@@ -50,6 +50,11 @@ public final class Config {
             .comment("Size of the leaves (multiplier).")
             .translation("rustling_leaves.configuration.leafSize")
             .defineInRange("leafSize", 1.0, 0.3, 3.0);
+    private static final ForgeConfigSpec.BooleanValue OLD_LEAF_TEXTURES = BUILDER
+            .comment("Draw leaves with this mod's original textures (a few leaf shapes, needles and petals) instead of the",
+                    "falling leaves of newer Minecraft versions.")
+            .translation("rustling_leaves.configuration.oldLeafTextures")
+            .define("oldLeafTextures", false);
     private static final ForgeConfigSpec.DoubleValue AUTUMN_COLORS = BUILDER
             .comment("Share of leaves that fall in autumn colors (yellow, orange, red, brown) instead of the tree's color.")
             .translation("rustling_leaves.configuration.autumnColors")
@@ -163,6 +168,7 @@ public final class Config {
         settings.raking = RAKING.get();
         settings.drawPileBlocks = PILE_BLOCKS.get();
         settings.leafSize = LEAF_SIZE.get().floatValue();
+        settings.oldLeafTextures = OLD_LEAF_TEXTURES.get();
         settings.autumnColors = AUTUMN_COLORS.get().floatValue();
         settings.leavesPerBreak = LEAVES_PER_BREAK.get();
         settings.litterDistance = LITTER_DISTANCE.get();

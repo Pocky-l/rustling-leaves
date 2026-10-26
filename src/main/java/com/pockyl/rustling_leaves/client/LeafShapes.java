@@ -2,6 +2,7 @@ package com.pockyl.rustling_leaves.client;
 
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.block.Block;
 
 import com.pockyl.rustling_leaves.RustlingLeaves;
@@ -12,6 +13,7 @@ import java.util.Map;
 
 /** Client side of leaf shapes: the sprite of every sprite index and which shape a tree drops. */
 final class LeafShapes {
+    /** The sprite indices of {@link LeafShape} (falling leaves of newer Minecraft versions), then the old sprites. */
     static final ResourceLocation[] SPRITES = {
             RustlingLeaves.id("block/leaf/leaf_light"),
             RustlingLeaves.id("block/leaf/leaf_mid"),
@@ -19,7 +21,16 @@ final class LeafShapes {
             RustlingLeaves.id("block/leaf/petal_light"),
             RustlingLeaves.id("block/leaf/petal_mid"),
             RustlingLeaves.id("block/leaf/petal_dark"),
+            RustlingLeaves.id("block/leaf/broad_0"),
+            RustlingLeaves.id("block/leaf/broad_1"),
+            RustlingLeaves.id("block/leaf/broad_2"),
+            RustlingLeaves.id("block/leaf/round"),
+            RustlingLeaves.id("block/leaf/needle"),
+            RustlingLeaves.id("block/leaf/petal"),
     };
+    /** First old sprite and number of old sprites of every shape (option {@code oldLeafTextures}). */
+    private static final int[] OLD_FIRST = {6, 9, 10, 11};
+    private static final int[] OLD_VARIANTS = {3, 1, 1, 1};
 
     /** Seamless texture of densely packed leaves for the body of piles. */
     static final ResourceLocation LITTER = RustlingLeaves.id("block/leaf/litter");
@@ -31,6 +42,16 @@ final class LeafShapes {
     private static final Map<Block, LeafShape> BY_BLOCK = new IdentityHashMap<>();
 
     private LeafShapes() {
+    }
+
+    /** Index into {@link #SPRITES} of a leaf drawn with sprite index {@code sprite} of its shape. */
+    static int slot(int shape, int sprite, boolean old) {
+        if (!old) {
+            return sprite;
+        }
+        LeafShape leafShape = LeafShape.byId(shape);
+        int s = leafShape.ordinal();
+        return OLD_FIRST[s] + Mth.clamp(sprite - leafShape.firstSprite, 0, OLD_VARIANTS[s] - 1);
     }
 
     /** Guesses the shape from the block id, which also covers modded trees with conventional names. */
