@@ -5,7 +5,7 @@ and whirlwinds.
 
 ![Leaf litter under the trees and leaves drifting on the water](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/screenshots/forest-floor.jpg)
 
-📦 **Requires** [NeoForge](https://neoforged.net) 1.21.1 (21.1.144 or newer) · client-side only, works on any server
+📦 **Requires** [NeoForge](https://neoforged.net) 1.21.1 (21.1.144 or newer) · client-side, works on any server (optional on the server)
 
 ## ✨ Features
 
@@ -18,8 +18,9 @@ and whirlwinds.
 - 🌬️ **Wind you can see** - gust waves skitter leaves over the ground, squalls strip trees, leaf whirlwinds wander over
   open ground; wind charges and explosions blow rings of leaves away.
 - 🌊 **Leaves on water** - they soak and darken, drift with the current and down waterfalls, gather into rafts and sink.
-- 🧹 **Rake them into piles** with a hoe or shovel while sneaking.
-- 🖥️ **Purely client-side** - adds no items or blocks, so it works on any server, with or without the mod.
+- 🧹 **Rake them into piles** with a hoe or shovel while sneaking - your friends see the pile form too.
+- 🖥️ **Client-side** - adds no items or blocks, so it works on any server, with or without the mod. On the server
+  it is optional and only passes on where players rake.
 - 🎨 **Colours of the tree** in every biome, modded trees included, with a share of autumn yellows and reds.
 - ⚡ **Built for huge numbers** - cached GPU meshes and a simplified far layer keep thousands of leaves cheap out to the
   render distance.

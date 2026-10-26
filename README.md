@@ -30,8 +30,9 @@
 - 🌬️ **Wind you can see** - gust waves skitter leaves over the ground, squalls strip trees, leaf whirlwinds wander over
   open ground; wind charges and explosions blow rings of leaves away.
 - 🌊 **Leaves on water** - they soak and darken, drift with the current and down waterfalls, gather into rafts and sink.
-- 🧹 **Rake them into piles** with a hoe or shovel while sneaking.
-- 🖥️ **Purely client-side** - adds no items or blocks, so it works on any server, with or without the mod.
+- 🧹 **Rake them into piles** with a hoe or shovel while sneaking - your friends see the pile form too.
+- 🖥️ **Client-side** - adds no items or blocks, so it works on any server, with or without the mod. On the server
+  it is optional and only passes on where players rake.
 - 🎨 **Colours of the tree** in every biome, modded trees included, with a share of autumn yellows and reds.
 - ⚡ **Built for huge numbers** - cached GPU meshes and a simplified far layer keep thousands of leaves cheap out to the
   render distance.
@@ -105,7 +106,8 @@ Leaf litter is saved in `saves/<world>/rustling_leaves/` (singleplayer) or `rust
 ## Installation
 
 1. Install [NeoForge](https://neoforged.net) 21.1.144 or newer for Minecraft 1.21.1.
-2. Put this mod into the `mods` folder of your client. It is client-side only: the server does not need it.
+2. Put this mod into the `mods` folder of your client. The server does not need it; installed there as well, it
+   shows every player's raking at the exact spot to the players nearby.
 
 ## Building
 
