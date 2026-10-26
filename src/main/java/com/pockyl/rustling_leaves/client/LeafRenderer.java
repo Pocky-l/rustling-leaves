@@ -23,6 +23,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ChunkTrackingView;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
@@ -86,6 +87,10 @@ final class LeafRenderer implements AutoCloseable {
     private static final float SHADOW_ALPHA = 0.42F;
     private static final int SHADOW_STEPS = 4;
     private static final float SHADOW_MAX_HEIGHT = 4.0F;
+    /** Under a canopy (no direct sun) a falling leaf's shadow keeps this much of its opacity. */
+    private static final float SHADE_SHADOW = 0.35F;
+    /** Opacity of the contact shadow a leaf lying on the ground casts one leaf pixel aside. */
+    private static final float CONTACT_ALPHA = 0.3F;
     /** Opacity of the shadow on the ground next to a pile and one cell further out. */
     private static final float FOOT_ALPHA_NEAR = 0.34F;
     private static final float FOOT_ALPHA_FAR = 0.17F;
@@ -724,6 +729,7 @@ final class LeafRenderer implements AutoCloseable {
         loadRing(tile);
         BufferBuilder builder = new BufferBuilder(bytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
         boolean detailShadows = shadows && tile.wantDetailed;
+        BufferBuilder shadowBuilder = new BufferBuilder(shadowBytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
         if (detailShadows) {
             Arrays.fill(footShadow, (byte) 0);
         }
@@ -773,12 +779,18 @@ final class LeafRenderer implements AutoCloseable {
                     float px = (float) (pose.x - tile.originX);
                     float py = (float) (pose.y - tile.originY);
                     float pz = (float) (pose.z - tile.originZ);
+                    float step = pose.size * 0.4F;
                     if (detailShadows && n >= SURFACE_MIN && depth < 2) {
                         // The leaf's silhouette, darker, one leaf pixel aside and just under it: a pixel-art drop shadow.
-                        float step = pose.size * 0.4F;
                         emit(builder, px + step, py - 0.004F, pz + step, pose.yaw, pose.pitch, pose.roll, pose.size,
                                 shade(ringColor[self], DROP_SHADE * occlusion), light, sprite);
                         quads++;
+                    } else if (detailShadows && n < SURFACE_MIN) {
+                        // A leaf lying on the ground: a faint contact shadow one leaf pixel aside, so it does not look
+                        // painted onto the grass.
+                        int s = pose.shape == LeafShape.PETAL.ordinal() ? LeafShapes.SHADOW_PETAL : LeafShapes.SHADOW_LEAF;
+                        emitShadow(shadowBuilder, px + step, py, pz + step, (float) (base - tile.originY) + SHADOW_LIFT, 0.0F,
+                                pose.yaw, pose.pitch, pose.roll, pose.size, s, shadowColor(CONTACT_ALPHA * occlusion), light);
                     }
                     emit(builder, px, py, pz, pose.yaw, pose.pitch, pose.roll, pose.size, shade(pose.color, shade), light, sprite);
                     quads++;
@@ -789,6 +801,12 @@ final class LeafRenderer implements AutoCloseable {
         MeshData mesh = builder.build();
         if (mesh == null) {
             tile.empty = true;
+            // Finish the shadow builder too: its bytes would otherwise end up in the next mesh built from them.
+            MeshData unused = shadowBuilder.build();
+            if (unused != null) {
+                unused.close();
+            }
+            tile.shadowEmpty = true;
             return;
         }
         if (tile.buffer == null) {
@@ -797,7 +815,7 @@ final class LeafRenderer implements AutoCloseable {
         tile.buffer.bind();
         tile.buffer.upload(mesh);
         tile.empty = false;
-        buildFootShadows(tile, detailShadows);
+        buildFootShadows(tile, detailShadows, shadowBuilder);
     }
 
     /**
@@ -859,8 +877,7 @@ final class LeafRenderer implements AutoCloseable {
         }
     }
 
-    private void buildFootShadows(Tile tile, boolean detailShadows) {
-        BufferBuilder builder = new BufferBuilder(shadowBytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
+    private void buildFootShadows(Tile tile, boolean detailShadows, BufferBuilder builder) {
         if (detailShadows) {
             for (int f = 0; f < footShadow.length; f++) {
                 byte level = footShadow[f];
@@ -1067,8 +1084,15 @@ final class LeafRenderer implements AutoCloseable {
 
     private void buildMoving(Vec3 cam, Vector3f look, float partialTick) {
         BufferBuilder builder = new BufferBuilder(bytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
-        BufferBuilder shadowBuilder = shadows ? new BufferBuilder(shadowBytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK)
-                : null;
+        // How strong the sun's shadows are: none below SHADOW_MIN_SUN, full a little higher, weak in rain.
+        float sunStrength = (float) Mth.clamp((simulation.sunY() - LeafSimulation.SHADOW_MIN_SUN) / 0.15, 0.0, 1.0);
+        Level level = Minecraft.getInstance().level;
+        if (level != null) {
+            sunStrength *= 1.0F - 0.7F * level.getRainLevel(partialTick);
+        }
+        BufferBuilder shadowBuilder = shadows && sunStrength > 0.0F
+                ? new BufferBuilder(shadowBytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK) : null;
+        float sunSlope = (float) (simulation.sunX() / Math.max(LeafSimulation.SHADOW_MIN_SUN, simulation.sunY()));
         for (int i = 0, highWater = pool.highWater(); i < highWater; i++) {
             byte state = pool.state[i];
             if (state == LeafPool.FREE || !drawnChunk(Mth.floor(pool.x[i]) >> 4, Mth.floor(pool.z[i]) >> 4)) {
@@ -1098,9 +1122,12 @@ final class LeafRenderer implements AutoCloseable {
                     int s = pool.shape[i] == LeafShape.PETAL.ordinal() ? LeafShapes.SHADOW_PETAL : LeafShapes.SHADOW_LEAF;
                     // Fainter the higher the leaf, in a few even steps.
                     int step = Math.min(SHADOW_STEPS - 1, (int) (height / SHADOW_MAX_HEIGHT * SHADOW_STEPS));
-                    float alpha = SHADOW_ALPHA * (SHADOW_STEPS - step) / SHADOW_STEPS;
-                    emitShadow(shadowBuilder, x, (float) (ground - cam.y) + SHADOW_LIFT, z, yaw, pitch, roll, size, s,
-                            shadowColor(alpha), pool.light[i]);
+                    float alpha = SHADOW_ALPHA * (SHADOW_STEPS - step) / SHADOW_STEPS * sunStrength
+                            * (pool.shadowSunlit[i] ? 1.0F : SHADE_SHADOW);
+                    if (alpha >= 0.03F) {
+                        emitShadow(shadowBuilder, x, y, z, (float) (ground - cam.y) + SHADOW_LIFT, sunSlope, yaw, pitch, roll, size, s,
+                                shadowColor(alpha), pool.light[i]);
+                    }
                 }
             }
         }
@@ -1121,11 +1148,12 @@ final class LeafRenderer implements AutoCloseable {
     }
 
     /**
-     * The shadow of a leaf in the sun high above: its quad (same basis as {@link #emit}) projected straight down onto
-     * the ground at {@code groundY}, so a leaf seen edge-on from above casts a thin sliver.
+     * The shadow of a leaf: its quad (same basis as {@link #emit}) projected along the sunbeam onto the ground at
+     * {@code groundY}. {@code sunSlope} = sun x / sun y: 0 at noon (straight down), long shadows to the side towards
+     * sunset and sunrise; a leaf seen edge-on by the sun casts a thin sliver.
      */
-    private void emitShadow(BufferBuilder builder, float x, float groundY, float z, float yaw, float pitch, float roll, float half,
-            int s, int color, int light) {
+    private void emitShadow(BufferBuilder builder, float x, float y, float z, float groundY, float sunSlope, float yaw, float pitch,
+            float roll, float half, int s, int color, int light) {
         float sa = Mth.sin(yaw);
         float ca = Mth.cos(yaw);
         float sb = Mth.sin(pitch);
@@ -1133,11 +1161,16 @@ final class LeafRenderer implements AutoCloseable {
         float sc = Mth.sin(roll);
         float cc = Mth.cos(roll);
         float ax = (ca * cc + sa * sb * sc) * half;
+        float ay = cb * sc * half;
         float az = (-sa * cc + ca * sb * sc) * half;
         float bx = sa * cb * half;
+        float by = -sb * half;
         float bz = ca * cb * half;
-        flatQuad(builder, groundY, x - ax - bx, z - az - bz, x - ax + bx, z - az + bz, x + ax + bx, z + az + bz, x + ax - bx,
-                z + az - bz, s, color, light);
+        float x0 = x - ax - bx - sunSlope * (y - ay - by - groundY);
+        float x1 = x - ax + bx - sunSlope * (y - ay + by - groundY);
+        float x2 = x + ax + bx - sunSlope * (y + ay + by - groundY);
+        float x3 = x + ax - bx - sunSlope * (y + ay - by - groundY);
+        flatQuad(builder, groundY, x0, z - az - bz, x1, z - az + bz, x2, z + az + bz, x3, z + az - bz, s, color, light);
     }
 
     private static int shade(int rgb, float factor) {

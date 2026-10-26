@@ -6,10 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.4.0] - 2026-10-27
 ### Added
-- Pixel shadows. Falling leaves cast a crisp leaf-shaped shadow on the ground or the litter right under them,
-  fainter the higher they fly. Leaves lying on a pile shade the leaves beneath them, the sides and hollows of a pile
-  are darker than its crest, and piles shade the ground around their foot, so they read as heaps instead of flat
-  patches. The shadows are drawn like the leaves themselves and work with shader packs; client option
+- Pixel shadows. Falling leaves cast a crisp leaf-shaped shadow along the sunbeam: under them at noon, long and to
+  the side in the morning and evening, fainter the higher they fly, weak under the trees and in rain, none at night.
+  Leaves lying on the ground get a faint contact shadow, leaves on a pile shade the leaves beneath them, the sides and
+  hollows of a pile are darker than its crest, and piles shade the ground around their foot, so they read as heaps
+  instead of flat patches. The shadows are drawn like the leaves themselves and work with shader packs; client option
   `leaves.shadows` turns them off.
 - Client command `/rustlingleaves fallrate <value>` sets how many leaves fall from the trees (1 = normal, up to 10),
   right away and saved to the config; `/rustlingleaves fallrate` shows the current value. It works on any server.

@@ -72,8 +72,13 @@ public final class LeafPool {
     public final int[] color;
     public final int[] baseColor;
     public final int[] light;
-    /** Height of the ground or litter a falling leaf casts its shadow on; NaN when there is none nearby. */
+    /**
+     * Height of the ground or litter a falling leaf casts its shadow on, where the sunbeam through the leaf meets it;
+     * NaN when there is none nearby (or no sun).
+     */
     public final float[] shadow;
+    /** Whether the sun shines on that spot (open sky): under a canopy the leaf's shadow is much fainter. */
+    public final boolean[] shadowSunlit;
     public final int[] age;
     public final int[] life;
     public final byte[] state;
@@ -121,6 +126,7 @@ public final class LeafPool {
         baseColor = new int[capacity];
         light = new int[capacity];
         shadow = new float[capacity];
+        shadowSunlit = new boolean[capacity];
         age = new int[capacity];
         life = new int[capacity];
         state = new byte[capacity];
