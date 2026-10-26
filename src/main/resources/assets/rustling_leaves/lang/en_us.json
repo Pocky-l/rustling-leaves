@@ -4,6 +4,8 @@
   "rustling_leaves.configuration.section.rustling.leaves.client.toml.title": "Leaves",
   "rustling_leaves.configuration.leaves": "Leaves",
   "rustling_leaves.configuration.maxLeaves": "Maximum Moving Leaves",
+  "commands.rustling_leaves.fallrate.get": "Leaf fall rate: %s (1 = normal)",
+  "commands.rustling_leaves.fallrate.set": "Leaf fall rate set to %s",
   "rustling_leaves.configuration.fallRate": "Fall Rate",
   "rustling_leaves.configuration.treeFallRates": "Fall Rate Depends on the Tree",
   "rustling_leaves.configuration.spawnRadius": "Falling Radius (blocks)",

@@ -17,10 +17,12 @@ public final class Config {
                     "are not counted: they are stored as leaf litter and cost almost nothing.")
             .translation("rustling_leaves.configuration.maxLeaves")
             .defineInRange("maxLeaves", 8000, 0, 40000);
+    public static final double MIN_FALL_RATE = 0.0;
+    public static final double MAX_FALL_RATE = 10.0;
     private static final ModConfigSpec.DoubleValue FALL_RATE = BUILDER
             .comment("How often leaves fall from trees (multiplier, 0 disables falling leaves).")
             .translation("rustling_leaves.configuration.fallRate")
-            .defineInRange("fallRate", 1.0, 0.0, 10.0);
+            .defineInRange("fallRate", 1.0, MIN_FALL_RATE, MAX_FALL_RATE);
     private static final ModConfigSpec.BooleanValue TREE_FALL_RATES = BUILDER
             .comment("Whether the tree matters: birches shed more leaves, spruces and other conifers hardly any.")
             .translation("rustling_leaves.configuration.treeFallRates")
@@ -163,6 +165,16 @@ public final class Config {
     public static final ModConfigSpec SPEC = BUILDER.build();
 
     private Config() {
+    }
+
+    public static double fallRate() {
+        return FALL_RATE.get();
+    }
+
+    /** Sets {@code leaves.fallRate} and saves the config file (the client command). */
+    public static void setFallRate(double value) {
+        FALL_RATE.set(value);
+        SPEC.save();
     }
 
     /** Copies the loaded values into the simulation settings. */

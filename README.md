@@ -54,6 +54,9 @@ No keys. Just play:
 
 ## Configuration
 
+`/rustlingleaves fallrate <value>` (client command, works on any server) sets `leaves.fallRate` in game, e.g. `3` for a
+thick leaf fall; without a value it shows the current one.
+
 `config/rustling_leaves-client.toml` (also in the in-game config screen: Mods -> Rustling Leaves -> Config):
 
 | Option | Default | Description |

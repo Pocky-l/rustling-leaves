@@ -4,6 +4,11 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] - 2026-10-27
+### Added
+- Client command `/rustlingleaves fallrate <value>` sets how many leaves fall from the trees (1 = normal, up to 10),
+  right away and saved to the config; `/rustlingleaves fallrate` shows the current value. It works on any server.
+
 ## [2.3.0] - 2026-10-27
 ### Added
 - Client option `leaves.oldLeafTextures` brings back the mod's original leaf textures (several leaf shapes, needles
