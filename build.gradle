@@ -209,7 +209,7 @@ publishMods {
     file = tasks.named('reobfJar').flatMap { it.archiveFile }
     changelog = releaseNotes ?: ''
     type = STABLE
-    displayName = "${mod_name} ${mod_version}"
+    displayName = "${mod_name} ${mod_version}+${minecraft_version}"
     modLoaders.add('forge')
     dryRun = providers.gradleProperty('dryRun').map { it != 'false' }.orElse(false)
 
