@@ -58,7 +58,7 @@ public final class Config {
             .translation("rustling_leaves.configuration.oldLeafTextures")
             .define("oldLeafTextures", false);
     private static final ModConfigSpec.BooleanValue SHADOWS = BUILDER
-            .comment("Pixel shadows: falling leaves cast a dithered shadow on the ground under them, leaves on piles cast",
+            .comment("Pixel shadows: falling leaves cast a crisp shadow on the ground under them, leaves on piles cast",
                     "one on the leaves below, and piles shade the ground around their foot. Drawn like the leaves, so they",
                     "work with shader packs.")
             .translation("rustling_leaves.configuration.shadows")
