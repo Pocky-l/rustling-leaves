@@ -28,7 +28,8 @@ Physically simulated leaves: falling leaves, leaf piles you can wade through, ra
 - **Leaves behave like a granular material**: piles settle into round cones, leaves trickle down slopes, fill
   hollows, ditches and cauldrons up to the rim and run over the edge.
 - **Rake leaves into piles**: sneak and hold right click with a hoe or shovel on leaf litter to sweep the leaves around that
-  spot together; without sneaking the tool tills the ground and makes paths as usual.
+  spot together; without sneaking the tool tills the ground and makes paths as usual. Other players see the pile
+  form too.
 - **Wind you can see**: gust waves sweep across the forest and skitter loose leaves over the ground until they
   pile up against obstacles; **squalls** - strong gust fronts - roll through and strip a band of trees at once;
   **leaf whirlwinds** wander over open ground, suck up the litter and spin it up in a swirling column.
@@ -62,8 +63,8 @@ Physically simulated leaves: falling leaves, leaf piles you can wade through, ra
   without leaves popping in; only moving leaves are
   simulated in full, and everything that pushes leaves finds them through a spatial grid. The F3 screen shows the
   current numbers.
-- **Purely client-side**: the mod adds no items or blocks, so it works on any server, with or without the mod,
-  even on vanilla servers.
+- **Client-side**: the mod adds no items or blocks, so it works on any server, with or without the mod,
+  even on vanilla servers. On the server it is optional and only passes on where players rake.
 
 ## Configuration
 

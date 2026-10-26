@@ -41,6 +41,8 @@ import com.pockyl.rustling_leaves.Config;
 import com.pockyl.rustling_leaves.RustlingLeaves;
 import com.pockyl.rustling_leaves.client.compat.ImmersiveWeathering;
 import com.pockyl.rustling_leaves.client.compat.SereneSeasons;
+import com.pockyl.rustling_leaves.network.ModNetwork;
+import com.pockyl.rustling_leaves.network.RakePayload;
 import com.pockyl.rustling_leaves.sim.LeafListener;
 import com.pockyl.rustling_leaves.sim.LeafPool;
 import com.pockyl.rustling_leaves.sim.LeafSettings;
@@ -94,6 +96,8 @@ public final class LeafManager {
     /** Vertical movement of each entity in the previous tick, to detect landings. */
     private static final Int2FloatOpenHashMap LAST_FALL = new Int2FloatOpenHashMap();
     private static final Int2IntOpenHashMap SOUND_READY = new Int2IntOpenHashMap();
+    /** Swing progress of the other players in the previous tick, to see a new swing start. */
+    private static final Int2IntOpenHashMap LAST_SWING = new Int2IntOpenHashMap();
 
     private static volatile boolean configChanged;
     private static LeafSimulation simulation;
@@ -159,6 +163,7 @@ public final class LeafManager {
         simulation.beginTick(level, camera.x, camera.y, camera.z);
         disturbByEntities(camera);
         simulation.finishTick();
+        rakeByOtherPlayers(minecraft);
         SPAWNER.tick(level, simulation, camera.x, camera.z);
         if (ticks % SAVE_INTERVAL == 0) {
             save(camera);
@@ -209,18 +214,81 @@ public final class LeafManager {
             return;
         }
         Vec3 at = hit.getLocation();
-        if (simulation.litterAround(at.x, at.y, at.z, RAKE_RADIUS) < 3) {
+        if (rakeAt(at)) {
+            event.setCanceled(true);
+            // The swing reaches the other players through vanilla; clients without the server channel guess the
+            // stroke from it (rakeByOtherPlayers), with the channel the exact point follows.
+            event.setSwingHand(true);
+            ClientPacketListener connection = minecraft.getConnection();
+            if (connection != null && ModNetwork.present(connection.getConnection())) {
+                ModNetwork.sendToServer(new RakePayload(at.x, at.y, at.z));
+            }
+        }
+    }
+
+    /** A player nearby raked at a point (relayed by a server with the mod): the same stroke in our own litter. */
+    static void onRemoteRake(RakePayload payload) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (simulation == null || level == null || minecraft.level != level || !SETTINGS.raking) {
             return;
         }
+        Vec3 at = new Vec3(payload.x(), payload.y(), payload.z());
+        double range = SETTINGS.spawnRadius + 16.0;
+        if (at.distanceToSqr(cameraPosition(minecraft)) < range * range) {
+            rakeAt(at);
+        }
+    }
+
+    /** Rakes the litter around a point into a pile with its sound; false when there was nothing to rake. */
+    private static boolean rakeAt(Vec3 at) {
+        if (simulation.litterAround(at.x, at.y, at.z, RAKE_RADIUS) < 3) {
+            return false;
+        }
         int moved = simulation.rake(at.x, at.y, at.z, RAKE_RADIUS);
-        if (moved > 0) {
-            event.setCanceled(true);
-            event.setSwingHand(true);
-            float volume = Math.min(1.0F, 0.4F + moved / 60.0F) * Math.max(0.3F, SETTINGS.rustleVolume);
-            level.playLocalSound(at.x, at.y, at.z, SoundEvents.AZALEA_LEAVES_STEP, SoundSource.PLAYERS, volume,
-                    0.8F + level.random.nextFloat() * 0.2F, false);
-            level.playLocalSound(at.x, at.y, at.z, SoundEvents.BRUSH_GENERIC, SoundSource.PLAYERS, volume * 0.5F,
-                    0.7F + level.random.nextFloat() * 0.2F, false);
+        if (moved <= 0) {
+            return false;
+        }
+        float volume = Math.min(1.0F, 0.4F + moved / 60.0F) * Math.max(0.3F, SETTINGS.rustleVolume);
+        level.playLocalSound(at.x, at.y, at.z, SoundEvents.AZALEA_LEAVES_STEP, SoundSource.PLAYERS, volume,
+                0.8F + level.random.nextFloat() * 0.2F, false);
+        level.playLocalSound(at.x, at.y, at.z, SoundEvents.BRUSH_GENERIC, SoundSource.PLAYERS, volume * 0.5F,
+                0.7F + level.random.nextFloat() * 0.2F, false);
+        return true;
+    }
+
+    /**
+     * Without the mod on the server nothing tells us where other players rake, so a stroke is guessed from what every
+     * client sees anyway: a sneaking player with a hoe or shovel starts a main hand swing -> rake where they look.
+     * Digging while sneaking with a shovel looks the same and rakes too; that is the price of needing no server part.
+     */
+    private static void rakeByOtherPlayers(Minecraft minecraft) {
+        ClientPacketListener connection = minecraft.getConnection();
+        if (!SETTINGS.raking || connection == null || ModNetwork.present(connection.getConnection())) {
+            LAST_SWING.clear();
+            return;
+        }
+        double range = SETTINGS.spawnRadius + 8.0;
+        Vec3 camera = cameraPosition(minecraft);
+        for (Player player : level.players()) {
+            if (player == minecraft.player || player.isSpectator() || player.distanceToSqr(camera) > range * range) {
+                continue;
+            }
+            int id = player.getId();
+            int last = LAST_SWING.getOrDefault(id, Integer.MAX_VALUE);
+            int now = player.swinging ? player.swingTime : Integer.MAX_VALUE;
+            LAST_SWING.put(id, now);
+            // A new swing starts over at -1 / 0; a running one only counts up.
+            if (now >= last || player.swingingArm != InteractionHand.MAIN_HAND) {
+                continue;
+            }
+            ItemStack stack = player.getMainHandItem();
+            if (!player.isShiftKeyDown() || !stack.is(ItemTags.HOES) && !stack.is(ItemTags.SHOVELS)) {
+                continue;
+            }
+            if (player.pick(player.getBlockReach(), 1.0F, false) instanceof BlockHitResult hit
+                    && hit.getType() == HitResult.Type.BLOCK) {
+                rakeAt(hit.getLocation());
+            }
         }
     }
 
@@ -486,6 +554,7 @@ public final class LeafManager {
         nextSeasonCheck = 0;
         LAST_FALL.clear();
         SOUND_READY.clear();
+        LAST_SWING.clear();
         COLORS.clear();
     }
 

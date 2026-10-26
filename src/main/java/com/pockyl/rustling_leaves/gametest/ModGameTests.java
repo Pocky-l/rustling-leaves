@@ -3,6 +3,8 @@ package com.pockyl.rustling_leaves.gametest;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LeavesBlock;
@@ -10,10 +12,13 @@ import net.minecraft.world.level.block.SlabBlock;
 import net.minecraft.world.level.block.SnowLayerBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.SlabType;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
 
 import com.pockyl.rustling_leaves.RustlingLeaves;
+import com.pockyl.rustling_leaves.network.ModNetwork;
+import com.pockyl.rustling_leaves.network.RakePayload;
 import com.pockyl.rustling_leaves.sim.Armful;
 import com.pockyl.rustling_leaves.sim.LeafListener;
 import com.pockyl.rustling_leaves.sim.LeafPool;
@@ -52,6 +57,22 @@ public final class ModGameTests {
 
     @GameTest(template = "empty")
     public static void modLoads(GameTestHelper helper) {
+        helper.succeed();
+    }
+
+    /** The server relays a rake stroke only from a sneaking player with a hoe or shovel who can reach the point. */
+    @GameTest(template = "empty")
+    public static void serverRelaysOnlyPlausibleRakes(GameTestHelper helper) {
+        Vec3 eye = new Vec3(0.0, 1.62, 0.0);
+        Vec3 near = new Vec3(3.0, 0.0, 2.0);
+        ItemStack hoe = new ItemStack(Items.IRON_HOE);
+        helper.assertTrue(ModNetwork.canRake(eye, near, 4.5, true, hoe), "a sneaking player with a hoe rakes");
+        helper.assertTrue(ModNetwork.canRake(eye, near, 4.5, true, new ItemStack(Items.WOODEN_SHOVEL)), "a shovel rakes");
+        helper.assertFalse(ModNetwork.canRake(eye, near, 4.5, false, hoe), "no rake without sneaking");
+        helper.assertFalse(ModNetwork.canRake(eye, near, 4.5, true, new ItemStack(Items.STICK)), "no rake with a stick");
+        helper.assertFalse(ModNetwork.canRake(eye, new Vec3(20.0, 0.0, 0.0), 4.5, true, hoe), "no rake out of reach");
+        helper.assertFalse(ModNetwork.canRake(eye, new Vec3(Double.NaN, 0.0, 0.0), 4.5, true, hoe), "no rake at NaN");
+        helper.assertFalse(new RakePayload(Double.NaN, 0.0, 0.0).isFinite(), "NaN payloads are dropped");
         helper.succeed();
     }
 

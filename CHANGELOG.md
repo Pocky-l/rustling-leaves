@@ -4,6 +4,15 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0+1.20.1] - 2026-10-26
+### Added
+- Raking is visible to other players: when someone rakes leaves together, everyone around sees their own leaves
+  gather into the pile, with the raking sound.
+  - With Rustling Leaves on the server, the exact spot of every stroke is passed on to the players nearby. Installing
+    it on the server stays optional, and players without the mod can still join.
+  - Without it on the server, your game recognises a rake stroke when another player sneaks with a hoe or shovel and
+    swings it at the ground. Digging while sneaking with a shovel can then look like raking.
+
 ## [2.0.1+1.20.1] - 2026-10-26
 ### Removed
 - The wind sound of leaf whirlwinds. Rustling Leaves makes no wind sounds any more; the rustle of leaves under your

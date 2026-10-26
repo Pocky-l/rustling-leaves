@@ -11,7 +11,7 @@ authors="${mod_authors}"
 displayURL="${mod_url}"
 logoFile="logo.png"
 description='''${mod_description}'''
-# Purely client-side: it works on any server, with or without the mod.
+# Client-side: it works on any server, with or without the mod (installed on a server it also shares rake strokes).
 displayTest="IGNORE_ALL_VERSION"
 
 [[dependencies.${mod_id}]]
