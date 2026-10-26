@@ -89,8 +89,11 @@ final class LeafRenderer implements AutoCloseable {
     private static final float SHADOW_MAX_HEIGHT = 4.0F;
     /** Under a canopy (no direct sun) a falling leaf's shadow keeps this much of its opacity. */
     private static final float SHADE_SHADOW = 0.35F;
-    /** Opacity of the contact shadow a leaf lying on the ground casts one leaf pixel aside. */
-    private static final float CONTACT_ALPHA = 0.3F;
+    /**
+     * Opacity of the contact shadow a leaf lying on the ground casts half a leaf pixel aside: only a hint of an edge,
+     * stronger looked dirty (owner).
+     */
+    private static final float CONTACT_ALPHA = 0.14F;
     /** Opacity of the shadow on the ground next to a pile and one cell further out. */
     private static final float FOOT_ALPHA_NEAR = 0.34F;
     private static final float FOOT_ALPHA_FAR = 0.17F;
@@ -786,10 +789,10 @@ final class LeafRenderer implements AutoCloseable {
                                 shade(ringColor[self], DROP_SHADE * occlusion), light, sprite);
                         quads++;
                     } else if (detailShadows && n < SURFACE_MIN) {
-                        // A leaf lying on the ground: a faint contact shadow one leaf pixel aside, so it does not look
-                        // painted onto the grass.
+                        // A leaf lying on the ground: a faint contact shadow half a leaf pixel aside, so it does not
+                        // look painted onto the grass.
                         int s = pose.shape == LeafShape.PETAL.ordinal() ? LeafShapes.SHADOW_PETAL : LeafShapes.SHADOW_LEAF;
-                        emitShadow(shadowBuilder, px + step, py, pz + step, (float) (base - tile.originY) + SHADOW_LIFT, 0.0F,
+                        emitShadow(shadowBuilder, px + step * 0.5F, py, pz + step * 0.5F, (float) (base - tile.originY) + SHADOW_LIFT, 0.0F,
                                 pose.yaw, pose.pitch, pose.roll, pose.size, s, shadowColor(CONTACT_ALPHA * occlusion), light);
                     }
                     emit(builder, px, py, pz, pose.yaw, pose.pitch, pose.roll, pose.size, shade(pose.color, shade), light, sprite);
