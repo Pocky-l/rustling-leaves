@@ -65,6 +65,16 @@ public final class Config {
                     "Off: the piles keep their own look and falling leaves land on top of them.")
             .translation("rustling_leaves.configuration.immersiveWeatheringPiles")
             .define("immersiveWeatheringPiles", true);
+    private static final ModConfigSpec.BooleanValue REALISTIC_WAVES = BUILDER
+            .comment("With Realistic Waves installed, leaves floating on the water ride its swell and surf, rising and tilting",
+                    "with every wave. Off: they lie at the flat water level of vanilla.")
+            .translation("rustling_leaves.configuration.realisticWaves")
+            .define("realisticWaves", true);
+    private static final ModConfigSpec.BooleanValue FALLING_LEAVES_MOD = BUILDER
+            .comment("With Falling Leaves installed, also show its own falling leaf particles. Off (the default): only the",
+                    "leaves of this mod fall, so trees do not shed twice; Falling Leaves still drops snow from snowy leaves.")
+            .translation("rustling_leaves.configuration.fallingLeavesMod")
+            .define("fallingLeavesMod", false);
     private static final ModConfigSpec.IntValue LEAVES_PER_BREAK = BUILDER
             .comment("Leaves released when a leaves block is broken or decays.")
             .translation("rustling_leaves.configuration.leavesPerBreak")
@@ -162,6 +172,8 @@ public final class Config {
         settings.windEvents = WIND_EVENTS.get().floatValue();
         settings.raking = RAKING.get();
         settings.drawPileBlocks = PILE_BLOCKS.get();
+        settings.rideWaves = REALISTIC_WAVES.get();
+        settings.otherModLeaves = FALLING_LEAVES_MOD.get();
         settings.leafSize = LEAF_SIZE.get().floatValue();
         settings.autumnColors = AUTUMN_COLORS.get().floatValue();
         settings.leavesPerBreak = LEAVES_PER_BREAK.get();

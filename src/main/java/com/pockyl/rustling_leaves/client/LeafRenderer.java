@@ -807,7 +807,8 @@ final class LeafRenderer implements AutoCloseable {
                 continue;
             }
             float x = (float) (Mth.lerp(partialTick, pool.prevX[i], pool.x[i]) - cam.x);
-            float y = (float) (Mth.lerp(partialTick, pool.prevY[i], pool.y[i]) - cam.y);
+            float y = (float) (Mth.lerp(partialTick, pool.prevY[i], pool.y[i]) - cam.y)
+                    + Mth.lerp(partialTick, pool.prevLift[i], pool.lift[i]);
             float z = (float) (Mth.lerp(partialTick, pool.prevZ[i], pool.z[i]) - cam.z);
             if (x * look.x() + y * look.y() + z * look.z() < -0.5F) {
                 continue;

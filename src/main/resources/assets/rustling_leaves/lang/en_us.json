@@ -22,6 +22,8 @@
   "rustling_leaves.configuration.windEvents": "Squalls and Whirlwinds",
   "rustling_leaves.configuration.raking": "Raking with Hoe or Shovel",
   "rustling_leaves.configuration.immersiveWeatheringPiles": "Immersive Weathering Piles as Litter",
+  "rustling_leaves.configuration.realisticWaves": "Floating Leaves Ride Realistic Waves",
+  "rustling_leaves.configuration.fallingLeavesMod": "Keep Falling Leaves Particles Too",
   "rustling_leaves.configuration.litterDistance": "Litter View Distance",
   "rustling_leaves.configuration.seasons": "Seasons",
   "rustling_leaves.configuration.seasonsEnabled": "Leaf Fall Follows the Seasons",

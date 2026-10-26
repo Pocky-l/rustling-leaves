@@ -40,6 +40,7 @@ import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import com.pockyl.rustling_leaves.Config;
 import com.pockyl.rustling_leaves.RustlingLeaves;
 import com.pockyl.rustling_leaves.client.compat.ImmersiveWeathering;
+import com.pockyl.rustling_leaves.client.compat.RealisticWaves;
 import com.pockyl.rustling_leaves.client.compat.SereneSeasons;
 import com.pockyl.rustling_leaves.sim.LeafListener;
 import com.pockyl.rustling_leaves.sim.LeafPool;
@@ -52,6 +53,7 @@ import com.pockyl.rustling_leaves.sim.LitterField;
 import com.pockyl.rustling_leaves.sim.PileBlocks;
 import com.pockyl.rustling_leaves.sim.SeasonCurve;
 import com.pockyl.rustling_leaves.sim.TreeLeaves;
+import com.pockyl.rustling_leaves.sim.WaterWaves;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -96,6 +98,8 @@ public final class LeafManager {
     private static final Int2IntOpenHashMap SOUND_READY = new Int2IntOpenHashMap();
 
     private static volatile boolean configChanged;
+    private static boolean wavesLookedUp;
+    private static RealisticWaves realisticWaves;
     private static LeafSimulation simulation;
     private static LeafRenderer renderer;
     private static LitterStorage storage;
@@ -126,6 +130,7 @@ public final class LeafManager {
                 reset();
             } else if (simulation != null) {
                 simulation.setPiles(PILES, TREES, SETTINGS.drawPileBlocks);
+                simulation.setWaves(waves());
             }
             updatePileModels(minecraft);
         }
@@ -140,6 +145,7 @@ public final class LeafManager {
             simulation = new LeafSimulation(SETTINGS, SETTINGS.maxLeaves, new Listener());
             simulation.setLevel(level);
             simulation.setPiles(PILES, TREES, SETTINGS.drawPileBlocks);
+            simulation.setWaves(waves());
             renderer = new LeafRenderer(simulation);
             storage = new LitterStorage(storageDirectory(minecraft, level));
         }
@@ -225,6 +231,27 @@ public final class LeafManager {
      * Called instead of a vanilla cherry petal particle under the cherry leaves at {@code pos}: drops a simulated petal
      * there (scaled by the fall rate and the season). Returns false when the simulation is off, so the vanilla particle shows.
      */
+    /**
+     * Whether the leaf particles of Falling Leaves are left out: the simulation drops the leaves itself (unless the
+     * player keeps both). Called from its particle spawner.
+     */
+    public static boolean replacesFallingLeaves() {
+        return simulation != null && SETTINGS.fallRate > 0.0F && !SETTINGS.otherModLeaves;
+    }
+
+    /** The waves of Realistic Waves for the floating leaves, if installed and wanted. */
+    private static WaterWaves waves() {
+        if (!SETTINGS.rideWaves || !ModList.get().isLoaded(RealisticWaves.MOD_ID)) {
+            return WaterWaves.NONE;
+        }
+        if (!wavesLookedUp) {
+            // Looked up on first use: this class loads with the config, long before the other mod is ready.
+            wavesLookedUp = true;
+            realisticWaves = RealisticWaves.find();
+        }
+        return realisticWaves != null ? realisticWaves : WaterWaves.NONE;
+    }
+
     public static boolean replaceCherryPetal(Level particleLevel, BlockPos pos, BlockState state) {
         if (simulation == null || particleLevel != level) {
             return false;

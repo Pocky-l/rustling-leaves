@@ -4,6 +4,17 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - Unreleased
+### Added
+- Compatibility with [Realistic Waves](https://www.curseforge.com/minecraft/mc-mods/realistic-waves): leaves floating
+  on the sea ride its swell and surf instead of lying on the flat water underneath. They rise and sink with every wave,
+  tilt with its slope and land on a crest where they touch it; they still drift, gather into rafts and soak as before.
+- Compatibility with [Falling Leaves](https://www.curseforge.com/minecraft/mc-mods/falling-leaves-forge): with both mods
+  installed, trees no longer shed twice - Rustling Leaves takes over, and the flat leaf particles of Falling Leaves are
+  left out. Its snow falling from snowy leaves stays.
+- New client options `leaves.realisticWaves` (turn the wave riding off) and `leaves.fallingLeavesMod` (keep the
+  leaves of Falling Leaves as well).
+
 ## [2.0.1] - 2026-10-25
 ### Removed
 - The wind sound of leaf whirlwinds. Rustling Leaves makes no wind sounds any more; the rustle of leaves under your

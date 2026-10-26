@@ -43,6 +43,18 @@ displayTest="IGNORE_ALL_VERSION"
     versionRange="*"
     ordering="NONE"
     side="CLIENT"
+[[dependencies.${mod_id}]]
+    modId="whitecap"
+    type="optional"
+    versionRange="*"
+    ordering="NONE"
+    side="CLIENT"
+[[dependencies.${mod_id}]]
+    modId="fallingleaves"
+    type="optional"
+    versionRange="*"
+    ordering="NONE"
+    side="CLIENT"
 
 [[mixins]]
 config="${mod_id}.mixins.json"

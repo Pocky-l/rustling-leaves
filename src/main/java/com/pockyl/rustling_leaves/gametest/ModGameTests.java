@@ -3,6 +3,7 @@ package com.pockyl.rustling_leaves.gametest;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LeavesBlock;
@@ -26,6 +27,7 @@ import com.pockyl.rustling_leaves.sim.LitterField;
 import com.pockyl.rustling_leaves.sim.PileBlocks;
 import com.pockyl.rustling_leaves.sim.SeasonCurve;
 import com.pockyl.rustling_leaves.sim.TreeLeaves;
+import com.pockyl.rustling_leaves.sim.WaterWaves;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -202,6 +204,41 @@ public final class ModGameTests {
         helper.assertTrue(pool.state[leaf] == LeafPool.FLOATING, "leaf is not floating, state " + pool.state[leaf]);
         double y = relativeY(helper, pool.y[leaf]);
         helper.assertTrue(y > 1.8 && y < 2.0, "leaf floats at y " + y);
+        helper.succeed();
+    }
+
+    @GameTest(template = "box")
+    public static void floatingLeafRidesTheWaves(GameTestHelper helper) {
+        floor(helper);
+        fill(helper, 0, 0, 6, 6, 1, Blocks.STONE.defaultBlockState());
+        fill(helper, 1, 1, 5, 5, 1, Blocks.WATER.defaultBlockState());
+        LeafSimulation sim = simulation(helper, 64, LeafListener.NONE);
+        // A wave field that rises towards +x, as another mod might draw it: 0.6 blocks over the still water mid-pond.
+        double originX = helper.absolutePos(BlockPos.ZERO).getX();
+        WaterWaves waves = (x, z) -> (float) (0.6 + 0.3 * (x - originX - 3.5));
+        sim.setWaves(waves);
+        int leaf = spawn(sim, helper, 3.5, 4.5, 3.5);
+        LeafPool pool = sim.pool();
+        double lowest = Double.MAX_VALUE;
+        for (int t = 0; t < 300; t++) {
+            if (pool.state[leaf] == LeafPool.FALLING) {
+                lowest = Math.min(lowest, relativeY(helper, pool.y[leaf]));
+            }
+            run(sim, helper, 1);
+        }
+        helper.assertTrue(pool.state[leaf] == LeafPool.FLOATING, "leaf is not floating, state " + pool.state[leaf]);
+        double y = relativeY(helper, pool.y[leaf]);
+        helper.assertTrue(y > 1.8 && y < 2.0, "the simulated leaf left the still water: y " + y);
+        double drawn = y + pool.lift[leaf];
+        double crest = 1.0 + 8.0 / 9.0 + waves.lift(pool.x[leaf], pool.z[leaf]);
+        helper.assertTrue(Math.abs(drawn - crest) < 0.06, "the leaf is drawn at y " + drawn + ", the wave is at " + crest);
+        helper.assertTrue(lowest > 2.1, "the leaf fell into the wave down to y " + lowest + " before it landed on it");
+        float tilt = Mth.sqrt(pool.roll[leaf] * pool.roll[leaf] + pool.pitch[leaf] * pool.pitch[leaf]);
+        helper.assertTrue(tilt > 0.15F, "the leaf does not tilt with the wave: " + tilt);
+        sim.setWaves(WaterWaves.NONE);
+        run(sim, helper, 20);
+        helper.assertTrue(pool.state[leaf] == LeafPool.FLOATING && pool.lift[leaf] == 0.0F,
+                "without the waves the leaf is not back on the still water: lift " + pool.lift[leaf]);
         helper.succeed();
     }
 

@@ -64,6 +64,9 @@ public final class LeafPool {
     public final float[] swirl;
     /** Surface the leaf touched down on. */
     public final double[] ground;
+    /** How far the leaf is drawn above its simulated height: riding the waves of another mod on the water. */
+    public final float[] lift;
+    public final float[] prevLift;
 
     /** Color as drawn, and the color of the tree it came from (what the litter remembers). */
     public final int[] color;
@@ -110,6 +113,8 @@ public final class LeafPool {
         auxB = new float[capacity];
         swirl = new float[capacity];
         ground = new double[capacity];
+        lift = new float[capacity];
+        prevLift = new float[capacity];
         color = new int[capacity];
         baseColor = new int[capacity];
         light = new int[capacity];
@@ -170,5 +175,6 @@ public final class LeafPool {
         prevYaw[leaf] = yaw[leaf];
         prevPitch[leaf] = pitch[leaf];
         prevRoll[leaf] = roll[leaf];
+        prevLift[leaf] = lift[leaf];
     }
 }

@@ -67,6 +67,8 @@ No keys. Just play:
 | `leaves.leafSize` | `1.0` | Size of the leaves |
 | `leaves.autumnColors` | `0.35` | Share of leaves in autumn colors |
 | `leaves.immersiveWeatheringPiles` | `true` | Draw Immersive Weathering's leaf piles as leaf litter |
+| `leaves.realisticWaves` | `true` | With Realistic Waves: floating leaves ride its waves (off = flat vanilla water level) |
+| `leaves.fallingLeavesMod` | `false` | With Falling Leaves: keep its leaf particles as well (off = only Rustling Leaves' leaves fall) |
 | `leaves.leavesPerBreak` | `14` | Leaves released by a broken or decayed leaves block |
 | `physics.windStrength` | `1.0` | Wind strength (0 = still air) |
 | `physics.windEvents` | `1.0` | How often squalls and whirlwinds happen (0 = never) |
@@ -95,6 +97,10 @@ Leaf litter is saved in `saves/<world>/rustling_leaves/` (singleplayer) or `rust
 [![Serene Seasons](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/compat/serene-seasons.png)](https://www.curseforge.com/minecraft/mc-mods/serene-seasons) ✅ **[Serene Seasons](https://www.curseforge.com/minecraft/mc-mods/serene-seasons)** (optional) - leaf fall is an autumn event: more and more red and yellow leaves, bare ground again early in winter.
 
 [![Immersive Weathering: Renewed](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/compat/immersive-weathering.png)](https://modrinth.com/mod/immersive-weather-renewed) ✅ **[Immersive Weathering: Renewed](https://modrinth.com/mod/immersive-weather-renewed)** (optional) - its leaf piles are drawn as soft Rustling Leaves litter that merges with the forest floor.
+
+[![Realistic Waves](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/compat/realistic-waves.png)](https://www.curseforge.com/minecraft/mc-mods/realistic-waves) ✅ **[Realistic Waves](https://www.curseforge.com/minecraft/mc-mods/realistic-waves)** (optional) - leaves floating on the sea ride its swell and surf, rising, sinking and tilting with every wave.
+
+[![Falling Leaves](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/compat/falling-leaves.png)](https://www.curseforge.com/minecraft/mc-mods/falling-leaves-forge) ✅ **[Falling Leaves](https://www.curseforge.com/minecraft/mc-mods/falling-leaves-forge)** - Rustling Leaves takes over its falling leaves, so trees do not shed twice (its snow from snowy leaves stays; a config option keeps both).
 
 ## Installation
 

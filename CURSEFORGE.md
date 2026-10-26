@@ -36,10 +36,14 @@ and whirlwinds.
 
 [![Immersive Weathering: Renewed](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/compat/immersive-weathering.png)](https://modrinth.com/mod/immersive-weather-renewed) ✅ **[Immersive Weathering: Renewed](https://modrinth.com/mod/immersive-weather-renewed)** (optional) - its leaf piles are drawn as soft Rustling Leaves litter that merges with the forest floor.
 
+[![Realistic Waves](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/compat/realistic-waves.png)](https://www.curseforge.com/minecraft/mc-mods/realistic-waves) ✅ **[Realistic Waves](https://www.curseforge.com/minecraft/mc-mods/realistic-waves)** (optional) - leaves floating on the sea ride its swell and surf, rising, sinking and tilting with every wave.
+
+[![Falling Leaves](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/compat/falling-leaves.png)](https://www.curseforge.com/minecraft/mc-mods/falling-leaves-forge) ✅ **[Falling Leaves](https://www.curseforge.com/minecraft/mc-mods/falling-leaves-forge)** - Rustling Leaves takes over its falling leaves, so trees do not shed twice (its snow from snowy leaves stays; a config option keeps both).
+
 ## ⚙️ Configuration
 
 The in-game config screen tunes everything: number of leaves, fall rate, how long litter lies, autumn colours, wind,
-whirlwinds, footsteps, raking, rustle volume and the seasons.
+whirlwinds, footsteps, raking, rustle volume, the seasons and the other mods it works with.
 
 ## 📸 Screenshots
 

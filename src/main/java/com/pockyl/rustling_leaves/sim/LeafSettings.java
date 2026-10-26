@@ -28,6 +28,10 @@ public final class LeafSettings {
     public boolean raking = true;
     /** Draw the leaf pile blocks of other mods (Immersive Weathering) as litter instead of their own models. */
     public boolean drawPileBlocks = true;
+    /** Floating leaves ride the waves another mod draws on the water (Realistic Waves). */
+    public boolean rideWaves = true;
+    /** Keep the leaf particles of other falling leaf mods (Falling Leaves) besides the simulated leaves. */
+    public boolean otherModLeaves = false;
 
     /**
      * In-game days a natural carpet of leaves lies before it has rotted away (thicker piles last longer); 0 keeps the

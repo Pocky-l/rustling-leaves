@@ -52,6 +52,13 @@ public final class LeafSimulation {
     private static final float STILL_SPEED = 0.003F;
     /** Strength of that pull, blocks per tick squared: a slow creep, not a rush. */
     private static final float MENISCUS_PULL = 0.0004F;
+    /**
+     * How fast the drawn height of a leaf may move towards the waves of another mod, blocks per tick: faster than any
+     * wave rises or falls, so a riding leaf follows it exactly, but a leaf that just landed or sank eases over.
+     */
+    private static final float WAVE_CATCH_UP = 0.15F;
+    /** Distance over which the slope of such waves is measured under a floating leaf. */
+    private static final double WAVE_PROBE = 0.25;
     /** Brightness of a soaked leaf. */
     public static final float WET_SHADE = 0.76F;
     /** Share of leaves that tumble instead of fluttering (in nature: long, stiff leaves). */
@@ -98,7 +105,9 @@ public final class LeafSimulation {
     private final int[] direction = new int[1];
     private final LitterField.Spill spill = this::spill;
     private final BlockPos.MutableBlockPos pileProbe = new BlockPos.MutableBlockPos();
+    private final BlockPos.MutableBlockPos waveProbe = new BlockPos.MutableBlockPos();
     private TreeLeaves pileLook;
+    private WaterWaves waves = WaterWaves.NONE;
     private final List<GrowingPile> growingPiles = new ArrayList<>();
     private int tick;
     private int cascadeBudget;
@@ -187,6 +196,10 @@ public final class LeafSimulation {
                 default -> {
                 }
             }
+            if (pool.lift[i] != 0.0F && pool.state[i] != LeafPool.FLOATING) {
+                // Off the waves (sinking, blown away): drawn back down to where it really is.
+                pool.lift[i] -= Mth.clamp(pool.lift[i], -WAVE_CATCH_UP, WAVE_CATCH_UP);
+            }
         }
         if (!growingPiles.isEmpty()) {
             feedPiles();
@@ -215,6 +228,11 @@ public final class LeafSimulation {
     /** Top of the collision box containing the point, or NaN when the point is free. Foliage is never solid. */
     public double solidTop(double x, double y, double z) {
         return terrain.solidTop(x, y, z);
+    }
+
+    /** Lets floating leaves ride the waves another mod draws on the water ({@link WaterWaves#NONE}: flat water). */
+    public void setWaves(WaterWaves waves) {
+        this.waves = waves;
     }
 
     /** Points the simulation at a level without ticking (for seeding before the first tick). */
@@ -312,6 +330,8 @@ public final class LeafSimulation {
         pool.light[i] = level != null ? terrain.lightAt(x, y + 0.1, z) : 0xF000F0;
         pool.age[i] = 0;
         pool.life[i] = 0;
+        pool.lift[i] = 0.0F;
+        pool.prevLift[i] = 0.0F;
     }
 
     private boolean underwater(double x, double y, double z) {
@@ -364,6 +384,9 @@ public final class LeafSimulation {
             return;
         }
         BlockState here = level.getBlockState(cursor);
+        if (waves != WaterWaves.NONE && here.isAir() && landOnWave(i, x, y, z)) {
+            return;
+        }
         boolean foliage = here.is(BlockTags.LEAVES);
         if (!foliage && !here.isAir()) {
             FluidState fluid = here.getFluidState();
@@ -750,6 +773,27 @@ public final class LeafSimulation {
     // Floating
     // ------------------------------------------------------------------------------------------------------------
 
+    /**
+     * A leaf coming down over water that another mod draws as a wave crest lands on the crest, where it is seen to
+     * touch the water, instead of passing into the wave down to the still water level.
+     */
+    private boolean landOnWave(int i, double x, double y, double z) {
+        waveProbe.set(Mth.floor(x), Mth.floor(y) - 1, Mth.floor(z));
+        FluidState fluid = level.getFluidState(waveProbe);
+        if (!fluid.is(FluidTags.WATER)) {
+            return false;
+        }
+        double surface = waveProbe.getY() + fluid.getHeight(level, waveProbe);
+        float lift = waves.lift(x, z);
+        if (!(lift > 0.0F) || y > surface + lift) {
+            return false;
+        }
+        startFloating(i, surface);
+        // Simulated on the still water from now on, drawn where it touched the crest.
+        pool.lift[i] = (float) (y - pool.y[i]);
+        return true;
+    }
+
     private void startFloating(int i, double surface) {
         pool.state[i] = LeafPool.FLOATING;
         pool.y[i] = surface + 0.015;
@@ -796,6 +840,7 @@ public final class LeafSimulation {
         if (fluid.hasProperty(FlowingFluid.FALLING) && fluid.getValue(FlowingFluid.FALLING)) {
             // In a waterfall: carried down with the water, tumbling.
             pool.y[i] -= 0.3;
+            pool.lift[i] -= Mth.clamp(pool.lift[i], -WAVE_CATCH_UP, WAVE_CATCH_UP);
             pool.vx[i] *= 0.8F;
             pool.vz[i] *= 0.8F;
             pool.x[i] += pool.vx[i];
@@ -917,6 +962,18 @@ public final class LeafSimulation {
         pool.x[i] = x;
         pool.y[i] = y + height - soak * 0.01;
         pool.z[i] = z;
+        float waveSlopeX = 0.0F;
+        float waveSlopeZ = 0.0F;
+        float lift = waves.lift(x, z);
+        if (Float.isNaN(lift)) {
+            lift = 0.0F;
+        } else {
+            float east = waves.lift(x + WAVE_PROBE, z);
+            float south = waves.lift(x, z + WAVE_PROBE);
+            waveSlopeX = Float.isNaN(east) ? 0.0F : (east - lift) / (float) WAVE_PROBE;
+            waveSlopeZ = Float.isNaN(south) ? 0.0F : (south - lift) / (float) WAVE_PROBE;
+        }
+        pool.lift[i] += Mth.clamp(lift - pool.lift[i], -WAVE_CATCH_UP, WAVE_CATCH_UP);
 
         // Turning: lined up with the current like a weather vane, spun by its swirl, a little jitter.
         float flowSpeed = Mth.sqrt(pool.auxA[i] * pool.auxA[i] + pool.auxB[i] * pool.auxB[i]);
@@ -928,11 +985,15 @@ public final class LeafSimulation {
         float jitter = calm ? 0.0F : (random.next() - 0.5F) * 0.003F;
         pool.spinYaw[i] = pool.spinYaw[i] * 0.9F + (calm ? 0.0F : pool.swirl[i] * 0.04F + vane) + jitter;
         pool.yaw[i] += pool.spinYaw[i];
-        // Flat on the water, following only the gentle slope of the ripples.
+        // Flat on the water, following the gentle slope of the ripples (and the waves it rides).
         float sin = Mth.sin(pool.yaw[i]);
         float cos = Mth.cos(pool.yaw[i]);
-        pool.roll[i] += ((float) Math.atan(slopeX * cos - slopeZ * sin) * 1.5F - pool.roll[i]) * 0.4F;
-        pool.pitch[i] += ((float) -Math.atan(slopeX * sin + slopeZ * cos) * 1.5F - pool.pitch[i]) * 0.4F;
+        float roll = (float) Math.atan(slopeX * cos - slopeZ * sin) * 1.5F
+                + (float) Math.atan(waveSlopeX * cos - waveSlopeZ * sin);
+        float pitch = (float) -Math.atan(slopeX * sin + slopeZ * cos) * 1.5F
+                - (float) Math.atan(waveSlopeX * sin + waveSlopeZ * cos);
+        pool.roll[i] += (roll - pool.roll[i]) * 0.4F;
+        pool.pitch[i] += (pitch - pool.pitch[i]) * 0.4F;
     }
 
     /** Whether a floating leaf can be at (x, z): the water reaches up to this surface block there and nothing solid. */
