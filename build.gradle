@@ -52,6 +52,8 @@ legacyForge {
 
         gameTestServer {
             type = 'gameTestServer'
+            // Own directory: in run/ it would test inside the dev client's world instead of a fresh flat one.
+            gameDirectory = project.file('run/gametest')
             systemProperty 'forge.enabledGameTestNamespaces', project.mod_id
         }
 
@@ -93,6 +95,20 @@ dependencies {
     // Its config classes (for the dimension whitelist) extend GlitchCore's.
     modCompileOnly "com.github.glitchfiend:GlitchCore-forge:${minecraft_version}-${glitchcore_version}"
 }
+
+// Forge 1.20.1 runs the game tests on a dedicated server, in a world made from server.properties: a flat one, so the
+// tests do not meet hills, oceans, caves and snowy biomes around their small areas.
+var prepareGameTestServer = tasks.register('prepareGameTestServer') {
+    var dir = project.file('run/gametest')
+    outputs.file(new File(dir, 'server.properties'))
+    doLast {
+        dir.mkdirs()
+        new File(dir, 'server.properties').text = [
+                'level-type=minecraft:flat', 'generate-structures=false', 'spawn-protection=0'
+        ].join(System.lineSeparator()) + System.lineSeparator()
+    }
+}
+tasks.named('runGameTestServer') { dependsOn prepareGameTestServer }
 
 var generateModMetadata = tasks.register('generateModMetadata', ProcessResources) {
     var replaceProperties = [
