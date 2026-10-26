@@ -4,6 +4,8 @@
   "rustling_leaves.configuration.section.rustling.leaves.client.toml.title": "Листья",
   "rustling_leaves.configuration.leaves": "Листья",
   "rustling_leaves.configuration.maxLeaves": "Максимум летящих листьев",
+  "commands.rustling_leaves.fallrate.get": "Частота листопада: %s (1 = обычная)",
+  "commands.rustling_leaves.fallrate.set": "Частота листопада: %s",
   "rustling_leaves.configuration.fallRate": "Частота листопада",
   "rustling_leaves.configuration.treeFallRates": "Листопад зависит от дерева",
   "rustling_leaves.configuration.spawnRadius": "Радиус листопада (блоков)",
