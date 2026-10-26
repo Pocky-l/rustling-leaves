@@ -66,6 +66,7 @@ No keys. Just play:
 | `leaves.litterLifetime` | `10.0` | In-game days until a carpet of fallen leaves has rotted away (piles last longer, 0 = never) |
 | `leaves.litterDistance` | `128` | How far lying leaves are shown (capped by the render distance) |
 | `leaves.leafSize` | `1.0` | Size of the leaves |
+| `leaves.oldLeafTextures` | `false` | Draw leaves with the mod's original textures (leaf shapes, needles, petals) instead of the falling leaves of newer Minecraft versions |
 | `leaves.autumnColors` | `0.35` | Share of leaves in autumn colors |
 | `leaves.immersiveWeatheringPiles` | `true` | Draw Immersive Weathering's leaf piles as leaf litter |
 | `leaves.realisticWaves` | `true` | With Realistic Waves: floating leaves ride its waves (off = flat vanilla water level) |

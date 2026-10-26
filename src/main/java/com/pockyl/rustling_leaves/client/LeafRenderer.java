@@ -112,10 +112,12 @@ final class LeafRenderer implements AutoCloseable {
     private final VertexBuffer moving = new VertexBuffer(VertexBuffer.Usage.DYNAMIC);
     private boolean movingEmpty = true;
     private boolean shaderPack;
-    private final float[] u0 = new float[LeafShape.SPRITE_COUNT];
-    private final float[] v0 = new float[LeafShape.SPRITE_COUNT];
-    private final float[] u1 = new float[LeafShape.SPRITE_COUNT];
-    private final float[] v1 = new float[LeafShape.SPRITE_COUNT];
+    /** Whether the meshes were built with the mod's old leaf textures (option {@code oldLeafTextures}). */
+    private boolean oldTextures;
+    private final float[] u0 = new float[LeafShapes.SPRITES.length];
+    private final float[] v0 = new float[LeafShapes.SPRITES.length];
+    private final float[] u1 = new float[LeafShapes.SPRITES.length];
+    private final float[] v1 = new float[LeafShapes.SPRITES.length];
     private final int[] ringCount = new int[RING * RING];
     private final double[] ringBase = new double[RING * RING];
     private final double[] ringTop = new double[RING * RING];
@@ -255,8 +257,11 @@ final class LeafRenderer implements AutoCloseable {
         frame++;
         // While a shader pack is active, Iris reads BLOCK vertices in its larger terrain layout - also from buffers
         // that were built before: switching a pack on or off rebuilds every mesh, otherwise they come out garbled.
-        if (ShaderPacks.inUse() != shaderPack) {
-            shaderPack = !shaderPack;
+        // Switching the leaf textures rebuilds them too.
+        boolean old = simulation.settings().oldLeafTextures;
+        if (ShaderPacks.inUse() != shaderPack || old != oldTextures) {
+            shaderPack = ShaderPacks.inUse();
+            oldTextures = old;
             for (ChunkView view : views.values()) {
                 view.close();
             }
@@ -344,7 +349,7 @@ final class LeafRenderer implements AutoCloseable {
 
     private void updateSprites() {
         TextureAtlas atlas = Minecraft.getInstance().getModelManager().getAtlas(TextureAtlas.LOCATION_BLOCKS);
-        for (int s = 0; s < LeafShape.SPRITE_COUNT; s++) {
+        for (int s = 0; s < LeafShapes.SPRITES.length; s++) {
             TextureAtlasSprite sprite = atlas.getSprite(LeafShapes.SPRITES[s]);
             u0[s] = sprite.getU0();
             v0[s] = sprite.getV0();
@@ -640,7 +645,8 @@ final class LeafRenderer implements AutoCloseable {
                     // Leaves deeper in the pile are in its shadow.
                     float shade = Math.max(0.84F, 1.0F - depth * 0.04F);
                     emit(builder, (float) (pose.x - tile.originX), (float) (pose.y - tile.originY), (float) (pose.z - tile.originZ),
-                            pose.yaw, pose.pitch, pose.roll, pose.size, shade(pose.color, shade), light, pose.sprite);
+                            pose.yaw, pose.pitch, pose.roll, pose.size, shade(pose.color, shade), light,
+                            LeafShapes.slot(pose.shape, pose.sprite, oldTextures));
                     quads++;
                 }
             }
@@ -821,7 +827,7 @@ final class LeafRenderer implements AutoCloseable {
             int color = wet > 0.0F ? shade(pool.color[i], 1.0F - (1.0F - LeafSimulation.WET_SHADE) * wet) : pool.color[i];
             emit(builder, x, y, z, Mth.lerp(partialTick, pool.prevYaw[i], pool.yaw[i]),
                     Mth.lerp(partialTick, pool.prevPitch[i], pool.pitch[i]), Mth.lerp(partialTick, pool.prevRoll[i], pool.roll[i]),
-                    size, color, pool.light[i], pool.sprite[i]);
+                    size, color, pool.light[i], LeafShapes.slot(pool.shape[i], pool.sprite[i], oldTextures));
         }
         MeshData mesh = builder.build();
         movingEmpty = mesh == null;

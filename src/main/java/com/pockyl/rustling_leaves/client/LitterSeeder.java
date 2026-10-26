@@ -44,6 +44,9 @@ final class LitterSeeder {
     private final float[] density = new float[256];
     private final double[] blockGround = new double[256];
     private final double[] ground = new double[256 * 16];
+    /** Tree color and leaf shape of every block that gets leaves (valid where its ground is known). */
+    private final int[] blockColor = new int[256];
+    private final int[] blockShape = new int[256];
 
     LitterSeeder(LeafColors colors) {
         this.colors = colors;
@@ -150,6 +153,8 @@ final class LitterSeeder {
                 int z = originZ + bz;
                 int color = colors.base(treeState, level, cursor.set(x, Mth.floor(here), z));
                 int shape = LeafShapes.of(treeState.getBlock()).ordinal();
+                blockColor[b] = color;
+                blockShape[b] = shape;
                 // Hollows collect leaves, humps and ledges shed them.
                 float relief = (float) Mth.clamp(neighborGround(bx, bz, here) - here, -1.0, 1.0);
                 float terrain = Mth.clamp(1.0F + relief * 1.5F, 0.3F, 2.0F);
@@ -268,9 +273,9 @@ final class LitterSeeder {
             return;
         }
         double centerGround = ground[column * 16 + 5];
-        int sourceCell = LitterField.index((originX + (column & 15)) * 4 + 1, (originZ + (column >> 4)) * 4 + 1);
-        int pileColor = chunk.color[sourceCell];
-        int pileShape = chunk.shape[sourceCell];
+        // The tree over the pile, not the litter of one cell: that cell may have got no leaves (no color yet).
+        int pileColor = blockColor[column];
+        int pileShape = blockShape[column];
         float radius = 0.8F + unit(hash >>> 13) * 0.9F;
         float peak = 10.0F + unit(hash >>> 29) * 14.0F;
         double centerX = originX + (column & 15) + 0.5;
