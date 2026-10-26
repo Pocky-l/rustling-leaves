@@ -28,6 +28,19 @@ final class LeafShapes {
             RustlingLeaves.id("block/leaf/needle"),
             RustlingLeaves.id("block/leaf/petal"),
     };
+    /**
+     * Shadow sprites: white silhouettes with hard pixel edges, drawn translucent black by the renderer - leaf and
+     * petal for falling leaves, a square for the ground around piles.
+     */
+    static final ResourceLocation[] SHADOW_SPRITES = {
+            RustlingLeaves.id("block/leaf/shadow/leaf"),
+            RustlingLeaves.id("block/leaf/shadow/petal"),
+            RustlingLeaves.id("block/leaf/shadow/cell"),
+    };
+    static final int SHADOW_LEAF = 0;
+    static final int SHADOW_PETAL = 1;
+    static final int SHADOW_CELL = 2;
+
     /** First old sprite and number of old sprites of every shape (option {@code oldLeafTextures}). */
     private static final int[] OLD_FIRST = {6, 9, 10, 11};
     private static final int[] OLD_VARIANTS = {3, 1, 1, 1};

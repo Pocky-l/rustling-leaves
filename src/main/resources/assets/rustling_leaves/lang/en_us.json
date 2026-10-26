@@ -10,6 +10,7 @@
   "rustling_leaves.configuration.treeFallRates": "Fall Rate Depends on the Tree",
   "rustling_leaves.configuration.spawnRadius": "Falling Radius (blocks)",
   "rustling_leaves.configuration.leafSize": "Leaf Size",
+  "rustling_leaves.configuration.shadows": "Pixel Shadows",
   "rustling_leaves.configuration.oldLeafTextures": "Old Leaf Textures of the Mod",
   "rustling_leaves.configuration.autumnColors": "Autumn Colors",
   "rustling_leaves.configuration.leavesPerBreak": "Leaves per Broken Block",

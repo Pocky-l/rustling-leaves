@@ -38,6 +38,7 @@ import com.pockyl.rustling_leaves.sim.LitterChunk;
 import com.pockyl.rustling_leaves.sim.LitterField;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
@@ -62,6 +63,43 @@ final class LeafRenderer implements AutoCloseable {
                     .setTextureState(RenderStateShard.BLOCK_SHEET_MIPPED)
                     .setCullState(RenderStateShard.NO_CULL)
                     .createCompositeState(false));
+    /**
+     * Pixel shadows: translucent black silhouettes with hard pixel edges, laid on the ground like vanilla's decals -
+     * the vanilla translucent terrain shader (Iris swaps it for the pack's translucent program), the block atlas
+     * WITHOUT mipmaps (the edges stay pixel-sharp at a distance), no depth writes and the decal polygon offset, so
+     * they neither hide what is behind them nor flicker against the ground.
+     */
+    private static final RenderType SHADOWS = RenderType.create(RustlingLeaves.MOD_ID + "_leaf_shadows",
+            DefaultVertexFormat.BLOCK, VertexFormat.Mode.QUADS, 1 << 16, false, false, RenderType.CompositeState.builder()
+                    .setLightmapState(RenderStateShard.LIGHTMAP)
+                    .setShaderState(RenderStateShard.RENDERTYPE_TRANSLUCENT_SHADER)
+                    .setTextureState(RenderStateShard.BLOCK_SHEET)
+                    .setTransparencyState(RenderStateShard.TRANSLUCENT_TRANSPARENCY)
+                    .setWriteMaskState(RenderStateShard.COLOR_WRITE)
+                    .setCullState(RenderStateShard.NO_CULL)
+                    .setLayeringState(RenderStateShard.POLYGON_OFFSET_LAYERING)
+                    .createCompositeState(false));
+    /**
+     * Opacity of a falling leaf's shadow right at the ground; it fades in steps (pixel-art style, no smooth gradient)
+     * until {@link #SHADOW_MAX_HEIGHT}.
+     */
+    private static final float SHADOW_ALPHA = 0.42F;
+    private static final int SHADOW_STEPS = 4;
+    private static final float SHADOW_MAX_HEIGHT = 4.0F;
+    /** Opacity of the shadow on the ground next to a pile and one cell further out. */
+    private static final float FOOT_ALPHA_NEAR = 0.34F;
+    private static final float FOOT_ALPHA_FAR = 0.17F;
+    /** Shadows on the ground lie this far above it (plus the polygon offset). */
+    private static final float SHADOW_LIFT = 0.003F;
+    /**
+     * A leaf lying on a pile casts its silhouette, darkened, onto the leaves below: this much darker than the pile's
+     * colour, one leaf pixel towards +X/+Z (light from the north-west, like the pixel art of the textures).
+     */
+    private static final float DROP_SHADE = 0.5F;
+    /** Stacks at least this deep shade the ground around their foot. */
+    private static final int FOOT_SHADOW_MIN = 6;
+    /** How much a cell under taller neighbours is darkened at most (cavities and the foot of a pile slope). */
+    private static final float OCCLUSION = 0.32F;
     private static final long REBUILD_BUDGET_NANOS = 3_000_000L;
     private static final double DETAIL_DISTANCE = 40.0;
     /** Beyond this distance (to the chunk center) a chunk is drawn as one coarse mesh; 8 blocks of hysteresis. */
@@ -100,6 +138,8 @@ final class LeafRenderer implements AutoCloseable {
     private static final int TEX_SPARSE = 1;
     private static final int TEX_LAYER = 2;
     private static final int RING = LitterChunk.TILE + 2;
+    /** The tile and two cells around it, the reach of the shadow at the foot of a stack. */
+    private static final int FOOT = LitterChunk.TILE + 4;
     private static final float TILE_BLOCKS = LitterChunk.TILE * LitterField.CELL;
 
     private final LeafSimulation simulation;
@@ -109,9 +149,21 @@ final class LeafRenderer implements AutoCloseable {
     private final List<Mesh> dirty = new ArrayList<>();
     private final LitterField.Pose pose = new LitterField.Pose();
     private final ByteBufferBuilder bytes = new ByteBufferBuilder(1 << 18);
+    private final ByteBufferBuilder shadowBytes = new ByteBufferBuilder(1 << 16);
     private final VertexBuffer moving = new VertexBuffer(VertexBuffer.Usage.DYNAMIC);
+    private final VertexBuffer movingShadows = new VertexBuffer(VertexBuffer.Usage.DYNAMIC);
     private boolean movingEmpty = true;
+    private boolean movingShadowsEmpty = true;
     private boolean shaderPack;
+    /** Whether the meshes were built with shadows (option {@code shadows}). */
+    private boolean shadows;
+    private final float[] shadowU0 = new float[LeafShapes.SHADOW_SPRITES.length];
+    private final float[] shadowV0 = new float[LeafShapes.SHADOW_SPRITES.length];
+    private final float[] shadowU1 = new float[LeafShapes.SHADOW_SPRITES.length];
+    private final float[] shadowV1 = new float[LeafShapes.SHADOW_SPRITES.length];
+    /** Shadow on the ground of the tile's cells and a margin of two cells: 0 none, 1 sparse, 2 dense. */
+    private final byte[] footShadow = new byte[FOOT * FOOT];
+    private final double[] footGround = new double[FOOT * FOOT];
     /** Whether the meshes were built with the mod's old leaf textures (option {@code oldLeafTextures}). */
     private boolean oldTextures;
     private final float[] u0 = new float[LeafShapes.SPRITES.length];
@@ -159,6 +211,8 @@ final class LeafRenderer implements AutoCloseable {
         AABB bounds;
         VertexBuffer buffer;
         boolean empty = true;
+        VertexBuffer shadowBuffer;
+        boolean shadowEmpty = true;
         int builtRevision = Integer.MIN_VALUE;
         double distanceSq;
         int quads;
@@ -176,6 +230,11 @@ final class LeafRenderer implements AutoCloseable {
                 buffer.close();
                 buffer = null;
             }
+            if (shadowBuffer != null) {
+                shadowBuffer.close();
+                shadowBuffer = null;
+            }
+            shadowEmpty = true;
             builtRevision = Integer.MIN_VALUE;
         }
     }
@@ -259,9 +318,11 @@ final class LeafRenderer implements AutoCloseable {
         // that were built before: switching a pack on or off rebuilds every mesh, otherwise they come out garbled.
         // Switching the leaf textures rebuilds them too.
         boolean old = simulation.settings().oldLeafTextures;
-        if (ShaderPacks.inUse() != shaderPack || old != oldTextures) {
+        boolean shadowsOn = simulation.settings().shadows;
+        if (ShaderPacks.inUse() != shaderPack || old != oldTextures || shadowsOn != shadows) {
             shaderPack = ShaderPacks.inUse();
             oldTextures = old;
+            shadows = shadowsOn;
             for (ChunkView view : views.values()) {
                 view.close();
             }
@@ -315,6 +376,53 @@ final class LeafRenderer implements AutoCloseable {
         VertexBuffer.unbind();
         shader.clear();
         LEAVES.clearRenderState();
+        if (shadows) {
+            renderShadows(frustum, modelView, projection, cam);
+        }
+    }
+
+    /** The shadows of the detailed tiles and of the falling leaves, in their own pass (see {@link #SHADOWS}). */
+    private void renderShadows(Frustum frustum, Matrix4f modelView, Matrix4f projection, Vec3 cam) {
+        SHADOWS.setupRenderState();
+        ShaderInstance shader = RenderSystem.getShader();
+        if (shader == null) {
+            SHADOWS.clearRenderState();
+            return;
+        }
+        shader.setDefaultUniforms(VertexFormat.Mode.QUADS, modelView, projection, Minecraft.getInstance().getWindow());
+        shader.apply();
+        Uniform offset = shader.CHUNK_OFFSET;
+        for (ChunkView view : views.values()) {
+            if (!drawnChunk(view.chunk.x, view.chunk.z) || view.drawFar()) {
+                continue;
+            }
+            for (Tile tile : view.tiles) {
+                if (tile == null || tile.shadowBuffer == null || tile.shadowEmpty || tile.bounds == null
+                        || !frustum.isVisible(tile.bounds)) {
+                    continue;
+                }
+                if (offset != null) {
+                    offset.set((float) (tile.originX - cam.x), (float) (tile.originY - cam.y), (float) (tile.originZ - cam.z));
+                    offset.upload();
+                }
+                tile.shadowBuffer.bind();
+                tile.shadowBuffer.draw();
+            }
+        }
+        if (!movingShadowsEmpty) {
+            if (offset != null) {
+                offset.set(0.0F, 0.0F, 0.0F);
+                offset.upload();
+            }
+            movingShadows.bind();
+            movingShadows.draw();
+        }
+        if (offset != null) {
+            offset.set(0.0F, 0.0F, 0.0F);
+        }
+        VertexBuffer.unbind();
+        shader.clear();
+        SHADOWS.clearRenderState();
     }
 
     /**
@@ -355,6 +463,13 @@ final class LeafRenderer implements AutoCloseable {
             v0[s] = sprite.getV0();
             u1[s] = sprite.getU1();
             v1[s] = sprite.getV1();
+        }
+        for (int s = 0; s < LeafShapes.SHADOW_SPRITES.length; s++) {
+            TextureAtlasSprite sprite = atlas.getSprite(LeafShapes.SHADOW_SPRITES[s]);
+            shadowU0[s] = sprite.getU0();
+            shadowV0[s] = sprite.getV0();
+            shadowU1[s] = sprite.getU1();
+            shadowV1[s] = sprite.getV1();
         }
         ResourceLocation[] layers = {LeafShapes.LITTER, LeafShapes.LITTER_SPARSE, LeafShapes.LITTER_LAYER};
         for (int t = 0; t < layers.length; t++) {
@@ -604,10 +719,14 @@ final class LeafRenderer implements AutoCloseable {
         }
         tile.originY = Math.floor(minY);
         currentOriginY = tile.originY;
-        tile.bounds = new AABB(tile.originX - 0.3, minY - 0.2, tile.originZ - 0.3, tile.originX + TILE_BLOCKS + 0.3, maxY + 0.3,
-                tile.originZ + TILE_BLOCKS + 0.3);
+        tile.bounds = new AABB(tile.originX - 0.6, minY - 0.3, tile.originZ - 0.6, tile.originX + TILE_BLOCKS + 0.6, maxY + 0.3,
+                tile.originZ + TILE_BLOCKS + 0.6);
         loadRing(tile);
         BufferBuilder builder = new BufferBuilder(bytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
+        boolean detailShadows = shadows && tile.wantDetailed;
+        if (detailShadows) {
+            Arrays.fill(footShadow, (byte) 0);
+        }
         int quads = 0;
         for (int lz = 0; lz < LitterChunk.TILE; lz++) {
             for (int lx = 0; lx < LitterChunk.TILE; lx++) {
@@ -620,6 +739,10 @@ final class LeafRenderer implements AutoCloseable {
                 }
                 double base = chunk.base[i];
                 double top = base + n * LitterField.LAYER;
+                float occlusion = shadows ? occlusion(lx, lz, base, top) : 1.0F;
+                if (detailShadows && n >= FOOT_SHADOW_MIN) {
+                    markFootShadow(tile, lx, lz, base, top);
+                }
                 double lowest = Math.min(Math.min(neighborTop(cellX + 1, cellZ, base), neighborTop(cellX - 1, cellZ, base)),
                         Math.min(neighborTop(cellX, cellZ + 1, base), neighborTop(cellX, cellZ - 1, base)));
                 int side = Mth.clamp(Mth.ceil((top - lowest) / LitterField.LAYER), 0, MAX_SIDE_LAYERS);
@@ -629,10 +752,11 @@ final class LeafRenderer implements AutoCloseable {
                     // Carpet: a leaf layer with gaps over the ground. Pile: a solid shadowed body under that layer.
                     if (n >= BODY_MIN) {
                         emitSurface(builder, tile, lx, lz, base, light, TEX_BODY, tile.wantDetailed ? BODY_SINK : MID_BODY_SINK,
-                                BODY_SHADE);
+                                BODY_SHADE * occlusion);
                         quads++;
                     }
-                    emitSurface(builder, tile, lx, lz, base, light, n >= DENSE_MIN ? TEX_LAYER : TEX_SPARSE, LAYER_SINK, 1.0F);
+                    emitSurface(builder, tile, lx, lz, base, light, n >= DENSE_MIN ? TEX_LAYER : TEX_SPARSE, LAYER_SINK,
+                            occlusion);
                     quads++;
                     // Beyond the detail distance the leaf layer stands for the loose leaves: single leaves there are
                     // smaller than a few pixels and only flicker.
@@ -640,13 +764,23 @@ final class LeafRenderer implements AutoCloseable {
                     layers = tile.wantDetailed ? SURFACE_TOP_LAYERS : 0;
                 }
                 int visible = Math.min(n, layers + (tile.wantDetailed ? side : side / 2));
+                int self = (lz + 1) * RING + lx + 1;
                 for (int depth = 0; depth < visible; depth++) {
                     field.pose(chunk, cellX, cellZ, n - 1 - depth, pose);
                     // Leaves deeper in the pile are in its shadow.
-                    float shade = Math.max(0.84F, 1.0F - depth * 0.04F);
-                    emit(builder, (float) (pose.x - tile.originX), (float) (pose.y - tile.originY), (float) (pose.z - tile.originZ),
-                            pose.yaw, pose.pitch, pose.roll, pose.size, shade(pose.color, shade), light,
-                            LeafShapes.slot(pose.shape, pose.sprite, oldTextures));
+                    float shade = Math.max(0.84F, 1.0F - depth * 0.04F) * occlusion;
+                    int sprite = LeafShapes.slot(pose.shape, pose.sprite, oldTextures);
+                    float px = (float) (pose.x - tile.originX);
+                    float py = (float) (pose.y - tile.originY);
+                    float pz = (float) (pose.z - tile.originZ);
+                    if (detailShadows && n >= SURFACE_MIN && depth < 2) {
+                        // The leaf's silhouette, darker, one leaf pixel aside and just under it: a pixel-art drop shadow.
+                        float step = pose.size * 0.4F;
+                        emit(builder, px + step, py - 0.004F, pz + step, pose.yaw, pose.pitch, pose.roll, pose.size,
+                                shade(ringColor[self], DROP_SHADE * occlusion), light, sprite);
+                        quads++;
+                    }
+                    emit(builder, px, py, pz, pose.yaw, pose.pitch, pose.roll, pose.size, shade(pose.color, shade), light, sprite);
                     quads++;
                 }
             }
@@ -663,6 +797,132 @@ final class LeafRenderer implements AutoCloseable {
         tile.buffer.bind();
         tile.buffer.upload(mesh);
         tile.empty = false;
+        buildFootShadows(tile, detailShadows);
+    }
+
+    /**
+     * Light that reaches a cell between taller stacks, from 1 (open) down to {@code 1 - OCCLUSION}: the sides and the
+     * foot of a pile and hollows in it are darker than its crest, in steps of 0.04 like a pixel-art shading ramp.
+     */
+    private float occlusion(int lx, int lz, double base, double top) {
+        float sum = 0.0F;
+        for (int dz = -1; dz <= 1; dz++) {
+            for (int dx = -1; dx <= 1; dx++) {
+                if (dx == 0 && dz == 0) {
+                    continue;
+                }
+                int r = (lz + 1 + dz) * RING + lx + 1 + dx;
+                if (ringCount[r] > 0 && Math.abs(ringBase[r] - base) <= LitterField.SAME_LEVEL) {
+                    sum += (float) Mth.clamp((ringTop[r] - top) / 0.12, 0.0, 1.0);
+                }
+            }
+        }
+        float shade = 1.0F - OCCLUSION * Math.min(1.0F, sum / 4.0F);
+        return Math.round(shade * 25.0F) / 25.0F;
+    }
+
+    /**
+     * Shades the ground around a stack that rises above it: the cells next to it get the dense shadow, those two
+     * cells away the sparse one (only where the stack stands well above them). Cells with a leaf surface of their own
+     * are left alone, {@link #occlusion} shades those.
+     */
+    private void markFootShadow(Tile tile, int lx, int lz, double base, double top) {
+        for (int dz = -2; dz <= 2; dz++) {
+            for (int dx = -2; dx <= 2; dx++) {
+                int ring = Math.max(Math.abs(dx), Math.abs(dz));
+                if (ring == 0) {
+                    continue;
+                }
+                int f = (lz + dz + 2) * FOOT + lx + dx + 2;
+                int cellX = tile.cellX + lx + dx;
+                int cellZ = tile.cellZ + lz + dz;
+                LitterChunk chunk = field.chunkAtCell(cellX, cellZ);
+                if (chunk == null) {
+                    continue;
+                }
+                int i = LitterField.index(cellX, cellZ);
+                int n = chunk.count[i];
+                if (n >= SURFACE_MIN) {
+                    continue;
+                }
+                double ground = n > 0 ? chunk.base[i] : field.groundAt(cellX, cellZ, base);
+                if (Math.abs(ground - base) > LitterField.SAME_LEVEL) {
+                    continue;
+                }
+                double rise = top - ground;
+                byte level = ring == 1 ? (byte) (rise >= 0.15 ? 2 : rise >= 0.06 ? 1 : 0) : (byte) (rise >= 0.2 ? 1 : 0);
+                if (level > footShadow[f]) {
+                    footShadow[f] = level;
+                    footGround[f] = ground;
+                }
+            }
+        }
+    }
+
+    private void buildFootShadows(Tile tile, boolean detailShadows) {
+        BufferBuilder builder = new BufferBuilder(shadowBytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
+        if (detailShadows) {
+            for (int f = 0; f < footShadow.length; f++) {
+                byte level = footShadow[f];
+                if (level == 0) {
+                    continue;
+                }
+                int lx = f % FOOT - 2;
+                int lz = f / FOOT - 2;
+                double ground = footGround[f];
+                int light = simulation.lightAt(tile.originX + (lx + 0.5) * LitterField.CELL, ground + 0.05,
+                        tile.originZ + (lz + 0.5) * LitterField.CELL);
+                float x0 = lx * LitterField.CELL;
+                float z0 = lz * LitterField.CELL;
+                float x1 = x0 + LitterField.CELL;
+                float z1 = z0 + LitterField.CELL;
+                float y = (float) (ground - tile.originY) + SHADOW_LIFT;
+                flatQuad(builder, y, x0, z0, x0, z1, x1, z1, x1, z0, LeafShapes.SHADOW_CELL,
+                        shadowColor(level == 2 ? FOOT_ALPHA_NEAR : FOOT_ALPHA_FAR), light);
+            }
+        }
+        MeshData mesh = builder.build();
+        tile.shadowEmpty = mesh == null;
+        if (mesh == null) {
+            return;
+        }
+        if (tile.shadowBuffer == null) {
+            tile.shadowBuffer = new VertexBuffer(VertexBuffer.Usage.STATIC);
+        }
+        tile.shadowBuffer.bind();
+        tile.shadowBuffer.upload(mesh);
+    }
+
+    /** Black at {@code alpha} opacity. */
+    private static int shadowColor(float alpha) {
+        return Math.round(alpha * 255.0F) << 24;
+    }
+
+    /**
+     * A horizontal shadow quad through four corners (x, z) at height y with the whole shadow sprite {@code s} (its
+     * corners in the order u0v0, u0v1, u1v1, u1v0), wound counter-clockwise seen from above: shader packs take the
+     * normal from the winding.
+     */
+    private void flatQuad(BufferBuilder builder, float y, float x0, float z0, float x1, float z1, float x2, float z2, float x3,
+            float z3, int s, int color, int light) {
+        float su0 = shadowU0[s];
+        float sv0 = shadowV0[s];
+        float su1 = shadowU1[s];
+        float sv1 = shadowV1[s];
+        // y of (p2 - p0) x (p3 - p1): positive = counter-clockwise from above, else the corners go the other way round.
+        float cross = (z2 - z0) * (x3 - x1) - (x2 - x0) * (z3 - z1);
+        int overlay = OverlayTexture.NO_OVERLAY;
+        if (cross >= 0.0F) {
+            builder.addVertex(x0, y, z0, color, su0, sv0, overlay, light, 0.0F, 1.0F, 0.0F);
+            builder.addVertex(x1, y, z1, color, su0, sv1, overlay, light, 0.0F, 1.0F, 0.0F);
+            builder.addVertex(x2, y, z2, color, su1, sv1, overlay, light, 0.0F, 1.0F, 0.0F);
+            builder.addVertex(x3, y, z3, color, su1, sv0, overlay, light, 0.0F, 1.0F, 0.0F);
+        } else {
+            builder.addVertex(x0, y, z0, color, su0, sv0, overlay, light, 0.0F, 1.0F, 0.0F);
+            builder.addVertex(x3, y, z3, color, su1, sv0, overlay, light, 0.0F, 1.0F, 0.0F);
+            builder.addVertex(x2, y, z2, color, su1, sv1, overlay, light, 0.0F, 1.0F, 0.0F);
+            builder.addVertex(x1, y, z1, color, su0, sv1, overlay, light, 0.0F, 1.0F, 0.0F);
+        }
     }
 
     /** Ground under an empty ring cell near {@code base}, cached per tile build. */
@@ -807,6 +1067,8 @@ final class LeafRenderer implements AutoCloseable {
 
     private void buildMoving(Vec3 cam, Vector3f look, float partialTick) {
         BufferBuilder builder = new BufferBuilder(bytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
+        BufferBuilder shadowBuilder = shadows ? new BufferBuilder(shadowBytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK)
+                : null;
         for (int i = 0, highWater = pool.highWater(); i < highWater; i++) {
             byte state = pool.state[i];
             if (state == LeafPool.FREE || !drawnChunk(Mth.floor(pool.x[i]) >> 4, Mth.floor(pool.z[i]) >> 4)) {
@@ -825,9 +1087,22 @@ final class LeafRenderer implements AutoCloseable {
             }
             float wet = pool.wetness(i);
             int color = wet > 0.0F ? shade(pool.color[i], 1.0F - (1.0F - LeafSimulation.WET_SHADE) * wet) : pool.color[i];
-            emit(builder, x, y, z, Mth.lerp(partialTick, pool.prevYaw[i], pool.yaw[i]),
-                    Mth.lerp(partialTick, pool.prevPitch[i], pool.pitch[i]), Mth.lerp(partialTick, pool.prevRoll[i], pool.roll[i]),
-                    size, color, pool.light[i], LeafShapes.slot(pool.shape[i], pool.sprite[i], oldTextures));
+            float yaw = Mth.lerp(partialTick, pool.prevYaw[i], pool.yaw[i]);
+            float pitch = Mth.lerp(partialTick, pool.prevPitch[i], pool.pitch[i]);
+            float roll = Mth.lerp(partialTick, pool.prevRoll[i], pool.roll[i]);
+            emit(builder, x, y, z, yaw, pitch, roll, size, color, pool.light[i], LeafShapes.slot(pool.shape[i], pool.sprite[i], oldTextures));
+            float ground = pool.shadow[i];
+            if (shadowBuilder != null && state == LeafPool.FALLING && !Float.isNaN(ground)) {
+                float height = y - (float) (ground - cam.y);
+                if (height > 0.04F && height < SHADOW_MAX_HEIGHT) {
+                    int s = pool.shape[i] == LeafShape.PETAL.ordinal() ? LeafShapes.SHADOW_PETAL : LeafShapes.SHADOW_LEAF;
+                    // Fainter the higher the leaf, in a few even steps.
+                    int step = Math.min(SHADOW_STEPS - 1, (int) (height / SHADOW_MAX_HEIGHT * SHADOW_STEPS));
+                    float alpha = SHADOW_ALPHA * (SHADOW_STEPS - step) / SHADOW_STEPS;
+                    emitShadow(shadowBuilder, x, (float) (ground - cam.y) + SHADOW_LIFT, z, yaw, pitch, roll, size, s,
+                            shadowColor(alpha), pool.light[i]);
+                }
+            }
         }
         MeshData mesh = builder.build();
         movingEmpty = mesh == null;
@@ -836,6 +1111,33 @@ final class LeafRenderer implements AutoCloseable {
             moving.upload(mesh);
             VertexBuffer.unbind();
         }
+        MeshData shadowMesh = shadowBuilder == null ? null : shadowBuilder.build();
+        movingShadowsEmpty = shadowMesh == null;
+        if (shadowMesh != null) {
+            movingShadows.bind();
+            movingShadows.upload(shadowMesh);
+            VertexBuffer.unbind();
+        }
+    }
+
+    /**
+     * The shadow of a leaf in the sun high above: its quad (same basis as {@link #emit}) projected straight down onto
+     * the ground at {@code groundY}, so a leaf seen edge-on from above casts a thin sliver.
+     */
+    private void emitShadow(BufferBuilder builder, float x, float groundY, float z, float yaw, float pitch, float roll, float half,
+            int s, int color, int light) {
+        float sa = Mth.sin(yaw);
+        float ca = Mth.cos(yaw);
+        float sb = Mth.sin(pitch);
+        float cb = Mth.cos(pitch);
+        float sc = Mth.sin(roll);
+        float cc = Mth.cos(roll);
+        float ax = (ca * cc + sa * sb * sc) * half;
+        float az = (-sa * cc + ca * sb * sc) * half;
+        float bx = sa * cb * half;
+        float bz = ca * cb * half;
+        flatQuad(builder, groundY, x - ax - bx, z - az - bz, x - ax + bx, z - az + bz, x + ax + bx, z + az + bz, x + ax - bx,
+                z + az - bz, s, color, light);
     }
 
     private static int shade(int rgb, float factor) {
@@ -886,6 +1188,8 @@ final class LeafRenderer implements AutoCloseable {
         }
         views.clear();
         moving.close();
+        movingShadows.close();
         bytes.close();
+        shadowBytes.close();
     }
 }
