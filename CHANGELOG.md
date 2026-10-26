@@ -4,6 +4,11 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.1] - 2026-10-26
+### Changed
+- Falling leaves and cherry petals use the leaf and petal textures of the newest Minecraft versions, in three shades
+  each, still coloured by their tree and the season. Piles keep their textures.
+
 ## [2.2.0] - 2026-10-26
 ### Added
 - Raking is visible to other players: when someone rakes leaves together, everyone around sees their own leaves

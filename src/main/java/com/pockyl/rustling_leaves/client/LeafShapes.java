@@ -13,12 +13,12 @@ import java.util.Map;
 /** Client side of leaf shapes: the sprite of every sprite index and which shape a tree drops. */
 final class LeafShapes {
     static final ResourceLocation[] SPRITES = {
-            RustlingLeaves.id("block/leaf/broad_0"),
-            RustlingLeaves.id("block/leaf/broad_1"),
-            RustlingLeaves.id("block/leaf/broad_2"),
-            RustlingLeaves.id("block/leaf/round"),
-            RustlingLeaves.id("block/leaf/needle"),
-            RustlingLeaves.id("block/leaf/petal"),
+            RustlingLeaves.id("block/leaf/leaf_light"),
+            RustlingLeaves.id("block/leaf/leaf_mid"),
+            RustlingLeaves.id("block/leaf/leaf_dark"),
+            RustlingLeaves.id("block/leaf/petal_light"),
+            RustlingLeaves.id("block/leaf/petal_mid"),
+            RustlingLeaves.id("block/leaf/petal_dark"),
     };
 
     /** Seamless texture of densely packed leaves for the body of piles. */
