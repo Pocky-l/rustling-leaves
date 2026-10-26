@@ -32,7 +32,9 @@ public final class LeafSettings {
     public boolean raking = true;
     /** Draw the leaf pile blocks of other mods (Immersive Weathering) as litter instead of their own models. */
     public boolean drawPileBlocks = true;
-    /** Keep the leaf particles of other falling leaf mods (Living Wind) besides the simulated leaves. */
+    /** Floating leaves ride the waves another mod draws on the water (Realistic Waves). */
+    public boolean rideWaves = true;
+    /** Keep the leaf particles of other falling leaf mods (Falling Leaves, Living Wind) besides the simulated leaves. */
     public boolean otherModLeaves = false;
     /** Blow with the world wind of another mod (Living Wind) instead of the simulation's own wind. */
     public boolean followWorldWind = true;

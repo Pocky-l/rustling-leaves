@@ -41,6 +41,7 @@ import com.pockyl.rustling_leaves.Config;
 import com.pockyl.rustling_leaves.RustlingLeaves;
 import com.pockyl.rustling_leaves.client.compat.ImmersiveWeathering;
 import com.pockyl.rustling_leaves.client.compat.LivingWind;
+import com.pockyl.rustling_leaves.client.compat.RealisticWaves;
 import com.pockyl.rustling_leaves.client.compat.SereneSeasons;
 import com.pockyl.rustling_leaves.network.ModNetwork;
 import com.pockyl.rustling_leaves.network.RakePayload;
@@ -55,6 +56,7 @@ import com.pockyl.rustling_leaves.sim.LitterField;
 import com.pockyl.rustling_leaves.sim.PileBlocks;
 import com.pockyl.rustling_leaves.sim.SeasonCurve;
 import com.pockyl.rustling_leaves.sim.TreeLeaves;
+import com.pockyl.rustling_leaves.sim.WaterWaves;
 import com.pockyl.rustling_leaves.sim.WindSource;
 
 import java.nio.file.Path;
@@ -102,6 +104,8 @@ public final class LeafManager {
     private static final Int2IntOpenHashMap LAST_SWING = new Int2IntOpenHashMap();
 
     private static volatile boolean configChanged;
+    private static boolean wavesLookedUp;
+    private static RealisticWaves realisticWaves;
     private static boolean windLookedUp;
     private static LivingWind livingWind;
     private static LeafSimulation simulation;
@@ -137,6 +141,7 @@ public final class LeafManager {
                 reset();
             } else if (simulation != null) {
                 simulation.setPiles(PILES, TREES, SETTINGS.drawPileBlocks);
+                simulation.setWaves(waves());
                 simulation.setWindSource(windSource());
             }
             updatePileModels(minecraft);
@@ -152,6 +157,7 @@ public final class LeafManager {
             simulation = new LeafSimulation(SETTINGS, SETTINGS.maxLeaves, new Listener());
             simulation.setLevel(level);
             simulation.setPiles(PILES, TREES, SETTINGS.drawPileBlocks);
+            simulation.setWaves(waves());
             simulation.setWindSource(windSource());
             renderer = new LeafRenderer(simulation);
             storage = new LitterStorage(storageDirectory(minecraft, level));
@@ -298,12 +304,30 @@ public final class LeafManager {
         }
     }
 
+    /** Hooked into block updates of the client level. */
     /**
-     * Whether the leaf particles of other leaf mods (Living Wind) are left out: the simulation drops the leaves itself
-     * (unless the player keeps both). Called from their particle spawners.
+     * Called instead of a vanilla cherry petal particle under the cherry leaves at {@code pos}: drops a simulated petal
+     * there (scaled by the fall rate and the season). Returns false when the simulation is off, so the vanilla particle shows.
+     */
+    /**
+     * Whether the leaf particles of other leaf mods (Falling Leaves, Living Wind) are left out: the simulation drops the
+     * leaves itself (unless the player keeps both). Called from their particle spawners.
      */
     public static boolean replacesFallingLeaves() {
         return simulation != null && SETTINGS.fallRate > 0.0F && !SETTINGS.otherModLeaves;
+    }
+
+    /** The waves of Realistic Waves for the floating leaves, if installed and wanted. */
+    private static WaterWaves waves() {
+        if (!SETTINGS.rideWaves || !ModList.get().isLoaded(RealisticWaves.MOD_ID)) {
+            return WaterWaves.NONE;
+        }
+        if (!wavesLookedUp) {
+            // Looked up on first use: this class loads with the config, long before the other mod is ready.
+            wavesLookedUp = true;
+            realisticWaves = RealisticWaves.find();
+        }
+        return realisticWaves != null ? realisticWaves : WaterWaves.NONE;
     }
 
     /** The world wind of Living Wind for the leaves, if installed and wanted. */
@@ -318,11 +342,6 @@ public final class LeafManager {
         return livingWind != null ? livingWind : WindSource.NONE;
     }
 
-    /** Hooked into block updates of the client level. */
-    /**
-     * Called instead of a vanilla cherry petal particle under the cherry leaves at {@code pos}: drops a simulated petal
-     * there (scaled by the fall rate and the season). Returns false when the simulation is off, so the vanilla particle shows.
-     */
     public static boolean replaceCherryPetal(Level particleLevel, BlockPos pos, BlockState state) {
         if (simulation == null || particleLevel != level) {
             return false;

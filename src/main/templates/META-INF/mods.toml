@@ -44,6 +44,22 @@ displayTest="IGNORE_ALL_VERSION"
     ordering="NONE"
     side="CLIENT"
 
+# Floating leaves ride its waves.
+[[dependencies.${mod_id}]]
+    modId="whitecap"
+    mandatory=false
+    versionRange="*"
+    ordering="NONE"
+    side="CLIENT"
+
+# Its leaf particles are left out while this mod drops the leaves.
+[[dependencies.${mod_id}]]
+    modId="fallingleaves"
+    mandatory=false
+    versionRange="*"
+    ordering="NONE"
+    side="CLIENT"
+
 # Leaves blow with its wind; its own canopy leaves are left out.
 [[dependencies.${mod_id}]]
     modId="livingwind"

@@ -78,14 +78,20 @@ public final class Config {
                     "Off: the piles keep their own look and falling leaves land on top of them.")
             .translation("rustling_leaves.configuration.immersiveWeatheringPiles")
             .define("immersiveWeatheringPiles", true);
+    private static final ForgeConfigSpec.BooleanValue REALISTIC_WAVES = BUILDER
+            .comment("With Realistic Waves installed, leaves floating on the water ride its swell and surf, rising and tilting",
+                    "with every wave. Off: they lie at the flat water level of vanilla.")
+            .translation("rustling_leaves.configuration.realisticWaves")
+            .define("realisticWaves", true);
     private static final ForgeConfigSpec.BooleanValue LIVING_WIND = BUILDER
             .comment("With Living Wind installed, leaves blow the way its wind blows, as strong as it blows, so they fly along",
                     "with its wind vanes and particles. Gusts, squalls and whirlwinds stay. Off: leaves keep their own wind.")
             .translation("rustling_leaves.configuration.livingWind")
             .define("livingWind", true);
     private static final ForgeConfigSpec.BooleanValue FALLING_LEAVES_MOD = BUILDER
-            .comment("With Living Wind installed, also show its own falling leaf particles. Off (the default): only the leaves",
-                    "of this mod fall, so trees do not shed twice; Living Wind still blows grass, plants and dust.")
+            .comment("With Falling Leaves or Living Wind installed, also show their own falling leaf particles. Off (the default):",
+                    "only the leaves of this mod fall, so trees do not shed twice; Falling Leaves still drops snow from snowy",
+                    "leaves and Living Wind still blows grass, plants and dust.")
             .translation("rustling_leaves.configuration.fallingLeavesMod")
             .define("fallingLeavesMod", false);
     private static final ForgeConfigSpec.IntValue LEAVES_PER_BREAK = BUILDER
@@ -195,6 +201,7 @@ public final class Config {
         settings.windEvents = WIND_EVENTS.get().floatValue();
         settings.raking = RAKING.get();
         settings.drawPileBlocks = PILE_BLOCKS.get();
+        settings.rideWaves = REALISTIC_WAVES.get();
         settings.otherModLeaves = FALLING_LEAVES_MOD.get();
         settings.followWorldWind = LIVING_WIND.get();
         settings.leafSize = LEAF_SIZE.get().floatValue();
