@@ -57,6 +57,12 @@ public final class Config {
                     "falling leaves of newer Minecraft versions.")
             .translation("rustling_leaves.configuration.oldLeafTextures")
             .define("oldLeafTextures", false);
+    private static final ForgeConfigSpec.BooleanValue SHADOWS = BUILDER
+            .comment("Pixel shadows: falling leaves cast a crisp shadow on the ground under them, leaves on piles cast",
+                    "one on the leaves below, and piles shade the ground around their foot. Drawn like the leaves, so they",
+                    "work with shader packs.")
+            .translation("rustling_leaves.configuration.shadows")
+            .define("shadows", true);
     private static final ForgeConfigSpec.DoubleValue AUTUMN_COLORS = BUILDER
             .comment("Share of leaves that fall in autumn colors (yellow, orange, red, brown) instead of the tree's color.")
             .translation("rustling_leaves.configuration.autumnColors")
@@ -181,6 +187,7 @@ public final class Config {
         settings.drawPileBlocks = PILE_BLOCKS.get();
         settings.leafSize = LEAF_SIZE.get().floatValue();
         settings.oldLeafTextures = OLD_LEAF_TEXTURES.get();
+        settings.shadows = SHADOWS.get();
         settings.autumnColors = AUTUMN_COLORS.get().floatValue();
         settings.leavesPerBreak = LEAVES_PER_BREAK.get();
         settings.litterDistance = LITTER_DISTANCE.get();

@@ -4,6 +4,18 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0+1.20.1] - 2026-10-27
+### Added
+- Pixel shadows. Falling leaves cast a crisp leaf-shaped shadow along the sunbeam: under them at noon, a little to
+  the side in the morning and evening. Like a real leaf's shadow it is sharp only close to the ground and fades out
+  over longer beams (so at sunset only low leaves cast one); weak under the trees and in rain, none at night.
+  Leaves lying on the ground get a faint contact shadow, leaves on a pile shade the leaves beneath them, the sides and
+  hollows of a pile are darker than its crest, and piles shade the ground around their foot, so they read as heaps
+  instead of flat patches. The shadows are drawn like the leaves themselves and work with shader packs; client option
+  `leaves.shadows` turns them off.
+- Client command `/rustlingleaves fallrate <value>` sets how many leaves fall from the trees (1 = normal, up to 10),
+  right away and saved to the config; `/rustlingleaves fallrate` shows the current value. It works on any server.
+
 ## [2.3.0+1.20.1] - 2026-10-27
 ### Added
 - Client option `leaves.oldLeafTextures` brings back the mod's original leaf textures (several leaf shapes, needles
