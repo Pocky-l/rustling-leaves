@@ -157,7 +157,8 @@ The jar is written to `build/libs/`.
 ## Credits
 
 - Author: **Pocky**.
-- Leaf textures and logo: original, made for this mod. Sounds: vanilla Minecraft.
+- Falling leaf and petal textures: from newer Minecraft versions, adapted for tinting. Pile textures and logo:
+  original, made for this mod. Sounds: vanilla Minecraft.
 
 <!-- more-mods:start -->
 ## More mods by Pocky

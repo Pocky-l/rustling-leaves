@@ -487,7 +487,7 @@ public final class LitterField {
             offZ = dequantize(top >>> 10, -0.2F, 1.2F);
             out.yaw = dequantize(top >>> 20, 0.0F, Mth.TWO_PI);
             out.size = dequantize(top >>> 30, 0.0F, 0.6F);
-            out.sprite = (int) (top >>> 40 & 15);
+            out.sprite = shape.ownSprite((int) (top >>> 40 & 15));
             out.color = chunk.topColor[i];
         } else {
             offX = -0.15F + unit(hash, 0) * 1.3F;
