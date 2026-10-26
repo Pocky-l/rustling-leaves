@@ -56,6 +56,8 @@ public final class LeafSimulation {
     public static final float WET_SHADE = 0.76F;
     /** Falling leaves farther than this from the camera cast no shadow. */
     public static final double SHADOW_RANGE = 24.0;
+    /** Below this height of the sun (sin of its elevation, about 12 degrees) leaves cast no shadow. */
+    public static final double SHADOW_MIN_SUN = 0.2;
     /** The surface under a leaf counts as level (the shadow lies flat on it) within this height difference. */
     private static final double SHADOW_LEVEL = 0.06;
     /** Blocks below a falling leaf searched for the ground its shadow falls on. */
@@ -111,6 +113,9 @@ public final class LeafSimulation {
     private double cameraX;
     private double cameraY;
     private double cameraZ;
+    /** Direction to the sun (it moves east to west over the X axis); sunY <= 0 at night. */
+    private double sunX;
+    private double sunY = 1.0;
     private Level level;
 
     public LeafSimulation(LeafSettings settings, int capacity, LeafListener listener) {
@@ -151,6 +156,7 @@ public final class LeafSimulation {
         this.cameraX = cameraX;
         this.cameraY = cameraY;
         this.cameraZ = cameraZ;
+        updateSun(level);
         tick++;
         wind.update(level, tick, settings, terrain, random, cameraX, cameraY, cameraZ);
         grid.rebuild(pool);
@@ -457,32 +463,62 @@ public final class LeafSimulation {
             pool.light[i] = terrain.lightAt(pool.x[i], pool.y[i], pool.z[i]);
         }
         if (pool.state[i] == LeafPool.FALLING) {
-            pool.shadow[i] = shadowBelow(pool.x[i], pool.y[i], pool.z[i], pool.size[i]);
+            pool.shadow[i] = shadowBelow(i, pool.x[i], pool.y[i], pool.z[i], pool.size[i]);
         }
     }
 
+    /** The sun's direction for the shadows of falling leaves, from the time of day; no sun without a sky. */
+    private void updateSun(Level level) {
+        if (level == null || !level.dimensionType().hasSkyLight() || level.dimensionType().hasFixedTime()) {
+            sunX = 0.0;
+            sunY = -1.0;
+            return;
+        }
+        double angle = level.getTimeOfDay(1.0F) * Mth.TWO_PI;
+        sunX = -Math.sin(angle);
+        sunY = Math.cos(angle);
+    }
+
+    /** Direction to the sun, X part (east is +X); see {@link #sunY()}. */
+    public double sunX() {
+        return sunX;
+    }
+
+    /** Direction to the sun, Y part: 1 at noon, 0 at sunrise and sunset, negative at night. */
+    public double sunY() {
+        return sunY;
+    }
+
     /**
-     * Height of the surface a falling leaf near the camera casts its shadow on, looked up every tick so the shadow
-     * stays on the ground as the leaf drifts over steps: the ground, or the leaf litter as it is drawn on it. NaN
-     * farther away from the camera than {@link #SHADOW_RANGE}, high above the ground, and over an edge (the surface is
-     * not level under the whole leaf): a shadow there would hang in the air over the lower side.
+     * Height of the surface a falling leaf near the camera casts its shadow on: where the sunbeam through the leaf
+     * meets the ground, or the leaf litter as it is drawn on it. Looked up every tick, so the shadow stays on the ground
+     * as the leaf drifts over steps. NaN farther away from the camera than {@link #SHADOW_RANGE}, with the sun too low,
+     * and over an edge (the surface is not level under the whole leaf): a shadow there would hang in the air over the
+     * lower side.
      */
-    private float shadowBelow(double x, double y, double z, float half) {
+    private float shadowBelow(int i, double x, double y, double z, float half) {
         double dx = x - cameraX;
         double dz = z - cameraZ;
-        if (!settings.shadows || dx * dx + dz * dz > SHADOW_RANGE * SHADOW_RANGE) {
+        if (!settings.shadows || sunY < SHADOW_MIN_SUN || dx * dx + dz * dz > SHADOW_RANGE * SHADOW_RANGE) {
             return Float.NaN;
         }
-        double surface = surfaceBelow(x, y, z);
+        double below = surfaceBelow(x, y, z);
+        if (Double.isNaN(below)) {
+            return Float.NaN;
+        }
+        // Along the sunbeam: the shadow lands this far to the side of the leaf (east or west).
+        double sx = x - sunX / sunY * (y - below);
+        double surface = surfaceBelow(sx, y, z);
         if (Double.isNaN(surface)) {
             return Float.NaN;
         }
         for (int k = 0; k < 4; k++) {
-            double around = surfaceBelow(x + (k == 0 ? half : k == 1 ? -half : 0.0), y, z + (k == 2 ? half : k == 3 ? -half : 0.0));
+            double around = surfaceBelow(sx + (k == 0 ? half : k == 1 ? -half : 0.0), y, z + (k == 2 ? half : k == 3 ? -half : 0.0));
             if (Double.isNaN(around) || Math.abs(around - surface) > SHADOW_LEVEL) {
                 return Float.NaN;
             }
         }
+        pool.shadowSunlit[i] = terrain.canSeeSky(sx, surface + 0.5, z);
         return (float) surface;
     }
 
