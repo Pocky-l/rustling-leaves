@@ -81,12 +81,13 @@ final class LeafRenderer implements AutoCloseable {
                     .setLayeringState(RenderStateShard.POLYGON_OFFSET_LAYERING)
                     .createCompositeState(false));
     /**
-     * Opacity of a falling leaf's shadow right at the ground; it fades in steps (pixel-art style, no smooth gradient)
-     * until {@link #SHADOW_MAX_HEIGHT}.
+     * Opacity of a falling leaf's shadow right at the ground; it keeps it while the sunbeam from the leaf to the ground
+     * is shorter than {@link #SHADOW_SHARP_BEAM}, then fades in steps (pixel-art style, no smooth gradient) until
+     * {@link LeafSimulation#SHADOW_MAX_BEAM}.
      */
     private static final float SHADOW_ALPHA = 0.42F;
     private static final int SHADOW_STEPS = 4;
-    private static final float SHADOW_MAX_HEIGHT = 4.0F;
+    private static final float SHADOW_SHARP_BEAM = 0.8F;
     /** Under a canopy (no direct sun) a falling leaf's shadow keeps this much of its opacity. */
     private static final float SHADE_SHADOW = 0.35F;
     /**
@@ -1087,15 +1088,18 @@ final class LeafRenderer implements AutoCloseable {
 
     private void buildMoving(Vec3 cam, Vector3f look, float partialTick) {
         BufferBuilder builder = new BufferBuilder(bytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
-        // How strong the sun's shadows are: none below SHADOW_MIN_SUN, full a little higher, weak in rain.
-        float sunStrength = (float) Mth.clamp((simulation.sunY() - LeafSimulation.SHADOW_MIN_SUN) / 0.15, 0.0, 1.0);
+        // How strong the sun's shadows are: none below SHADOW_MIN_SUN, full from ~30 degrees up (low light is diffuse),
+        // weak in rain.
+        float sunStrength = (float) Mth.clamp((simulation.sunY() - LeafSimulation.SHADOW_MIN_SUN) / 0.3, 0.0, 1.0);
         Level level = Minecraft.getInstance().level;
         if (level != null) {
             sunStrength *= 1.0F - 0.7F * level.getRainLevel(partialTick);
         }
         BufferBuilder shadowBuilder = shadows && sunStrength > 0.0F
                 ? new BufferBuilder(shadowBytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK) : null;
-        float sunSlope = (float) (simulation.sunX() / Math.max(LeafSimulation.SHADOW_MIN_SUN, simulation.sunY()));
+        float sunSlope = (float) simulation.sunSlope();
+        float beamPerHeight = Mth.sqrt(1.0F + sunSlope * sunSlope);
+        float fadeLength = (float) LeafSimulation.SHADOW_MAX_BEAM - SHADOW_SHARP_BEAM;
         for (int i = 0, highWater = pool.highWater(); i < highWater; i++) {
             byte state = pool.state[i];
             if (state == LeafPool.FREE || !drawnChunk(Mth.floor(pool.x[i]) >> 4, Mth.floor(pool.z[i]) >> 4)) {
@@ -1121,10 +1125,12 @@ final class LeafRenderer implements AutoCloseable {
             float ground = pool.shadow[i];
             if (shadowBuilder != null && state == LeafPool.FALLING && !Float.isNaN(ground)) {
                 float height = y - (float) (ground - cam.y);
-                if (height > 0.04F && height < SHADOW_MAX_HEIGHT) {
+                float beam = height * beamPerHeight;
+                if (height > 0.04F && beam < LeafSimulation.SHADOW_MAX_BEAM) {
                     int s = pool.shape[i] == LeafShape.PETAL.ordinal() ? LeafShapes.SHADOW_PETAL : LeafShapes.SHADOW_LEAF;
-                    // Fainter the higher the leaf, in a few even steps.
-                    int step = Math.min(SHADOW_STEPS - 1, (int) (height / SHADOW_MAX_HEIGHT * SHADOW_STEPS));
+                    // Sharp close to the ground, fainter the longer the beam, in a few even steps.
+                    float fade = Mth.clamp((beam - SHADOW_SHARP_BEAM) / fadeLength, 0.0F, 1.0F);
+                    int step = Math.min(SHADOW_STEPS - 1, (int) (fade * SHADOW_STEPS));
                     float alpha = SHADOW_ALPHA * (SHADOW_STEPS - step) / SHADOW_STEPS * sunStrength
                             * (pool.shadowSunlit[i] ? 1.0F : SHADE_SHADOW);
                     if (alpha >= 0.03F) {
