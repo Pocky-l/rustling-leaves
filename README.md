@@ -118,7 +118,7 @@ No keys. Just play:
 | `seasons.springSummerFallRate` | `0.02` | Fall rate multiplier in spring and summer (cherry blossom petals not affected) |
 | `seasons.autumnColors` | `3.0` | Multiplier of `leaves.autumnColors` in late autumn (capped at all leaves) |
 | `seasons.seasonalDecay` | `1.0` | Extra rot of the litter in late autumn and winter, in carpets per sub-season (0 = none) |
-| `sound.rustleVolume` | `0.6` | Volume of rustling and whirlwinds |
+| `sound.rustleVolume` | `0.6` | Volume of rustling |
 
 Leaf litter is saved in `saves/<world>/rustling_leaves/` (singleplayer) or `rustling_leaves/servers/<address>/`
 (multiplayer).

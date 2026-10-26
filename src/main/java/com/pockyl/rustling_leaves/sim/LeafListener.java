@@ -12,8 +12,4 @@ public interface LeafListener {
     /** A leaf fell into lava. */
     default void onBurn(double x, double y, double z) {
     }
-
-    /** A whirlwind is spinning here (called about once a second while it lives). */
-    default void onWhirl(double x, double y, double z, float intensity) {
-    }
 }
