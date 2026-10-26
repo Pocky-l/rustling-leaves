@@ -4,6 +4,20 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0+1.20.1] - 2026-10-27
+### Added
+- Client option `leaves.oldLeafTextures` brings back the mod's original leaf textures (several leaf shapes, needles
+  and petals). It switches in game, without a restart.
+
+### Changed
+- Falling leaves and cherry petals use the leaf and petal textures of the newest Minecraft versions, in three shades
+  each, still coloured by their tree and the season. Piles keep their textures.
+
+### Fixed
+- Some leaf piles in forests were black: piles that formed on their own could get no tree colour. New piles get the
+  colour of the tree above them, and black piles already lying in your worlds take the colour of the leaves around
+  them.
+
 ## [2.2.0+1.20.1] - 2026-10-26
 ### Added
 - Raking is visible to other players: when someone rakes leaves together, everyone around sees their own leaves

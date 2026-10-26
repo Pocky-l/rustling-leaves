@@ -855,7 +855,7 @@ public final class ModGameTests {
 
     @GameTest(template = "empty")
     public static void blackPileCellsAreRepairedOnLoad(GameTestHelper helper) throws IOException {
-        // Natural piles seeded before 2.2.1 could get color 0 (drawn black) next to the colored carpet around them.
+        // Natural piles seeded before 2.3.0 could get color 0 (drawn black) next to the colored carpet around them.
         LitterChunk chunk = new LitterChunk(0, 0);
         chunk.seedCell(LitterChunk.index(10, 10), 4, 64.0F, 0x39701F, LeafShape.ROUND.ordinal());
         chunk.seedCell(LitterChunk.index(12, 11), 9, 64.0F, 0, 0);

@@ -224,7 +224,7 @@ public final class LitterChunk {
     }
 
     /**
-     * Natural piles seeded before 2.2.1 could get no tree color (black, drawn as black leaves): they take the color and
+     * Natural piles seeded before 2.3.0 could get no tree color (black, drawn as black leaves): they take the color and
      * shape of the nearest colored stack of the chunk, their top leaf (colored black as well) is dropped.
      */
     private void repairBlackCells() {
