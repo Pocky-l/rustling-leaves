@@ -10,6 +10,7 @@
   "rustling_leaves.configuration.treeFallRates": "Листопад зависит от дерева",
   "rustling_leaves.configuration.spawnRadius": "Радиус листопада (блоков)",
   "rustling_leaves.configuration.leafSize": "Размер листьев",
+  "rustling_leaves.configuration.shadows": "Пиксельные тени",
   "rustling_leaves.configuration.oldLeafTextures": "Старые текстуры листьев мода",
   "rustling_leaves.configuration.autumnColors": "Осенние цвета",
   "rustling_leaves.configuration.leavesPerBreak": "Листьев с разбитого блока",

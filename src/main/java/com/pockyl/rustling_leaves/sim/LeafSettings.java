@@ -18,6 +18,8 @@ public final class LeafSettings {
     public float leafSize = 1.0F;
     /** Draw leaves with the mod's original textures instead of the falling leaves of newer Minecraft versions. */
     public boolean oldLeafTextures = false;
+    /** Pixel shadows: under falling leaves, under the leaves on piles and around the foot of piles. */
+    public boolean shadows = true;
     public float autumnColors = 0.35F;
     public float windStrength = 1.0F;
     /** How often squalls and whirlwinds happen (multiplier, 0 disables them). */

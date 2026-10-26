@@ -54,6 +54,12 @@ public final class LeafSimulation {
     private static final float MENISCUS_PULL = 0.0004F;
     /** Brightness of a soaked leaf. */
     public static final float WET_SHADE = 0.76F;
+    /** Falling leaves farther than this from the camera cast no shadow. */
+    public static final double SHADOW_RANGE = 24.0;
+    /** The surface under a leaf counts as level (the shadow lies flat on it) within this height difference. */
+    private static final double SHADOW_LEVEL = 0.06;
+    /** Blocks below a falling leaf searched for the ground its shadow falls on. */
+    private static final int SHADOW_DEPTH = 6;
     /** Share of leaves that tumble instead of fluttering (in nature: long, stiff leaves). */
     private static final float TUMBLER_SHARE = 0.25F;
     private static final float GROUND_FRICTION = 0.86F;
@@ -310,6 +316,7 @@ public final class LeafSimulation {
         pool.shape[i] = (byte) shape;
         pool.sprite[i] = (byte) sprite;
         pool.light[i] = level != null ? terrain.lightAt(x, y + 0.1, z) : 0xF000F0;
+        pool.shadow[i] = Float.NaN;
         pool.age[i] = 0;
         pool.life[i] = 0;
     }
@@ -449,6 +456,55 @@ public final class LeafSimulation {
         if (pool.state[i] == LeafPool.FALLING && ((i + tick) & 3) == 0) {
             pool.light[i] = terrain.lightAt(pool.x[i], pool.y[i], pool.z[i]);
         }
+        if (pool.state[i] == LeafPool.FALLING) {
+            pool.shadow[i] = shadowBelow(pool.x[i], pool.y[i], pool.z[i], pool.size[i]);
+        }
+    }
+
+    /**
+     * Height of the surface a falling leaf near the camera casts its shadow on, looked up every tick so the shadow
+     * stays on the ground as the leaf drifts over steps: the ground, or the leaf litter as it is drawn on it. NaN
+     * farther away from the camera than {@link #SHADOW_RANGE}, high above the ground, and over an edge (the surface is
+     * not level under the whole leaf): a shadow there would hang in the air over the lower side.
+     */
+    private float shadowBelow(double x, double y, double z, float half) {
+        double dx = x - cameraX;
+        double dz = z - cameraZ;
+        if (!settings.shadows || dx * dx + dz * dz > SHADOW_RANGE * SHADOW_RANGE) {
+            return Float.NaN;
+        }
+        double surface = surfaceBelow(x, y, z);
+        if (Double.isNaN(surface)) {
+            return Float.NaN;
+        }
+        for (int k = 0; k < 4; k++) {
+            double around = surfaceBelow(x + (k == 0 ? half : k == 1 ? -half : 0.0), y, z + (k == 2 ? half : k == 3 ? -half : 0.0));
+            if (Double.isNaN(around) || Math.abs(around - surface) > SHADOW_LEVEL) {
+                return Float.NaN;
+            }
+        }
+        return (float) surface;
+    }
+
+    /** The ground below a point, or the top of the leaf litter on it where the renderer draws it. */
+    private double surfaceBelow(double x, double y, double z) {
+        double ground = terrain.groundBelow(x, y, z, SHADOW_DEPTH);
+        if (Double.isNaN(ground)) {
+            return Double.NaN;
+        }
+        int cellX = LitterField.cell(x);
+        int cellZ = LitterField.cell(z);
+        LitterChunk chunk = field.chunkAtCell(cellX, cellZ);
+        if (chunk == null) {
+            return ground;
+        }
+        int i = LitterField.index(cellX, cellZ);
+        int n = chunk.count[i];
+        if (n == 0 || Math.abs(chunk.base[i] - ground) > LitterField.SAME_LEVEL) {
+            return ground;
+        }
+        double top = chunk.base[i] + n * LitterField.LAYER;
+        return n >= LitterField.SURFACE_MIN ? top - LitterField.SURFACE_DROP : chunk.base[i];
     }
 
     /** Moves a falling leaf by its velocity in sub-steps short enough not to tunnel through blocks or piles. */
