@@ -31,6 +31,8 @@ import com.pockyl.rustling_leaves.sim.LitterField;
 import com.pockyl.rustling_leaves.sim.PileBlocks;
 import com.pockyl.rustling_leaves.sim.SeasonCurve;
 import com.pockyl.rustling_leaves.sim.TreeLeaves;
+import com.pockyl.rustling_leaves.sim.WindSource;
+import com.pockyl.rustling_leaves.sim.Wind;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -53,6 +55,47 @@ public final class ModGameTests {
     private static final float LAYER = LitterField.LAYER;
 
     private ModGameTests() {
+    }
+
+    @GameTest(template = "box")
+    public static void leavesBlowWithAnotherModsWind(GameTestHelper helper) {
+        floor(helper);
+        LeafSimulation sim = simulation(helper, 64, LeafListener.NONE);
+        sim.settings().windStrength = 1.0F;
+        // A fresh wind towards -z (north), as another mod might sync it: the heading need not be a unit vector.
+        float[] speed = {0.09F};
+        sim.setWindSource(out -> {
+            out[0] = 0.0F;
+            out[1] = -2.0F;
+            out[2] = speed[0];
+            return true;
+        });
+        run(sim, helper, 1);
+        Wind wind = sim.wind();
+        helper.assertTrue(Math.abs(wind.directionX()) < 1.0E-4F && Math.abs(wind.directionZ() + 1.0F) < 1.0E-4F,
+                "the wind does not blow north: " + wind.directionX() + ", " + wind.directionZ());
+        BlockPos center = helper.absolutePos(new BlockPos(3, 3, 3));
+        float strong = wind.speed(center.getX() + 0.5, center.getY(), center.getZ() + 0.5);
+        speed[0] = 0.009F;
+        run(sim, helper, 1);
+        float weak = wind.speed(center.getX() + 0.5, center.getY(), center.getZ() + 0.5);
+        helper.assertTrue(strong > 0.03F && weak < strong * 0.2F, "the wind speed does not follow: " + strong + " then " + weak);
+
+        speed[0] = 0.09F;
+        int leaf = spawn(sim, helper, 3.5, 5.5, 3.5);
+        LeafPool pool = sim.pool();
+        double startX = pool.x[leaf];
+        double startZ = pool.z[leaf];
+        run(sim, helper, 30);
+        double driftX = pool.x[leaf] - startX;
+        double driftZ = pool.z[leaf] - startZ;
+        // A gliding leaf also slides sideways; the wind must still carry it north more than anywhere else.
+        helper.assertTrue(driftZ < -0.5 && Math.abs(driftX) < -driftZ, "the leaf drifted " + driftX + ", " + driftZ);
+
+        sim.setWindSource(WindSource.NONE);
+        run(sim, helper, 1);
+        helper.assertTrue(wind.directionZ() > -0.9F, "the own wind does not come back: " + wind.directionZ());
+        helper.succeed();
     }
 
     @GameTest(template = "empty")

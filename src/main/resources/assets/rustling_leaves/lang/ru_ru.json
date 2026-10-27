@@ -26,6 +26,8 @@
   "rustling_leaves.configuration.windEvents": "Шквалы и вихри",
   "rustling_leaves.configuration.raking": "Грабли (мотыга или лопата)",
   "rustling_leaves.configuration.immersiveWeatheringPiles": "Кучи Immersive Weathering как листва",
+  "rustling_leaves.configuration.livingWind": "Листья летят по ветру Living Wind",
+  "rustling_leaves.configuration.fallingLeavesMod": "Оставить и листья других модов",
   "rustling_leaves.configuration.litterDistance": "Дальность отображения листвы",
   "rustling_leaves.configuration.seasons": "Времена года",
   "rustling_leaves.configuration.seasonsEnabled": "Листопад по временам года",

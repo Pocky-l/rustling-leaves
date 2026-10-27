@@ -40,6 +40,7 @@ import net.minecraftforge.fml.common.Mod;
 import com.pockyl.rustling_leaves.Config;
 import com.pockyl.rustling_leaves.RustlingLeaves;
 import com.pockyl.rustling_leaves.client.compat.ImmersiveWeathering;
+import com.pockyl.rustling_leaves.client.compat.LivingWind;
 import com.pockyl.rustling_leaves.client.compat.SereneSeasons;
 import com.pockyl.rustling_leaves.network.ModNetwork;
 import com.pockyl.rustling_leaves.network.RakePayload;
@@ -54,6 +55,7 @@ import com.pockyl.rustling_leaves.sim.LitterField;
 import com.pockyl.rustling_leaves.sim.PileBlocks;
 import com.pockyl.rustling_leaves.sim.SeasonCurve;
 import com.pockyl.rustling_leaves.sim.TreeLeaves;
+import com.pockyl.rustling_leaves.sim.WindSource;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -100,6 +102,8 @@ public final class LeafManager {
     private static final Int2IntOpenHashMap LAST_SWING = new Int2IntOpenHashMap();
 
     private static volatile boolean configChanged;
+    private static boolean windLookedUp;
+    private static LivingWind livingWind;
     private static LeafSimulation simulation;
     private static LeafRenderer renderer;
     private static LitterStorage storage;
@@ -133,6 +137,7 @@ public final class LeafManager {
                 reset();
             } else if (simulation != null) {
                 simulation.setPiles(PILES, TREES, SETTINGS.drawPileBlocks);
+                simulation.setWindSource(windSource());
             }
             updatePileModels(minecraft);
         }
@@ -147,6 +152,7 @@ public final class LeafManager {
             simulation = new LeafSimulation(SETTINGS, SETTINGS.maxLeaves, new Listener());
             simulation.setLevel(level);
             simulation.setPiles(PILES, TREES, SETTINGS.drawPileBlocks);
+            simulation.setWindSource(windSource());
             renderer = new LeafRenderer(simulation);
             storage = new LitterStorage(storageDirectory(minecraft, level));
         }
@@ -290,6 +296,26 @@ public final class LeafManager {
                 rakeAt(hit.getLocation());
             }
         }
+    }
+
+    /**
+     * Whether the leaf particles of other leaf mods (Living Wind) are left out: the simulation drops the leaves itself
+     * (unless the player keeps both). Called from their particle spawners.
+     */
+    public static boolean replacesFallingLeaves() {
+        return simulation != null && SETTINGS.fallRate > 0.0F && !SETTINGS.otherModLeaves;
+    }
+
+    /** The world wind of Living Wind for the leaves, if installed and wanted. */
+    private static WindSource windSource() {
+        if (!SETTINGS.followWorldWind || !ModList.get().isLoaded(LivingWind.MOD_ID)) {
+            return WindSource.NONE;
+        }
+        if (!windLookedUp) {
+            windLookedUp = true;
+            livingWind = LivingWind.find();
+        }
+        return livingWind != null ? livingWind : WindSource.NONE;
     }
 
     /** Hooked into block updates of the client level. */

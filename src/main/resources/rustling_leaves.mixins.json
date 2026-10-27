@@ -7,7 +7,8 @@
   "client": [
     "CherryLeavesBlockMixin",
     "ClientLevelMixin",
-    "ClientPacketListenerMixin"
+    "ClientPacketListenerMixin",
+    "LivingWindMixin"
   ],
   "injectors": {
     "defaultRequire": 1

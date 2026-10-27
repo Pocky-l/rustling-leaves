@@ -37,6 +37,8 @@ public final class Wind {
     private float rain;
     private float thunder;
     private boolean open;
+    private WindSource source = WindSource.NONE;
+    private final float[] outer = new float[3];
 
     /** A wandering vortex. */
     public static final class Whirlwind {
@@ -217,6 +219,21 @@ public final class Wind {
         }
     }
 
+    /** Lets the ambient wind blow as another mod's wind does ({@link WindSource#NONE}: its own wandering wind). */
+    public void setSource(WindSource source) {
+        this.source = source;
+    }
+
+    /** Heading of the ambient wind, x component of a unit vector. */
+    public float directionX() {
+        return dirX;
+    }
+
+    /** Heading of the ambient wind, z component of a unit vector. */
+    public float directionZ() {
+        return dirZ;
+    }
+
     /** Starts the air pulse of an explosion. */
     public void addBlast(double x, double y, double z, float radius, float strength, float swirl) {
         blasts.add(new Blast(x, y, z, radius, strength, swirl));
@@ -232,6 +249,14 @@ public final class Wind {
         rain = open ? level.getRainLevel(1.0F) : 0.0F;
         thunder = open ? level.getThunderLevel(1.0F) : 0.0F;
         base = open ? (CALM + RAIN * rain + THUNDER * thunder) * settings.windStrength : 0.0F;
+        if (source.read(outer)) {
+            float length = Mth.sqrt(outer[0] * outer[0] + outer[1] * outer[1]);
+            if (length > 1.0E-4F) {
+                dirX = outer[0] / length;
+                dirZ = outer[1] / length;
+            }
+            base = open ? Math.max(0.0F, outer[2]) * settings.windStrength : 0.0F;
+        }
 
         jets.removeIf(jet -> --jet.ttl <= 0);
         for (Blast blast : blasts) {

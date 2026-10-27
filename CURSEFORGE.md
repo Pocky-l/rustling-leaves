@@ -81,6 +81,8 @@ Immersive Weathering's leaf piles are drawn as leaf litter.
   it off in the `seasons` config section.
 - [Immersive Weathering](https://www.curseforge.com/minecraft/mc-mods/immersive-weathering): its leaf piles are drawn as this mod's leaf litter (see Features); turn it off with
   `leaves.immersiveWeatheringPiles` to keep their own look (falling leaves then land on top of them).
+- [Living Wind](https://www.curseforge.com/minecraft/mc-mods/living-wind): leaves blow with its wind, the way its wind vanes point and as hard as it blows; it leaves the
+  falling leaves to this mod (`leaves.livingWind`, `leaves.fallingLeavesMod`).
 - [Sodium](https://modrinth.com/mod/sodium) works.
 
 ## Requirements

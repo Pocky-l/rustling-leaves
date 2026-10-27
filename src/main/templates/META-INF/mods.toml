@@ -43,3 +43,11 @@ displayTest="IGNORE_ALL_VERSION"
     versionRange="*"
     ordering="NONE"
     side="CLIENT"
+
+# Leaves blow with its wind; its own canopy leaves are left out.
+[[dependencies.${mod_id}]]
+    modId="livingwind"
+    mandatory=false
+    versionRange="*"
+    ordering="NONE"
+    side="CLIENT"
