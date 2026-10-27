@@ -122,6 +122,11 @@ public final class LeafManager {
     private LeafManager() {
     }
 
+    /** The running leaf simulation, null while there is no world. */
+    public static LeafSimulation simulation() {
+        return simulation;
+    }
+
     /** Called from the config event, possibly on another thread; applied on the next client tick. */
     static void onConfigChanged() {
         configChanged = true;

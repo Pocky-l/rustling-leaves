@@ -483,6 +483,16 @@ public final class Wind {
         return dirX;
     }
 
+    /** Speed of the ambient wind before gusts and squalls, in blocks per tick. */
+    public float base() {
+        return base;
+    }
+
+    /** The game tick the wind was last updated at; its gust waves move with it. */
+    public float time() {
+        return time;
+    }
+
     public float dirZ() {
         return dirZ;
     }
