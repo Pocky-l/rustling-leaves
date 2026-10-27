@@ -43,6 +43,8 @@ and whirlwinds.
 
 [![Falling Leaves](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/compat/falling-leaves.png)](https://www.curseforge.com/minecraft/mc-mods/falling-leaves-forge) ✅ **[Falling Leaves](https://www.curseforge.com/minecraft/mc-mods/falling-leaves-forge)** - Rustling Leaves takes over its falling leaves, so trees do not shed twice (its snow from snowy leaves stays; a config option keeps both).
 
+[![Living Wind](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/compat/living-wind.png)](https://www.curseforge.com/minecraft/mc-mods/living-wind) ✅ **[Living Wind](https://www.curseforge.com/minecraft/mc-mods/living-wind)** (optional) - leaves blow with its wind: the way its wind vanes point and as hard as it blows, calm on a clear day, wild in a storm. Rustling Leaves takes over the leaves it blows out of the crowns (its grass and dust stay).
+
 ## ⚙️ Configuration
 
 The in-game config screen tunes everything: number of leaves, fall rate, leaf textures, how long litter lies,

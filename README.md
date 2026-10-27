@@ -76,7 +76,8 @@ thick leaf fall; without a value it shows the current one.
 | `leaves.autumnColors` | `0.35` | Share of leaves in autumn colors |
 | `leaves.immersiveWeatheringPiles` | `true` | Draw Immersive Weathering's leaf piles as leaf litter |
 | `leaves.realisticWaves` | `true` | With Realistic Waves: floating leaves ride its waves (off = flat vanilla water level) |
-| `leaves.fallingLeavesMod` | `false` | With Falling Leaves: keep its leaf particles as well (off = only Rustling Leaves' leaves fall) |
+| `leaves.livingWind` | `true` | With Living Wind: leaves blow with its wind (off = their own wind) |
+| `leaves.fallingLeavesMod` | `false` | With Falling Leaves or Living Wind: keep their falling leaves as well (off = only Rustling Leaves' leaves fall) |
 | `leaves.leavesPerBreak` | `14` | Leaves released by a broken or decayed leaves block |
 | `physics.windStrength` | `1.0` | Wind strength (0 = still air) |
 | `physics.windEvents` | `1.0` | How often squalls and whirlwinds happen (0 = never) |
@@ -109,6 +110,8 @@ Leaf litter is saved in `saves/<world>/rustling_leaves/` (singleplayer) or `rust
 [![Realistic Waves](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/compat/realistic-waves.png)](https://www.curseforge.com/minecraft/mc-mods/realistic-waves) ✅ **[Realistic Waves](https://www.curseforge.com/minecraft/mc-mods/realistic-waves)** (optional) - leaves floating on the sea ride its swell and surf, rising, sinking and tilting with every wave.
 
 [![Falling Leaves](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/compat/falling-leaves.png)](https://www.curseforge.com/minecraft/mc-mods/falling-leaves-forge) ✅ **[Falling Leaves](https://www.curseforge.com/minecraft/mc-mods/falling-leaves-forge)** - Rustling Leaves takes over its falling leaves, so trees do not shed twice (its snow from snowy leaves stays; a config option keeps both).
+
+[![Living Wind](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/compat/living-wind.png)](https://www.curseforge.com/minecraft/mc-mods/living-wind) ✅ **[Living Wind](https://www.curseforge.com/minecraft/mc-mods/living-wind)** (optional) - leaves blow with its wind: the way its wind vanes point and as hard as it blows, calm on a clear day, wild in a storm. Rustling Leaves takes over the leaves it blows out of the crowns (its grass and dust stay).
 
 ## Installation
 

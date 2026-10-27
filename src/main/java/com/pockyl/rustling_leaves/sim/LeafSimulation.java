@@ -255,6 +255,11 @@ public final class LeafSimulation {
         this.waves = waves;
     }
 
+    /** Lets the leaves blow with another mod's world wind ({@link WindSource#NONE}: the simulation's own wind). */
+    public void setWindSource(WindSource source) {
+        wind.setSource(source);
+    }
+
     /** Points the simulation at a level without ticking (for seeding before the first tick). */
     public void setLevel(Level level) {
         this.level = level;

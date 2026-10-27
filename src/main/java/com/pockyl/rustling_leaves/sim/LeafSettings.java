@@ -34,8 +34,10 @@ public final class LeafSettings {
     public boolean drawPileBlocks = true;
     /** Floating leaves ride the waves another mod draws on the water (Realistic Waves). */
     public boolean rideWaves = true;
-    /** Keep the leaf particles of other falling leaf mods (Falling Leaves) besides the simulated leaves. */
+    /** Keep the leaf particles of other falling leaf mods (Falling Leaves, Living Wind) besides the simulated leaves. */
     public boolean otherModLeaves = false;
+    /** Blow with the world wind of another mod (Living Wind) instead of the simulation's own wind. */
+    public boolean followWorldWind = true;
 
     /**
      * In-game days a natural carpet of leaves lies before it has rotted away (thicker piles last longer); 0 keeps the

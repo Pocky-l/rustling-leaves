@@ -4,6 +4,15 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - Unreleased
+### Added
+- Compatibility with [Living Wind](https://www.curseforge.com/minecraft/mc-mods/living-wind): leaves blow with its
+  wind, the way its wind vanes point and as hard as it blows, from a light breeze on a clear day to a gale in a
+  storm. Gust waves, squalls and whirlwinds still sweep through the forest on top of it. Client option
+  `leaves.livingWind` lets the leaves keep their own wind.
+- With Living Wind, Rustling Leaves takes over the leaves it blows out of the tree crowns, so trees do not shed twice;
+  the grass, plants and dust it blows stay. Option `leaves.fallingLeavesMod` keeps both, as with Falling Leaves.
+
 ## [2.4.0] - 2026-10-27
 ### Added
 - Pixel shadows. Falling leaves cast a crisp leaf-shaped shadow along the sunbeam: under them at noon, a little to
