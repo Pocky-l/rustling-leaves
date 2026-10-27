@@ -109,8 +109,9 @@ No keys. Just play:
 | `leaves.oldLeafTextures` | `false` | Draw leaves with the mod's original textures (leaf shapes, needles, petals) instead of the falling leaves of newer Minecraft versions |
 | `leaves.autumnColors` | `0.35` | Share of leaves in autumn colors |
 | `leaves.immersiveWeatheringPiles` | `true` | Draw Immersive Weathering's leaf piles as leaf litter |
+| `leaves.realisticWaves` | `true` | With Realistic Waves: floating leaves ride its waves (off = flat vanilla water level) |
 | `leaves.livingWind` | `true` | With Living Wind: leaves blow with its wind (off = their own wind) |
-| `leaves.fallingLeavesMod` | `false` | With Living Wind: keep its falling leaves as well (off = only Rustling Leaves' leaves fall) |
+| `leaves.fallingLeavesMod` | `false` | With Falling Leaves or Living Wind: keep their falling leaves as well (off = only Rustling Leaves' leaves fall) |
 | `leaves.leavesPerBreak` | `14` | Leaves released by a broken or decayed leaves block |
 | `physics.windStrength` | `1.0` | Wind strength (0 = still air) |
 | `physics.windEvents` | `1.0` | How often squalls and whirlwinds happen (0 = never) |
@@ -136,6 +137,10 @@ Leaf litter is saved in `saves/<world>/rustling_leaves/` (singleplayer) or `rust
   it off in the `seasons` config section.
 - [Immersive Weathering](https://www.curseforge.com/minecraft/mc-mods/immersive-weathering): its leaf piles are drawn as this mod's leaf litter (see Features); turn it off with
   `leaves.immersiveWeatheringPiles` to keep their own look (falling leaves then land on top of them).
+- [Realistic Waves](https://www.curseforge.com/minecraft/mc-mods/realistic-waves): leaves floating on the sea ride its swell and surf, rising, sinking and tilting
+  with every wave (`leaves.realisticWaves`).
+- [Falling Leaves](https://www.curseforge.com/minecraft/mc-mods/falling-leaves-forge): Rustling Leaves takes over its falling leaves, so trees do not shed twice
+  (its snow from snowy leaves stays; `leaves.fallingLeavesMod` keeps both).
 - [Living Wind](https://www.curseforge.com/minecraft/mc-mods/living-wind): leaves blow with its wind, the way its wind vanes point and as hard as it blows; it leaves the
   falling leaves to this mod (`leaves.livingWind`, `leaves.fallingLeavesMod`).
 - [Sodium](https://modrinth.com/mod/sodium) works.

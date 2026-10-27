@@ -11,7 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   storm. Gust waves, squalls and whirlwinds still sweep through the forest on top of it. Client option
   `leaves.livingWind` lets the leaves keep their own wind.
 - With Living Wind, Rustling Leaves takes over the leaves it blows out of the tree crowns, so trees do not shed twice;
-  the grass, plants and dust it blows stay. Client option `leaves.fallingLeavesMod` keeps both.
+  the grass, plants and dust it blows stay.
+- Compatibility with [Realistic Waves](https://www.curseforge.com/minecraft/mc-mods/realistic-waves) (brought over
+  from 2.1.0): leaves floating on the sea ride its swell and surf instead of lying on the flat water underneath. They
+  rise and sink with every wave, tilt with its slope and land on a crest where they touch it; they still drift, gather
+  into rafts and soak as before. Client option `leaves.realisticWaves` turns it off.
+- Compatibility with [Falling Leaves](https://www.curseforge.com/minecraft/mc-mods/falling-leaves-forge) (brought over
+  from 2.1.0): with both mods installed, trees no longer shed twice - Rustling Leaves takes over, and the flat leaf
+  particles of Falling Leaves are left out. Its snow falling from snowy leaves stays. `leaves.fallingLeavesMod` keeps
+  both.
 
 ## [2.4.0+1.20.1] - 2026-10-27
 ### Added
