@@ -4,7 +4,7 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.5.0+1.20.1] - Unreleased
+## [2.5.0+1.20.1] - 2026-10-27
 ### Added
 - Compatibility with [Living Wind](https://www.curseforge.com/minecraft/mc-mods/living-wind): leaves blow with its
   wind, the way its wind vanes point and as hard as it blows, from a light breeze on a clear day to a gale in a
