@@ -29,6 +29,8 @@ and whirlwinds.
 
 ## 🤝 Compatibility
 
+[![Pocky Shaders](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/compat/pocky-shaders.png)](https://www.curseforge.com/minecraft/shaders/pocky-shaders) ✅ **[Pocky Shaders](https://www.curseforge.com/minecraft/shaders/pocky-shaders)** (shader pack) - a shader pack that sways grass and tree crowns with the same gust waves that blow the leaves.
+
 [![Iris](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/compat/iris.png)](https://modrinth.com/mod/iris) ✅ **[Iris](https://modrinth.com/mod/iris)** (shader packs) - leaves and litter are lit and shaded like the blocks around them.
 
 [![Oculus](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/compat/oculus.png)](https://www.curseforge.com/minecraft/mc-mods/oculus) ✅ **[Oculus](https://www.curseforge.com/minecraft/mc-mods/oculus)** (shader packs on Forge) - the same as with Iris.
@@ -88,7 +90,7 @@ Made by **Pocky** · [source code](https://github.com/Pocky-l/rustling-leaves)
 
 [![Turbo for Distant Horizons](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/more-mods/dhturbo.png)](https://www.curseforge.com/minecraft/mc-mods/turbo-for-distant-horizons) **[Turbo for Distant Horizons](https://www.curseforge.com/minecraft/mc-mods/turbo-for-distant-horizons)** - Distant Horizons terrain generated several times faster
 
-[![Pocky Shaders](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/more-mods/pocky_shaders.png)](https://www.curseforge.com/minecraft/mc-mods/pocky-shaders) **[Pocky Shaders](https://www.curseforge.com/minecraft/mc-mods/pocky-shaders)** - a cosy, natural shader pack that sets itself up
+[![Pocky Shaders](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/more-mods/pocky_shaders.png)](https://www.curseforge.com/minecraft/shaders/pocky-shaders) **[Pocky Shaders](https://www.curseforge.com/minecraft/shaders/pocky-shaders)** - a cosy, natural shader pack that shows the weather of these mods
 
 **⚔️ Gear & gameplay**
 

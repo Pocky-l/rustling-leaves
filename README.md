@@ -97,6 +97,8 @@ Leaf litter is saved in `saves/<world>/rustling_leaves/` (singleplayer) or `rust
 
 ## Compatibility
 
+[![Pocky Shaders](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/compat/pocky-shaders.png)](https://www.curseforge.com/minecraft/shaders/pocky-shaders) ✅ **[Pocky Shaders](https://www.curseforge.com/minecraft/shaders/pocky-shaders)** (shader pack) - a shader pack that sways grass and tree crowns with the same gust waves that blow the leaves.
+
 [![Iris](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/compat/iris.png)](https://modrinth.com/mod/iris) ✅ **[Iris](https://modrinth.com/mod/iris)** (shader packs) - leaves and litter are lit and shaded like the blocks around them.
 
 [![Oculus](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/compat/oculus.png)](https://www.curseforge.com/minecraft/mc-mods/oculus) ✅ **[Oculus](https://www.curseforge.com/minecraft/mc-mods/oculus)** (shader packs on Forge) - the same as with Iris.
@@ -170,8 +172,8 @@ The jar is written to `build/libs/`.
     <td><a href="https://www.curseforge.com/minecraft/mc-mods/turbo-for-distant-horizons"><b>Turbo for Distant Horizons</b></a> - Distant Horizons terrain generated several times faster (<a href="https://github.com/Pocky-l/dhturbo">source</a>)</td>
   </tr>
   <tr>
-    <td width="56"><a href="https://www.curseforge.com/minecraft/mc-mods/pocky-shaders"><img src="docs/more-mods/pocky_shaders.png" width="48" alt="Pocky Shaders"></a></td>
-    <td><a href="https://www.curseforge.com/minecraft/mc-mods/pocky-shaders"><b>Pocky Shaders</b></a> - a cosy, natural shader pack that sets itself up (<a href="https://github.com/Pocky-l/pocky-shaders">source</a>)</td>
+    <td width="56"><a href="https://www.curseforge.com/minecraft/shaders/pocky-shaders"><img src="docs/more-mods/pocky_shaders.png" width="48" alt="Pocky Shaders"></a></td>
+    <td><a href="https://www.curseforge.com/minecraft/shaders/pocky-shaders"><b>Pocky Shaders</b></a> - a cosy, natural shader pack that shows the weather of these mods (<a href="https://github.com/Pocky-l/pocky-shaders">source</a>)</td>
   </tr>
 </table>
 

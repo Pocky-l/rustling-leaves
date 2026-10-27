@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Shader packs can sway with the leaves' wind: while an [Iris](https://www.curseforge.com/minecraft/mc-mods/irisshaders) shader pack is on, the mod hands its wind
   and gust waves to the pack every frame (`rustling_leaves:shader_data`, a small data texture any pack can read).
-  [Pocky Shaders](https://github.com/Pocky-l/pocky-shaders) bends grass and tree crowns with the very gusts that blow the leaves off.
+  [Pocky Shaders](https://www.curseforge.com/minecraft/shaders/pocky-shaders) bends grass and tree crowns with the very gusts that blow the leaves off.
 
 ## [2.5.0] - 2026-10-27
 ### Added
