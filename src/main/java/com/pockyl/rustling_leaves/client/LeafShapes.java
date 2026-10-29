@@ -13,7 +13,7 @@ import java.util.Map;
 
 /** Client side of leaf shapes: the sprite of every sprite index and which shape a tree drops. */
 final class LeafShapes {
-    /** The sprite indices of {@link LeafShape} (falling leaves of newer Minecraft versions), then the old sprites. */
+    /** The sprite indices of {@link LeafShape}: leaves and petals of newer Minecraft versions, the old sprites, the needle sprig. */
     static final ResourceLocation[] SPRITES = {
             RustlingLeaves.id("block/leaf/leaf_light"),
             RustlingLeaves.id("block/leaf/leaf_mid"),
@@ -27,6 +27,9 @@ final class LeafShapes {
             RustlingLeaves.id("block/leaf/round"),
             RustlingLeaves.id("block/leaf/needle"),
             RustlingLeaves.id("block/leaf/petal"),
+            RustlingLeaves.id("block/leaf/needle_light"),
+            RustlingLeaves.id("block/leaf/needle_mid"),
+            RustlingLeaves.id("block/leaf/needle_dark"),
     };
     /**
      * Shadow sprites: white silhouettes with hard pixel edges, drawn translucent black by the renderer - leaf and
@@ -36,10 +39,12 @@ final class LeafShapes {
             RustlingLeaves.id("block/leaf/shadow/leaf"),
             RustlingLeaves.id("block/leaf/shadow/petal"),
             RustlingLeaves.id("block/leaf/shadow/cell"),
+            RustlingLeaves.id("block/leaf/shadow/needle"),
     };
     static final int SHADOW_LEAF = 0;
     static final int SHADOW_PETAL = 1;
     static final int SHADOW_CELL = 2;
+    static final int SHADOW_NEEDLE = 3;
 
     /** First old sprite and number of old sprites of every shape (option {@code oldLeafTextures}). */
     private static final int[] OLD_FIRST = {6, 9, 10, 11};
@@ -55,6 +60,11 @@ final class LeafShapes {
     private static final Map<Block, LeafShape> BY_BLOCK = new IdentityHashMap<>();
 
     private LeafShapes() {
+    }
+
+    /** The shadow sprite of a leaf of this shape. */
+    static int shadow(int shape) {
+        return shape == LeafShape.PETAL.ordinal() ? SHADOW_PETAL : shape == LeafShape.NEEDLE.ordinal() ? SHADOW_NEEDLE : SHADOW_LEAF;
     }
 
     /** Index into {@link #SPRITES} of a leaf drawn with sprite index {@code sprite} of its shape. */

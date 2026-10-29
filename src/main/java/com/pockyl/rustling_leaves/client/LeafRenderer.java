@@ -75,21 +75,21 @@ final class LeafRenderer implements AutoCloseable {
      * Opacity of the contact shadow a leaf lying on the ground casts half a leaf pixel aside: only a hint of an edge,
      * stronger looked dirty (owner).
      */
-    private static final float CONTACT_ALPHA = 0.14F;
+    private static final float CONTACT_ALPHA = 0.1F;
     /** Opacity of the shadow on the ground next to a pile and one cell further out. */
-    private static final float FOOT_ALPHA_NEAR = 0.34F;
-    private static final float FOOT_ALPHA_FAR = 0.17F;
+    private static final float FOOT_ALPHA_NEAR = 0.24F;
+    private static final float FOOT_ALPHA_FAR = 0.12F;
     /** Shadows on the ground lie this far above it (plus the polygon offset). */
     private static final float SHADOW_LIFT = 0.003F;
     /**
      * A leaf lying on a pile casts its silhouette, darkened, onto the leaves below: this much darker than the pile's
      * colour, one leaf pixel towards +X/+Z (light from the north-west, like the pixel art of the textures).
      */
-    private static final float DROP_SHADE = 0.5F;
+    private static final float DROP_SHADE = 0.7F;
     /** Stacks at least this deep shade the ground around their foot. */
     private static final int FOOT_SHADOW_MIN = 6;
     /** How much a cell under taller neighbours is darkened at most (cavities and the foot of a pile slope). */
-    private static final float OCCLUSION = 0.32F;
+    private static final float OCCLUSION = 0.2F;
     private static final long REBUILD_BUDGET_NANOS = 3_000_000L;
     private static final double DETAIL_DISTANCE = 40.0;
     /** Beyond this distance (to the chunk center) a chunk is drawn as one coarse mesh; 8 blocks of hysteresis. */
@@ -117,7 +117,7 @@ final class LeafRenderer implements AutoCloseable {
     private static final int SURFACE_TOP_LAYERS = 3;
     /** The pile body sits below the loose leaves and is darker: it reads as the depth of the pile. */
     private static final float BODY_SINK = 0.02F;
-    private static final float BODY_SHADE = 0.8F;
+    private static final float BODY_SHADE = 0.88F;
     /** Stacks this deep hide the ground completely: they get the solid body under their leaf layer. */
     private static final int BODY_MIN = 12;
     /** Stacks this deep get the denser leaf layer. */
@@ -835,7 +835,7 @@ final class LeafRenderer implements AutoCloseable {
                 for (int depth = 0; depth < visible; depth++) {
                     field.pose(chunk, cellX, cellZ, n - 1 - depth, pose);
                     // Leaves deeper in the pile are in its shadow.
-                    float shade = Math.max(0.84F, 1.0F - depth * 0.04F) * occlusion;
+                    float shade = Math.max(0.9F, 1.0F - depth * 0.03F) * occlusion;
                     int sprite = LeafShapes.slot(pose.shape, pose.sprite, oldTextures);
                     float px = (float) (pose.x - tile.originX);
                     float py = (float) (pose.y - tile.originY);
@@ -849,7 +849,7 @@ final class LeafRenderer implements AutoCloseable {
                     } else if (detailShadows && n < SURFACE_MIN) {
                         // A leaf lying on the ground: a faint contact shadow half a leaf pixel aside, so it does not
                         // look painted onto the grass.
-                        int s = pose.shape == LeafShape.PETAL.ordinal() ? LeafShapes.SHADOW_PETAL : LeafShapes.SHADOW_LEAF;
+                        int s = LeafShapes.shadow(pose.shape);
                         emitShadow(shadowBuilder, px + step * 0.5F, py, pz + step * 0.5F, (float) (base - tile.originY) + SHADOW_LIFT, 0.0F,
                                 pose.yaw, pose.pitch, pose.roll, pose.size, s, shadowColor(CONTACT_ALPHA * occlusion), light);
                     }
@@ -1084,7 +1084,7 @@ final class LeafRenderer implements AutoCloseable {
         float nx = -slopeX / length;
         float ny = 1.0F / length;
         float nz = -slopeZ / length;
-        float shade = (nx * nx * 0.6F + ny * ny + nz * nz * 0.8F) * shadeFactor;
+        float shade = faceShade(nx, ny, nz) * shadeFactor;
         vertex(builder, x, y, z, opaque(color, shade), u, v, OverlayTexture.NO_OVERLAY, light, nx, ny, nz);
     }
 
@@ -1188,7 +1188,7 @@ final class LeafRenderer implements AutoCloseable {
                 float height = y - (float) (ground - cam.y);
                 float beam = height * beamPerHeight;
                 if (height > 0.04F && beam < LeafSimulation.SHADOW_MAX_BEAM) {
-                    int s = pool.shape[i] == LeafShape.PETAL.ordinal() ? LeafShapes.SHADOW_PETAL : LeafShapes.SHADOW_LEAF;
+                    int s = LeafShapes.shadow(pool.shape[i]);
                     // Sharp close to the ground, fainter the longer the beam, in a few even steps.
                     float fade = Mth.clamp((beam - SHADOW_SHARP_BEAM) / fadeLength, 0.0F, 1.0F);
                     int step = Math.min(SHADOW_STEPS - 1, (int) (fade * SHADOW_STEPS));
@@ -1251,8 +1251,8 @@ final class LeafRenderer implements AutoCloseable {
     }
 
     /**
-     * Writes one leaf as a quad rotated by yaw (Y), pitch (X) and roll (Z), shaded by its normal like vanilla block
-     * faces (both faces of a leaf look the same).
+     * Writes one leaf as a quad rotated by yaw (Y), pitch (X) and roll (Z), shaded by its normal (both faces of a leaf
+     * look the same).
      */
     private void emit(BufferBuilder builder, float x, float y, float z, float yaw, float pitch, float roll, float half, int rgb,
             int light, int sprite) {
@@ -1271,7 +1271,7 @@ final class LeafRenderer implements AutoCloseable {
         float nx = -ca * sc + sa * sb * cc;
         float ny = cb * cc;
         float nz = sa * sc + ca * sb * cc;
-        float shade = nx * nx * 0.6F + ny * ny + nz * nz * 0.8F;
+        float shade = faceShade(nx, ny, nz);
         int r = (int) ((rgb >> 16 & 0xFF) * shade);
         int g = (int) ((rgb >> 8 & 0xFF) * shade);
         int b = (int) ((rgb & 0xFF) * shade);
@@ -1289,6 +1289,18 @@ final class LeafRenderer implements AutoCloseable {
             float nx, float ny, float nz) {
         builder.vertex(x, y, z, (color >> 16 & 0xFF) / 255.0F, (color >> 8 & 0xFF) / 255.0F, (color & 0xFF) / 255.0F,
                 (color >>> 24) / 255.0F, u, v, overlay, light, nx, ny, nz);
+    }
+
+    /**
+     * Brightness of a leaf or pile surface by its normal: vanilla's face shading (sides 0.6, north/south 0.8), but only
+     * half as strong, since a thin leaf lets light through. A shader pack lights the leaves by their normal itself, so
+     * with one on they are not darkened twice.
+     */
+    private float faceShade(float nx, float ny, float nz) {
+        if (shaderPack) {
+            return 1.0F;
+        }
+        return 0.5F + 0.5F * (nx * nx * 0.6F + ny * ny + nz * nz * 0.8F);
     }
 
     @Override
