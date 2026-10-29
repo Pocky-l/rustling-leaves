@@ -223,10 +223,12 @@ public final class RenderBackend implements AutoCloseable {
      */
     private void drawNoted() {
         DynamicUniforms.Transform[] transforms = new DynamicUniforms.Transform[draws];
+        // A copy of its own: the uniform storage keeps the last transform to compare the next one with.
+        Matrix4f view = new Matrix4f(modelView);
         int maxIndices = 0;
         for (int i = 0; i < draws; i++) {
             Vector3f offset = new Vector3f(drawOffsets[i * 3], drawOffsets[i * 3 + 1], drawOffsets[i * 3 + 2]);
-            transforms[i] = new DynamicUniforms.Transform(modelView, WHITE, offset, IDENTITY);
+            transforms[i] = new DynamicUniforms.Transform(view, WHITE, offset, IDENTITY);
             maxIndices = Math.max(maxIndices, drawIndices[i]);
         }
         GpuBufferSlice[] slices = RenderSystem.getDynamicUniforms().writeTransforms(transforms);
