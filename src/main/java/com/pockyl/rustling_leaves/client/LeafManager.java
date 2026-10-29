@@ -583,7 +583,7 @@ public final class LeafManager {
         if (hide != LeafLitterModels.hidden()) {
             LeafLitterModels.setHidden(hide);
             if (minecraft.level != null) {
-                minecraft.levelExtractor.allChanged();
+                minecraft.levelRenderer.allChanged();
             }
         }
     }
@@ -688,7 +688,7 @@ public final class LeafManager {
     }
 
     private static Vec3 cameraPosition(Minecraft minecraft) {
-        Camera camera = minecraft.gameRenderer.mainCamera();
+        Camera camera = minecraft.gameRenderer.getMainCamera();
         if (camera.isInitialized()) {
             return camera.position();
         }

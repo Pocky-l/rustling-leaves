@@ -41,7 +41,7 @@ public final class PackWeather {
             DATA.wind(0.0F, 0.0F, partialTick);
         } else {
             Wind wind = simulation.wind();
-            Vec3 camera = Minecraft.getInstance().gameRenderer.mainCamera().position();
+            Vec3 camera = Minecraft.getInstance().gameRenderer.getMainCamera().position();
             float speed = wind.base() + 0.18F * wind.squall(camera.x, camera.z);
             DATA.wind(wind.dirX() * speed, wind.dirZ() * speed, partialTick);
             DATA.set(3, (float) (((wind.time() + partialTick) * 0.025) % GUST_PERIOD), 0.0F, 0.0F, 0.0F);
