@@ -91,6 +91,7 @@ public final class ModGameTests {
         test("season_curve_follows_the_year", ModGameTests::seasonCurveFollowsTheYear, EMPTY);
         test("leaves_fall_only_in_autumn", ModGameTests::leavesFallOnlyInAutumn, BOX, true);
         test("placed_leaves_do_not_shed_by_default", ModGameTests::placedLeavesDoNotShedByDefault, BOX, true);
+        test("vanilla_leaf_particles_become_leaves", ModGameTests::vanillaLeafParticlesBecomeLeaves, BOX, true);
         test("late_autumn_leaves_fall_in_autumn_colors", ModGameTests::lateAutumnLeavesFallInAutumnColors, BOX, true);
         test("falling_leaf_joins_the_litter", ModGameTests::fallingLeafJoinsTheLitter, BOX);
         test("leaf_rests_on_slab", ModGameTests::leafRestsOnSlab, BOX);
@@ -294,6 +295,75 @@ public final class ModGameTests {
         int allowed = shed(helper, Float.NaN, 200, null, true);
         helper.assertTrue(placed == 0, placed + " leaves fell from placed leaves");
         helper.assertTrue(allowed > 20, "only " + allowed + " leaves fell with placed leaves allowed");
+        helper.succeed();
+    }
+
+    /**
+     * Since 1.21.5 every leaves block drops vanilla falling leaves; each one becomes one simulated leaf at its spot (times
+     * the fall rate), and the canopy spawner leaves the calm fall of such trees to them.
+     */
+    public static void vanillaLeafParticlesBecomeLeaves(GameTestHelper helper) {
+        canopy(helper);
+        LeafSimulation sim = simulation(helper, 4096, LeafListener.NONE);
+        sim.settings().spawnRadius = 4;
+        sim.settings().placedLeaves = true;
+        SeasonCurve.clear(sim.settings());
+        LeafShape[] shape = {LeafShape.BROAD};
+        int[] fallen = new int[1];
+        LeafSpawner spawner = new LeafSpawner(new TreeLeaves() {
+            @Override
+            public int color(BlockState state, Level level, BlockPos pos) {
+                fallen[0]++;
+                return 0x00FF00;
+            }
+
+            @Override
+            public LeafShape shape(BlockState state) {
+                return shape[0];
+            }
+
+            @Override
+            public boolean dropsVanillaLeaves(BlockState state) {
+                return true;
+            }
+        });
+        BlockPos center = helper.absolutePos(new BlockPos(3, 1, 3));
+        for (int t = 0; t < 200; t++) {
+            sim.tick(helper.getLevel(), center.getX() + 0.5, center.getY(), center.getZ() + 0.5);
+            spawner.tick(helper.getLevel(), sim, center.getX() + 0.5, center.getZ() + 0.5);
+        }
+        helper.assertTrue(fallen[0] == 0, fallen[0] + " leaves fell in calm air besides the vanilla ones");
+        BlockPos crown = helper.absolutePos(new BlockPos(3, 5, 3));
+        BlockState leaves = helper.getLevel().getBlockState(crown);
+        spawner.dropBelow(helper.getLevel(), sim, leaves, crown);
+        helper.assertTrue(sim.pool().count() == 1, sim.pool().count() + " leaves for one vanilla leaf");
+        LeafPool pool = sim.pool();
+        for (int i = 0; i < pool.highWater(); i++) {
+            if (pool.state[i] != LeafPool.FREE) {
+                helper.assertTrue(pool.x[i] >= crown.getX() && pool.x[i] <= crown.getX() + 1 && pool.z[i] >= crown.getZ()
+                        && pool.z[i] <= crown.getZ() + 1 && Math.abs(pool.y[i] - crown.getY()) < 0.1, "the leaf is not under its block");
+            }
+        }
+        sim.settings().fallRate = 2.0F;
+        spawner.dropBelow(helper.getLevel(), sim, leaves, crown);
+        helper.assertTrue(sim.pool().count() == 3, "fall rate 2 did not drop two leaves");
+        sim.settings().placedLeaves = false;
+        spawner.dropBelow(helper.getLevel(), sim, leaves, crown);
+        helper.assertTrue(sim.pool().count() == 3, "placed leaves shed");
+        // Conifers shed less than vanilla, no tree more.
+        sim.settings().placedLeaves = true;
+        sim.settings().fallRate = 1.0F;
+        shape[0] = LeafShape.NEEDLE;
+        for (int n = 0; n < 200; n++) {
+            spawner.dropBelow(helper.getLevel(), sim, leaves, crown);
+        }
+        int needles = sim.pool().count() - 3;
+        helper.assertTrue(needles > 5 && needles < 70, needles + " needles for 200 vanilla leaves");
+        shape[0] = LeafShape.ROUND;
+        for (int n = 0; n < 50; n++) {
+            spawner.dropBelow(helper.getLevel(), sim, leaves, crown);
+        }
+        helper.assertTrue(sim.pool().count() - 3 - needles == 50, "a birch dropped more leaves than vanilla");
         helper.succeed();
     }
 
