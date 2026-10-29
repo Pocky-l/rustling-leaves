@@ -5,7 +5,7 @@ import com.mojang.logging.LogUtils;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.fml.ModList;
+import net.minecraftforge.fml.ModList;
 import org.slf4j.Logger;
 
 import com.pockyl.rustling_leaves.sim.LeafShape;
@@ -16,13 +16,16 @@ import java.lang.invoke.MethodType;
 import java.util.Arrays;
 
 /**
- * Tells a shader pack of <a href="https://modrinth.com/mod/iris">Iris</a> that the leaves it draws are leaves. A pack
+ * Tells a shader pack of <a href="https://www.curseforge.com/minecraft/mc-mods/oculus">Oculus</a> (the Forge port of Iris)
+ * that the leaves it draws are leaves. A pack
  * picks its material by the block id ({@code mc_Entity}) Iris writes into every terrain vertex; for quads outside the
  * chunk meshes Iris writes "no block", so packs light falling leaves like plain terrain: no light shining through them
  * against the sun, no foliage shading. Iris fills the id from the block its buffer builder was told about
  * ({@code BlockSensitiveBufferBuilder.beginBlock}, the call its own chunk meshing makes), and the pack's id of every
  * block state is in {@code WorldRenderingSettings.getBlockStateIds()}. Both are reached by reflection, so Iris is not
- * needed to build or run; any failure turns this off for the session.
+ * needed to build or run; any failure turns this off for the session. Oculus 1.7 and later have the package layout of
+ * Iris 1.7 ({@code net.irisshaders.iris}), older releases that of Iris 1.6 ({@code net.coderbot.iris}); both are looked
+ * up, with the 16-bit ids of Oculus or the int ids of newer Iris versions.
  */
 public final class IrisBlocks {
     private static final Logger LOGGER = LogUtils.getLogger();
@@ -33,7 +36,20 @@ public final class IrisBlocks {
             Blocks.SPRUCE_LEAVES.defaultBlockState(),
             Blocks.CHERRY_LEAVES.defaultBlockState(),
     };
-    private static final MethodHandle BEGIN;
+    /** Rendering settings and vertex tagging classes: Oculus 1.7 and later, then Oculus 1.6 and earlier. */
+    private static final String[][] INTERNALS = {
+            {"net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings",
+                    "net.irisshaders.iris.vertices.BlockSensitiveBufferBuilder"},
+            {"net.coderbot.iris.block_rendering.BlockRenderingSettings", "net.coderbot.iris.vertices.BlockSensitiveBufferBuilder"}
+    };
+
+    /** {@code beginBlock} of the layout found: the pack id of the block and its position. */
+    @FunctionalInterface
+    private interface BlockTagger {
+        void begin(BufferBuilder builder, int id, int x, int y, int z) throws Throwable;
+    }
+
+    private static final BlockTagger BEGIN;
     private static final MethodHandle END;
     private static final MethodHandle BLOCK_IDS;
 
@@ -42,32 +58,57 @@ public final class IrisBlocks {
     private static final int[] IDS = new int[LEAVES.length];
 
     static {
-        MethodHandle begin = null;
+        BlockTagger begin = null;
         MethodHandle end = null;
         MethodHandle blockIds = null;
         if (ModList.get().isLoaded("iris") || ModList.get().isLoaded("oculus")) {
-            try {
-                MethodHandles.Lookup lookup = MethodHandles.publicLookup();
-                Class<?> sensitive = Class.forName("net.irisshaders.iris.vertices.BlockSensitiveBufferBuilder");
-                begin = lookup.findVirtual(sensitive, "beginBlock", MethodType.methodType(void.class, int.class, byte.class,
-                                byte.class, int.class, int.class, int.class))
-                        .asType(MethodType.methodType(void.class, BufferBuilder.class, int.class, byte.class, byte.class,
-                                int.class, int.class, int.class));
-                end = lookup.findVirtual(sensitive, "endBlock", MethodType.methodType(void.class))
-                        .asType(MethodType.methodType(void.class, BufferBuilder.class));
-                Class<?> settings = Class.forName("net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings");
-                Object instance = settings.getField("INSTANCE").get(null);
-                blockIds = lookup.findVirtual(settings, "getBlockStateIds", MethodType.methodType(Object2IntMap.class))
-                        .bindTo(instance).asType(MethodType.methodType(Object.class));
-            } catch (ReflectiveOperationException | LinkageError | RuntimeException e) {
-                LOGGER.info("Shader packs will see the leaves as plain terrain: {}", e.toString());
-                begin = null;
+            MethodHandles.Lookup lookup = MethodHandles.publicLookup();
+            for (String[] names : INTERNALS) {
+                try {
+                    Class<?> settings = Class.forName(names[0]);
+                    Object instance = settings.getField("INSTANCE").get(null);
+                    MethodHandle ids = lookup.findVirtual(settings, "getBlockStateIds", MethodType.methodType(Object2IntMap.class))
+                            .bindTo(instance).asType(MethodType.methodType(Object.class));
+                    Class<?> sensitive = Class.forName(names[1]);
+                    BlockTagger tagger = tagger(lookup, sensitive);
+                    MethodHandle stop = lookup.findVirtual(sensitive, "endBlock", MethodType.methodType(void.class))
+                            .asType(MethodType.methodType(void.class, BufferBuilder.class));
+                    blockIds = ids;
+                    begin = tagger;
+                    end = stop;
+                    break;
+                } catch (ReflectiveOperationException | LinkageError | RuntimeException e) {
+                    // Not this layout; try the next one.
+                }
+            }
+            if (begin == null) {
+                LOGGER.info("Shader packs will see the leaves as plain terrain: no known Oculus vertex tagging");
             }
         }
         BEGIN = begin;
         END = end;
         BLOCK_IDS = blockIds;
         Arrays.fill(IDS, -1);
+    }
+
+    /** {@code beginBlock} with the 16-bit ids of Oculus, or with the int ids and light emission byte of newer Iris. */
+    private static BlockTagger tagger(MethodHandles.Lookup lookup, Class<?> sensitive) throws ReflectiveOperationException {
+        try {
+            MethodHandle begin = lookup.findVirtual(sensitive, "beginBlock", MethodType.methodType(void.class, short.class,
+                    short.class, int.class, int.class, int.class)).asType(MethodType.methodType(void.class, BufferBuilder.class,
+                    short.class, short.class, int.class, int.class, int.class));
+            // A block body: as a lambda expression the call would be compiled to return Object, not void.
+            return (builder, id, x, y, z) -> {
+                begin.invokeExact(builder, (short) id, (short) 0, x, y, z);
+            };
+        } catch (NoSuchMethodException e) {
+            MethodHandle begin = lookup.findVirtual(sensitive, "beginBlock", MethodType.methodType(void.class, int.class, byte.class,
+                    byte.class, int.class, int.class, int.class)).asType(MethodType.methodType(void.class, BufferBuilder.class,
+                    int.class, byte.class, byte.class, int.class, int.class, int.class));
+            return (builder, id, x, y, z) -> {
+                begin.invokeExact(builder, id, (byte) 0, (byte) 0, x, y, z);
+            };
+        }
     }
 
     private IrisBlocks() {
@@ -110,7 +151,7 @@ public final class IrisBlocks {
             return;
         }
         try {
-            BEGIN.invokeExact(builder, id, (byte) 0, (byte) 0, x, y, z);
+            BEGIN.begin(builder, id, x, y, z);
         } catch (Throwable e) {
             fail(e);
         }

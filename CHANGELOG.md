@@ -4,6 +4,45 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.0+1.20.1] - 2026-10-29
+Brings the Minecraft 1.20.1 version up to Rustling Leaves 2.8.0 (also 2.6.0 and 2.7.0).
+
+### Added
+- Leaf sounds of their own, cut from real field recordings: a dry crunch and swish when you walk through leaves,
+  soggy steps in wet leaves after rain and the scrape of a rake. They replace the borrowed block sounds.
+- Conifers drop needles: spruces, pines, firs and other conifers shed a small needle sprig (three shades, with its own
+  shadow) instead of the broad leaf. Under them lies a rusty carpet of mostly brown, dead needles that covers the
+  forest floor almost everywhere instead of in a few thin patches.
+- Leaves blow the way the rain slants with [Petrichor: Rain & Storms](https://www.curseforge.com/minecraft/mc-mods/petrichor-rain-storms) and the way the snow drifts with
+  [Hoarfrost: Snow & Blizzards](https://www.curseforge.com/minecraft/mc-mods/hoarfrost-snow-blizzards). Their gusts, squalls and whirlwinds stay. The option `leaves.livingWind` now
+  covers these mods too.
+- Client option `leaves.placedLeaves`: leaves placed by players (hedges, leaf roofs, decorations) no longer shed leaves
+  or get a leaf carpet under them, so builds stay tidy. Turn it on to have them shed like trees.
+- Shader packs can sway with the leaves' wind: while an [Oculus](https://www.curseforge.com/minecraft/mc-mods/oculus) shader pack is on, the mod hands its wind
+  and gust waves to the pack every frame (`rustling_leaves:shader_data`, a small data texture any pack can read).
+  [Pocky Shaders](https://www.curseforge.com/minecraft/shaders/pocky-shaders) bends grass and tree crowns with the very gusts that blow the leaves off.
+
+### Changed
+- Shader packs see falling leaves as leaves: with an Oculus shader pack, leaves in the air are shaded the way the pack
+  shades the tree crowns, glowing gold and red when a low sun shines through them.
+- New textures for leaf carpets and piles, strewn from the same small leaf sprites as the falling leaves. With
+  `leaves.oldLeafTextures` the piles get their old textures back too. Fewer leaves stick up from piles, and less
+  steeply.
+- Cleaner autumn colors: leaves that turn go all the way to golden, amber, orange, red or a warm brown instead of
+  olive and khaki. Softer shading on the ground: deeper leaves, the sides of piles and the shadows around them are
+  lighter, so litter no longer looks smudged.
+- Falling leaves are no longer darkened twice with a shader pack, and without one a leaf turned sideways is only a
+  little darker than one lying flat.
+- The pixel shadows of falling leaves fall the same way as the shadows of a shader pack that tilts the sun's path
+  (BSL, Complementary Unbound and others).
+
+### Fixed
+- No more short stutters caused by the leaf litter: the game froze for 50-70 ms every half minute while the litter was
+  saved, and for up to 100 ms after joining a world or teleporting while it was loaded. Saving and loading now go a
+  little at a time and the files are read in the background.
+- Leaves floating on the water no longer sink into it with shader packs whose water moves in waves (BSL, Photon,
+  MakeUp and others).
+
 ## [2.5.0+1.20.1] - 2026-10-27
 ### Added
 - Compatibility with [Living Wind](https://www.curseforge.com/minecraft/mc-mods/living-wind): leaves blow with its

@@ -33,17 +33,21 @@ public final class ShaderPacks {
             } catch (ReflectiveOperationException | LinkageError | RuntimeException e) {
                 inUse = null;
             }
-            try {
-                Class<?> manager = Class.forName("net.irisshaders.iris.pipeline.PipelineManager");
-                Class<?> rendering = Class.forName("net.irisshaders.iris.pipeline.WorldRenderingPipeline");
-                MethodHandle getManager = lookup.findStatic(Class.forName("net.irisshaders.iris.Iris"), "getPipelineManager",
-                        MethodType.methodType(manager));
-                MethodHandle getPipeline = lookup.findVirtual(manager, "getPipelineNullable", MethodType.methodType(rendering));
-                pipeline = MethodHandles.filterReturnValue(getManager, getPipeline).asType(MethodType.methodType(Object.class));
-                sunPath = lookup.findVirtual(rendering, "getSunPathRotation", MethodType.methodType(float.class))
-                        .asType(MethodType.methodType(float.class, Object.class));
-            } catch (ReflectiveOperationException | LinkageError | RuntimeException e) {
-                pipeline = null;
+            // Oculus 1.7 and later (package of Iris 1.7), then Oculus 1.6 and earlier.
+            for (String root : new String[] {"net.irisshaders.iris", "net.coderbot.iris"}) {
+                try {
+                    Class<?> manager = Class.forName(root + ".pipeline.PipelineManager");
+                    Class<?> rendering = Class.forName(root + ".pipeline.WorldRenderingPipeline");
+                    MethodHandle getManager = lookup.findStatic(Class.forName(root + ".Iris"), "getPipelineManager",
+                            MethodType.methodType(manager));
+                    MethodHandle getPipeline = lookup.findVirtual(manager, "getPipelineNullable", MethodType.methodType(rendering));
+                    pipeline = MethodHandles.filterReturnValue(getManager, getPipeline).asType(MethodType.methodType(Object.class));
+                    sunPath = lookup.findVirtual(rendering, "getSunPathRotation", MethodType.methodType(float.class))
+                            .asType(MethodType.methodType(float.class, Object.class));
+                    break;
+                } catch (ReflectiveOperationException | LinkageError | RuntimeException e) {
+                    pipeline = null;
+                }
             }
         }
         IN_USE = inUse;

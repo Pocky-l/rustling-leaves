@@ -3,7 +3,7 @@ package com.pockyl.rustling_leaves.client.compat;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.Mth;
-import net.neoforged.fml.ModList;
+import net.minecraftforge.fml.ModList;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 

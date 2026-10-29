@@ -2,10 +2,10 @@ package com.pockyl.rustling_leaves.client.compat;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.client.event.RenderFrameEvent;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
 
 import com.pockyl.rustling_leaves.RustlingLeaves;
 import com.pockyl.rustling_leaves.client.LeafManager;
@@ -21,7 +21,7 @@ import com.pockyl.rustling_leaves.sim.Wind;
  * The gust at a position is 0.5 + 0.32 sin(s) + 0.18 sin(2.7 s + 1.1) with s = phase - dot(xz, direction) * 0.05, as
  * in {@link Wind#gust}.
  */
-@EventBusSubscriber(modid = RustlingLeaves.MOD_ID, value = Dist.CLIENT)
+@Mod.EventBusSubscriber(modid = RustlingLeaves.MOD_ID, value = Dist.CLIENT)
 public final class PackWeather {
     /** sin(s) and sin(2.7 s) both repeat after 20 pi. */
     private static final double GUST_PERIOD = 20.0 * Math.PI;
@@ -31,11 +31,11 @@ public final class PackWeather {
     }
 
     @SubscribeEvent
-    static void onFrameStart(RenderFrameEvent.Pre event) {
-        if (!DATA.begin(ShaderPacks.inUse())) {
+    public static void onFrameStart(TickEvent.RenderTickEvent event) {
+        if (event.phase != TickEvent.Phase.START || !DATA.begin(ShaderPacks.inUse())) {
             return;
         }
-        float partialTick = event.getPartialTick().getGameTimeDeltaPartialTick(false);
+        float partialTick = event.renderTickTime;
         LeafSimulation simulation = LeafManager.simulation();
         if (simulation == null) {
             DATA.wind(0.0F, 0.0F, partialTick);

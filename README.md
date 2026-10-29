@@ -99,6 +99,7 @@ No keys. Just play:
 | `leaves.maxLeaves` | `8000` | Maximum number of moving leaves (0 disables the mod); lying leaves are not counted |
 | `leaves.fallRate` | `1.0` | How often leaves fall from trees (0 = no falling leaves) |
 | `leaves.treeFallRates` | `true` | Birches shed more, conifers less (off = all trees alike) |
+| `leaves.placedLeaves` | `false` | Leaves placed by players (hedges, leaf roofs) shed and get litter like trees |
 | `leaves.spawnRadius` | `32` | Radius around you in which trees drop leaves |
 | `leaves.carpetDepth` | `4` | Natural leaf carpet thickness (leaves per quarter block, 0 = none) |
 | `leaves.naturalPiles` | `true` | Drifts against walls and trunks and occasional piles in forests |
@@ -110,7 +111,7 @@ No keys. Just play:
 | `leaves.autumnColors` | `0.35` | Share of leaves in autumn colors |
 | `leaves.immersiveWeatheringPiles` | `true` | Draw Immersive Weathering's leaf piles as leaf litter |
 | `leaves.realisticWaves` | `true` | With Realistic Waves: floating leaves ride its waves (off = flat vanilla water level) |
-| `leaves.livingWind` | `true` | With Living Wind: leaves blow with its wind (off = their own wind) |
+| `leaves.livingWind` | `true` | With Living Wind, Petrichor or Hoarfrost: leaves blow with their wind (off = their own wind) |
 | `leaves.fallingLeavesMod` | `false` | With Falling Leaves or Living Wind: keep their falling leaves as well (off = only Rustling Leaves' leaves fall) |
 | `leaves.leavesPerBreak` | `14` | Leaves released by a broken or decayed leaves block |
 | `physics.windStrength` | `1.0` | Wind strength (0 = still air) |
@@ -143,6 +144,8 @@ Leaf litter is saved in `saves/<world>/rustling_leaves/` (singleplayer) or `rust
   (its snow from snowy leaves stays; `leaves.fallingLeavesMod` keeps both).
 - [Living Wind](https://www.curseforge.com/minecraft/mc-mods/living-wind): leaves blow with its wind, the way its wind vanes point and as hard as it blows; it leaves the
   falling leaves to this mod (`leaves.livingWind`, `leaves.fallingLeavesMod`).
+- [Petrichor: Rain & Storms](https://www.curseforge.com/minecraft/mc-mods/petrichor-rain-storms) and [Hoarfrost: Snow & Blizzards](https://www.curseforge.com/minecraft/mc-mods/hoarfrost-snow-blizzards): leaves blow the way the rain
+  slants and the snow drifts (`leaves.livingWind`).
 - [Sodium](https://modrinth.com/mod/sodium) works.
 
 ## Installation
@@ -169,7 +172,9 @@ The jar is written to `build/libs/`.
 
 - Author: **Pocky**.
 - Falling leaf and petal textures: from newer Minecraft versions, adapted for tinting. Pile textures and logo:
-  original, made for this mod. Sounds: vanilla Minecraft.
+  original, made for this mod. Sounds: CC0 field recordings from [Freesound](https://freesound.org) by Shain_T,
+  SpliceSound, Magdaadga, lolamadeus, nickmaysoundmusic, audioninja001, Ryding, Garuda1982 and Stefan21100190, cut
+  for the mod.
 
 <!-- more-mods:start -->
 ## More mods by Pocky

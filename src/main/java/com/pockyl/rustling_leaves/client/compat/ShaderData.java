@@ -10,7 +10,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.world.level.biome.Biome;
-import net.neoforged.fml.ModList;
+import net.minecraftforge.fml.ModList;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
@@ -66,7 +66,7 @@ public final class ShaderData {
 
     public ShaderData(String modId, int texels) {
         this.modId = modId;
-        this.id = ResourceLocation.fromNamespaceAndPath(modId, "shader_data");
+        this.id = new ResourceLocation(modId, "shader_data");
         this.values = new float[texels * 4];
         for (int share = 0; share < OWNERS.length; share++) {
             for (String owner : OWNERS[share]) {
