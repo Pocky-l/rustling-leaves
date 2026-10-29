@@ -296,7 +296,7 @@ public final class LeafManager {
         }
         float volume = Math.min(1.0F, 0.4F + moved / 60.0F) * Math.max(0.3F, SETTINGS.rustleVolume);
         level.playLocalSound(at.x, at.y, at.z, LeafSounds.RAKE, SoundSource.PLAYERS, volume,
-                0.92F + level.random.nextFloat() * 0.16F, false);
+                0.92F + level.getRandom().nextFloat() * 0.16F, false);
         return true;
     }
 
@@ -432,7 +432,7 @@ public final class LeafManager {
      */
     private static boolean placedByHand(BlockPos pos) {
         Player player = Minecraft.getInstance().player;
-        if (player == null || player.distanceToSqr(pos.getCenter()) > 8.0 * 8.0) {
+        if (player == null || player.distanceToSqr(Vec3.atCenterOf(pos)) > 8.0 * 8.0) {
             return false;
         }
         for (InteractionHand hand : InteractionHand.values()) {
@@ -487,7 +487,7 @@ public final class LeafManager {
             for (LitterChunk chunk : far) {
                 // Packed for the disk over the next ticks (a teleport moves hundreds of chunks out of range at once).
                 if (chunk.isDirty()) {
-                    leaving.put(ChunkPos.asLong(chunk.x, chunk.z), chunk);
+                    leaving.put(ChunkPos.pack(chunk.x, chunk.z), chunk);
                 }
                 field.remove(chunk.x, chunk.z);
             }
@@ -496,7 +496,7 @@ public final class LeafManager {
                 for (int cz = camChunkZ - reach; cz <= camChunkZ + reach; cz++) {
                     if (field.chunk(cx, cz) == null && chunkDistanceSq(cx, cz, camera) <= loadSq
                             && level.getChunkSource().hasChunk(cx, cz)) {
-                        toLoad.add(ChunkPos.asLong(cx, cz));
+                        toLoad.add(ChunkPos.pack(cx, cz));
                     }
                 }
             }
@@ -583,7 +583,7 @@ public final class LeafManager {
         if (hide != LeafLitterModels.hidden()) {
             LeafLitterModels.setHidden(hide);
             if (minecraft.level != null) {
-                minecraft.levelRenderer.allChanged();
+                minecraft.levelExtractor.allChanged();
             }
         }
     }
@@ -688,7 +688,7 @@ public final class LeafManager {
     }
 
     private static Vec3 cameraPosition(Minecraft minecraft) {
-        Camera camera = minecraft.gameRenderer.getMainCamera();
+        Camera camera = minecraft.gameRenderer.mainCamera();
         if (camera.isInitialized()) {
             return camera.position();
         }
@@ -750,7 +750,7 @@ public final class LeafManager {
             SOUND_READY.put(disturbingEntity, ticks + SOUND_COOLDOWN);
             float loudness = Math.min(1.0F, 0.3F + count / 20.0F) * volume;
             // Field recordings: only a little pitch play, lower for bigger heaps of leaves.
-            float pitch = 0.93F + level.random.nextFloat() * 0.14F - Math.min(0.08F, count / 600.0F);
+            float pitch = 0.93F + level.getRandom().nextFloat() * 0.14F - Math.min(0.08F, count / 600.0F);
             level.playLocalSound(x, y, z, sound, SoundSource.AMBIENT, loudness, pitch, false);
         }
 

@@ -12,7 +12,8 @@ base {
     archivesName = "${mod_id}-neoforge-${minecraft_version}"
 }
 
-java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+// Minecraft 26.2 runs on Java 25.
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
 
 sourceSets.main.resources {
     srcDir('src/generated/resources')
@@ -32,11 +33,6 @@ repositories {
 
 neoForge {
     version = project.neo_version
-
-    parchment {
-        mappingsVersion = project.parchment_mappings_version
-        minecraftVersion = project.parchment_minecraft_version
-    }
 
     runs {
         client {
@@ -58,7 +54,7 @@ neoForge {
         }
 
         data {
-            data()
+            clientData()
             programArguments.addAll '--mod', project.mod_id, '--all',
                     '--output', file('src/generated/resources/').absolutePath,
                     '--existing', file('src/main/resources/').absolutePath
@@ -115,6 +111,7 @@ neoForge.ideSyncTask generateModMetadata
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
+    options.compilerArgs.addAll(['-Xmaxerrs', '50000'])
 }
 
 tasks.named('jar', Jar) {
@@ -152,9 +149,11 @@ static String extractChangelog(String changelog, String version) {
     return body ?: null
 }
 
+// Versions of ports are tagged with their Minecraft version in the changelog, e.g. 2.8.0+26.2.
+def releaseVersion = "${mod_version}+${minecraft_version}"
 def releaseNotes = extractChangelog(
         providers.fileContents(layout.projectDirectory.file('CHANGELOG.md')).asText.getOrElse(''),
-        mod_version)
+        releaseVersion)
 def curseforgeToken = providers.gradleProperty('curseforge_token')
         .orElse(providers.environmentVariable('CURSEFORGE_TOKEN'))
 
@@ -164,7 +163,7 @@ var releaseNotesTask = tasks.register('releaseNotes') {
     description = 'Validates release metadata and writes notes for the current version.'
 
     def notes = releaseNotes
-    def version = mod_version
+    def version = releaseVersion
     def projectId = curseforge_project_id
     def output = layout.buildDirectory.file('release-notes.md')
     inputs.property('notes', notes ?: '')
@@ -186,7 +185,7 @@ publishMods {
     file = tasks.named('jar', Jar).flatMap { it.archiveFile }
     changelog = releaseNotes ?: ''
     type = STABLE
-    displayName = "${mod_name} ${mod_version}"
+    displayName = "${mod_name} ${releaseVersion}"
     modLoaders.add('neoforge')
     dryRun = providers.gradleProperty('dryRun').map { it != 'false' }.orElse(false)
 
@@ -194,7 +193,7 @@ publishMods {
         projectId = curseforge_project_id
         accessToken = curseforgeToken
         minecraftVersions.add(minecraft_version)
-        javaVersions.add(JavaVersion.VERSION_21)
+        javaVersions.add(JavaVersion.VERSION_25)
         client = curseforge_client.toBoolean()
         server = curseforge_server.toBoolean()
         curseforge_requires.split(',')*.trim().findAll().each { requires(it) }

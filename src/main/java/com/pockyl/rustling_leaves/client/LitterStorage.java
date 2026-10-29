@@ -60,7 +60,7 @@ final class LitterStorage implements AutoCloseable {
      * read in the background and this turns true on a later call.
      */
     boolean ready(int chunkX, int chunkZ) {
-        long key = ChunkPos.asLong(chunkX >> 5, chunkZ >> 5);
+        long key = ChunkPos.pack(chunkX >> 5, chunkZ >> 5);
         if (regions.containsKey(key)) {
             return true;
         }
@@ -81,7 +81,7 @@ final class LitterStorage implements AutoCloseable {
 
     /** The saved litter of a chunk, or null if it was never saved. */
     LitterChunk load(int chunkX, int chunkZ) {
-        byte[] bytes = region(chunkX >> 5, chunkZ >> 5).chunks.get(ChunkPos.asLong(chunkX, chunkZ));
+        byte[] bytes = region(chunkX >> 5, chunkZ >> 5).chunks.get(ChunkPos.pack(chunkX, chunkZ));
         if (bytes == null) {
             return null;
         }
@@ -101,7 +101,7 @@ final class LitterStorage implements AutoCloseable {
             throw new IllegalStateException(e);
         }
         Region region = region(chunk.x >> 5, chunk.z >> 5);
-        region.chunks.put(ChunkPos.asLong(chunk.x, chunk.z), bytes.toByteArray());
+        region.chunks.put(ChunkPos.pack(chunk.x, chunk.z), bytes.toByteArray());
         region.dirty = true;
     }
 
@@ -138,7 +138,7 @@ final class LitterStorage implements AutoCloseable {
 
     /** A region in memory; one that is not yet (only when storing a chunk that was never asked for) is read now. */
     private Region region(int regionX, int regionZ) {
-        long key = ChunkPos.asLong(regionX, regionZ);
+        long key = ChunkPos.pack(regionX, regionZ);
         Region region = regions.get(key);
         if (region == null) {
             CompletableFuture<Region> pending = reading.remove(key);

@@ -96,7 +96,7 @@ public final class LitterField {
         if (cached != null && cached.x == chunkX && cached.z == chunkZ) {
             return cached;
         }
-        LitterChunk chunk = chunks.get(ChunkPos.asLong(chunkX, chunkZ));
+        LitterChunk chunk = chunks.get(ChunkPos.pack(chunkX, chunkZ));
         if (chunk != null) {
             last = chunk;
         }
@@ -109,12 +109,12 @@ public final class LitterField {
 
     public void put(LitterChunk chunk) {
         last = null;
-        chunks.put(ChunkPos.asLong(chunk.x, chunk.z), chunk);
+        chunks.put(ChunkPos.pack(chunk.x, chunk.z), chunk);
     }
 
     public LitterChunk remove(int chunkX, int chunkZ) {
         last = null;
-        return chunks.remove(ChunkPos.asLong(chunkX, chunkZ));
+        return chunks.remove(ChunkPos.pack(chunkX, chunkZ));
     }
 
     public Collection<LitterChunk> chunks() {
@@ -384,7 +384,7 @@ public final class LitterField {
     }
 
     public void queueRelax(int cellX, int cellZ) {
-        relaxQueue.enqueue(ChunkPos.asLong(cellX, cellZ));
+        relaxQueue.enqueue(ChunkPos.pack(cellX, cellZ));
     }
 
     /**
@@ -443,7 +443,7 @@ public final class LitterField {
                         moved = true;
                     }
                 }
-                relaxQueue.enqueue(ChunkPos.asLong(tx, tz));
+                relaxQueue.enqueue(ChunkPos.pack(tx, tz));
             }
             if (moved) {
                 relaxQueue.enqueue(key);

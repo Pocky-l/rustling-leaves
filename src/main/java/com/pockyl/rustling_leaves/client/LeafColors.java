@@ -1,9 +1,11 @@
 package com.pockyl.rustling_leaves.client;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.color.block.BlockTintSource;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.BlockAndTintGetter;
+import net.minecraft.world.level.Level;
+import net.minecraft.client.renderer.block.BlockAndTintGetter;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -19,9 +21,11 @@ import java.util.Map;
 final class LeafColors {
     private final Map<Block, Integer> textureAverage = new IdentityHashMap<>();
 
-    /** The tree color of a leaves block at a position. */
-    int base(BlockState state, BlockAndTintGetter level, BlockPos pos) {
-        int tint = Minecraft.getInstance().getBlockColors().getColor(state, level, pos, 0);
+    /** The tree color of a leaves block at a position (the client level tints by biome). */
+    int base(BlockState state, Level level, BlockPos pos) {
+        BlockTintSource source = Minecraft.getInstance().getBlockColors().getTintSource(state, 0);
+        int tint = source == null ? -1
+                : level instanceof BlockAndTintGetter tinted ? source.colorInWorld(state, tinted, pos) : source.color(state);
         return LeafPalette.multiply(tint == -1 ? 0xFFFFFF : tint, textureAverage(state));
     }
 
@@ -32,7 +36,7 @@ final class LeafColors {
     private int textureAverage(BlockState state) {
         return textureAverage.computeIfAbsent(state.getBlock(), block -> {
             try {
-                TextureAtlasSprite sprite = Minecraft.getInstance().getBlockRenderer().getBlockModel(state).particleIcon();
+                TextureAtlasSprite sprite = Minecraft.getInstance().getModelManager().getBlockStateModelSet().getParticleMaterial(state).sprite();
                 int width = sprite.contents().width();
                 int height = sprite.contents().height();
                 long r = 0;

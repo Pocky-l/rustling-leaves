@@ -20,7 +20,7 @@ public final class LeafSpawner {
     private static final int MAX_CANOPY_DEPTH = 10;
 
     private final TreeLeaves trees;
-    private final RandomSource random = RandomSource.createNewThreadLocalInstance();
+    private final RandomSource random = RandomSource.createThreadLocalInstance();
     private final BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
 
     public LeafSpawner(TreeLeaves trees) {

@@ -134,7 +134,7 @@ public final class ShaderData {
         }
         boolean open = level.dimensionType().hasSkyLight() && !level.dimensionType().hasCeiling();
         float rain = open ? level.getRainLevel(partialTick) : 0.0F;
-        BlockPos pos = minecraft.gameRenderer.getMainCamera().blockPosition();
+        BlockPos pos = minecraft.gameRenderer.mainCamera().blockPosition();
         float snowy = level.getBiome(pos).value().getPrecipitationAt(pos, level.getSeaLevel()) == Biome.Precipitation.SNOW ? 1.0F : 0.0F;
         float[] shares = {rain * (1.0F - snowy), rain * snowy, 1.0F - rain};
         float covered = 0.0F;

@@ -170,12 +170,12 @@ public final class ModGameTests {
     }
 
     private static void registerTests(RegisterGameTestsEvent event) {
-        Holder<TestEnvironmentDefinition> environment = event.registerEnvironment(RustlingLeaves.id("default"),
+        Holder<TestEnvironmentDefinition<?>> environment = event.registerEnvironment(RustlingLeaves.id("default"),
                 new TestEnvironmentDefinition.AllOf(List.of()));
         for (Test test : TESTS) {
             Identifier id = RustlingLeaves.id(test.name());
-            TestData<Holder<TestEnvironmentDefinition>> data = new TestData<>(environment, test.structure(), MAX_TICKS, 0, true,
-                    Rotation.NONE, false, 1, 1, test.skyAccess());
+            TestData<Holder<TestEnvironmentDefinition<?>>> data = new TestData<>(environment, test.structure(), MAX_TICKS, 0, true,
+                    Rotation.NONE, false, 1, 1, test.skyAccess(), 0);
             event.registerTest(id, new FunctionGameTestInstance(ResourceKey.create(Registries.TEST_FUNCTION, id), data));
         }
     }

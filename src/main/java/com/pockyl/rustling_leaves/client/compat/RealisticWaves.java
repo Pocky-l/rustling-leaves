@@ -103,7 +103,7 @@ public final class RealisticWaves implements WaterWaves {
 
     /** The lift at a block corner, taken just inside the first of the four blocks around it that has waves. */
     private float corner(Level level, int cornerX, int cornerZ) {
-        long key = ChunkPos.asLong(cornerX, cornerZ);
+        long key = ChunkPos.pack(cornerX, cornerZ);
         float cached = corners.get(key);
         if (cached != MISSING) {
             return cached;

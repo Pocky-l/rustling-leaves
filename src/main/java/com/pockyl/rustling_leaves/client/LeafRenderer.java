@@ -431,7 +431,7 @@ final class LeafRenderer implements AutoCloseable {
             if (chunk.total() == 0) {
                 continue;
             }
-            long key = ChunkPos.asLong(chunk.x, chunk.z);
+            long key = ChunkPos.pack(chunk.x, chunk.z);
             ChunkView view = views.get(key);
             if (view == null || view.chunk != chunk) {
                 if (view != null) {

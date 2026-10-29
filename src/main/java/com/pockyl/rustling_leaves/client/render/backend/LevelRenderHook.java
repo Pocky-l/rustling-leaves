@@ -45,6 +45,6 @@ public final class LevelRenderHook {
             return;
         }
         // The stub backend does not use the projection; the real one takes it from RenderSystem's projection buffer.
-        LeafManager.render(camera, LOOK, frustum, event.getModelViewMatrix(), new Matrix4f(), partialTick);
+        LeafManager.render(camera, LOOK, frustum, new Matrix4f(event.getModelViewMatrix()), new Matrix4f(), partialTick);
     }
 }
