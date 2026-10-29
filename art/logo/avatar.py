@@ -243,11 +243,7 @@ def compose():
                 leaf = leaf_at(leaves, ROCK * math.sin(w * math.tau * 0.8 + size), size, color, blur=1.4)
                 drop_shadow(img, leaf, x, y, (16, 26), 12, 0.22)
                 paste(img, leaf, x, y)
-        mask = Image.new("L", (S, S), 0)
-        ImageDraw.Draw(mask).rounded_rectangle([0, 0, S - 1, S - 1], radius=S // 8, fill=255)
-        out = Image.new("RGBA", (S, S), (0, 0, 0, 0))
-        out.paste(img, (0, 0), mask)
-        return out
+        return img  # square: CurseForge and Modrinth round the corners of avatars themselves
 
     frame(0.0).save(HERE / "avatar_512.png")
     tmp = tempfile.mkdtemp()
