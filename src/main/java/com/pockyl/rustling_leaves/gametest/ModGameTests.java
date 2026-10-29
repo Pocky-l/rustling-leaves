@@ -33,6 +33,7 @@ import com.pockyl.rustling_leaves.network.ModNetwork;
 import com.pockyl.rustling_leaves.network.RakePayload;
 import com.pockyl.rustling_leaves.sim.Armful;
 import com.pockyl.rustling_leaves.sim.LeafListener;
+import com.pockyl.rustling_leaves.sim.LeafPalette;
 import com.pockyl.rustling_leaves.sim.LeafPool;
 import com.pockyl.rustling_leaves.sim.LeafSettings;
 import com.pockyl.rustling_leaves.sim.LeafShape;
@@ -92,6 +93,7 @@ public final class ModGameTests {
         test("leaves_fall_only_in_autumn", ModGameTests::leavesFallOnlyInAutumn, BOX, true);
         test("placed_leaves_do_not_shed_by_default", ModGameTests::placedLeavesDoNotShedByDefault, BOX, true);
         test("vanilla_leaf_particles_become_leaves", ModGameTests::vanillaLeafParticlesBecomeLeaves, BOX, true);
+        test("pale_oak_leaves_stay_pale_in_autumn", ModGameTests::paleOakLeavesStayPaleInAutumn, EMPTY);
         test("late_autumn_leaves_fall_in_autumn_colors", ModGameTests::lateAutumnLeavesFallInAutumnColors, BOX, true);
         test("falling_leaf_joins_the_litter", ModGameTests::fallingLeafJoinsTheLitter, BOX);
         test("leaf_rests_on_slab", ModGameTests::leafRestsOnSlab, BOX);
@@ -364,6 +366,22 @@ public final class ModGameTests {
             spawner.dropBelow(helper.getLevel(), sim, leaves, crown);
         }
         helper.assertTrue(sim.pool().count() - 3 - needles == 50, "a birch dropped more leaves than vanilla");
+        helper.succeed();
+    }
+
+    /** Pale oak leaves (grey-green) keep their colour when every other tree turns golden and red. */
+    public static void paleOakLeavesStayPaleInAutumn(GameTestHelper helper) {
+        int paleOak = 0x858B83;
+        int oak = 0x2E750E;
+        int turned = 0;
+        for (int n = 0; n < 200; n++) {
+            long hash = LeafPalette.hash(n, 7, 11);
+            int pale = LeafPalette.vary(paleOak, hash, 1.0F, LeafShape.BROAD);
+            helper.assertTrue(LeafPalette.saturation(pale) < 0.15F, String.format("a pale oak leaf turned %06X", pale));
+            int green = LeafPalette.vary(oak, hash, 1.0F, LeafShape.BROAD);
+            turned += (green >> 16 & 0xFF) > (green >> 8 & 0xFF) ? 1 : 0;
+        }
+        helper.assertTrue(turned > 150, "only " + turned + " of 200 oak leaves turned");
         helper.succeed();
     }
 

@@ -13,6 +13,11 @@ public final class LeafPalette {
     private static final int[] NEEDLE_RUST = {0xB8743A, 0xC98A45, 0xA5612F, 0xD09A55, 0x9C5A34};
     /** Share of shed needles that are dead (brown); the rest fell green. */
     private static final float DEAD_NEEDLES = 0.8F;
+    /**
+     * Trees whose leaves are almost grey (the pale oak, saturation 0.06; other trees 0.4 and more) keep their ghostly
+     * colour in autumn: golden and red leaves would glow in the pale garden.
+     */
+    private static final float PALE = 0.15F;
 
     private LeafPalette() {
     }
@@ -20,7 +25,8 @@ public final class LeafPalette {
     /**
      * Gives one leaf its own color from the tree color: a share of leaves turns to an autumn color, every leaf gets a
      * slightly different brightness. A turned leaf keeps at most a fifth of the tree's green: halfway between green and
-     * orange is olive, which looks like dirt. Most conifer needles are dead and brown. Deterministic in {@code hash}.
+     * orange is olive, which looks like dirt. Most conifer needles are dead and brown; pale trees stay pale.
+     * Deterministic in {@code hash}.
      */
     public static int vary(int base, long hash, float autumnShare, LeafShape shape) {
         float pick = (hash & 0xFFFF) / 65536.0F;
@@ -29,12 +35,21 @@ public final class LeafPalette {
             // Conifers shed their old needles, which have died and turned brown, whatever the season.
             int rust = NEEDLE_RUST[(int) ((hash >>> 16) & 0xFF) % NEEDLE_RUST.length];
             color = lerp(color, rust, 0.85F + ((hash >>> 24) & 0xFF) / 255.0F * 0.15F);
-        } else if (shape.autumn && pick < autumnShare) {
+        } else if (shape.autumn && pick < autumnShare && saturation(base) >= PALE) {
             int autumn = AUTUMN[(int) ((hash >>> 16) & 0xFF) % AUTUMN.length];
             color = lerp(color, autumn, 0.8F + ((hash >>> 24) & 0xFF) / 255.0F * 0.2F);
         }
         float brightness = 0.93F + ((hash >>> 32) & 0xFF) / 255.0F * 0.17F;
         return scale(color, brightness);
+    }
+
+    /** How colourful a color is: 0 grey, 1 a pure hue. */
+    public static float saturation(int color) {
+        int r = color >> 16 & 0xFF;
+        int g = color >> 8 & 0xFF;
+        int b = color & 0xFF;
+        int max = Math.max(r, Math.max(g, b));
+        return max == 0 ? 0.0F : (max - Math.min(r, Math.min(g, b))) / (float) max;
     }
 
     public static int multiply(int a, int b) {
