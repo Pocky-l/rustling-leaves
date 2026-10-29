@@ -45,6 +45,7 @@ import com.pockyl.rustling_leaves.client.compat.ImmersiveWeathering;
 import com.pockyl.rustling_leaves.client.compat.LivingWind;
 import com.pockyl.rustling_leaves.client.compat.RealisticWaves;
 import com.pockyl.rustling_leaves.client.compat.SereneSeasons;
+import com.pockyl.rustling_leaves.client.compat.ShaderPacks;
 import com.pockyl.rustling_leaves.network.RakePayload;
 import com.pockyl.rustling_leaves.sim.LeafListener;
 import com.pockyl.rustling_leaves.sim.LeafPool;
@@ -105,6 +106,10 @@ public final class LeafManager {
     private static final Int2IntOpenHashMap LAST_SWING = new Int2IntOpenHashMap();
 
     private static volatile boolean configChanged;
+    /** How far above the still water floating leaves are drawn while a shader pack draws the water. */
+    private static final float SHADER_WATER_LIFT = 0.04F;
+    /** Whether a shader pack is on, checked once per tick (it can be switched in game). */
+    private static boolean shaderWater;
     private static boolean wavesLookedUp;
     private static RealisticWaves realisticWaves;
     private static boolean windLookedUp;
@@ -166,6 +171,7 @@ public final class LeafManager {
             storage = new LitterStorage(storageDirectory(minecraft, level));
         }
         ticks++;
+        shaderWater = ShaderPacks.inUse();
         burstsThisTick = 0;
         soundsThisTick = 0;
         Vec3 camera = cameraPosition(minecraft);
@@ -319,8 +325,21 @@ public final class LeafManager {
         return simulation != null && SETTINGS.fallRate > 0.0F && !SETTINGS.otherModLeaves;
     }
 
-    /** The waves of Realistic Waves for the floating leaves, if installed and wanted. */
+    /**
+     * The water surface the floating leaves are drawn on: the waves of Realistic Waves where it draws them, and with a
+     * shader pack the pack's water, which sways up to about 0.03 blocks above the vanilla surface and would cover
+     * leaves lying on the still water.
+     */
     private static WaterWaves waves() {
+        WaterWaves modWaves = modWaves();
+        return (x, z) -> {
+            float lift = modWaves.lift(x, z);
+            return Float.isNaN(lift) && shaderWater ? SHADER_WATER_LIFT : lift;
+        };
+    }
+
+    /** The waves of Realistic Waves, if installed and wanted. */
+    private static WaterWaves modWaves() {
         if (!SETTINGS.rideWaves || !ModList.get().isLoaded(RealisticWaves.MOD_ID)) {
             return WaterWaves.NONE;
         }

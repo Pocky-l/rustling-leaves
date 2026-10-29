@@ -106,7 +106,7 @@ Leaf litter is saved in `saves/<world>/rustling_leaves/` (singleplayer) or `rust
 
 [![Pocky Shaders](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/compat/pocky-shaders.png)](https://www.curseforge.com/minecraft/shaders/pocky-shaders) ✅ **[Pocky Shaders](https://www.curseforge.com/minecraft/shaders/pocky-shaders)** (shader pack) - a shader pack that sways grass and tree crowns with the same gust waves that blow the leaves.
 
-[![Iris](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/compat/iris.png)](https://modrinth.com/mod/iris) ✅ **[Iris](https://modrinth.com/mod/iris)** (shader packs) - leaves and litter are lit and shaded like the blocks around them.
+[![Iris](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/compat/iris.png)](https://modrinth.com/mod/iris) ✅ **[Iris](https://modrinth.com/mod/iris)** (shader packs) - leaves and litter are lit and shaded like the blocks around them, falling leaves glow against the sun like the tree crowns, floating leaves stay on top of the pack's water.
 
 [![Oculus](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/compat/oculus.png)](https://www.curseforge.com/minecraft/mc-mods/oculus) ✅ **[Oculus](https://www.curseforge.com/minecraft/mc-mods/oculus)** (shader packs on Forge) - the same as with Iris.
 

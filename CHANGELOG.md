@@ -4,6 +4,17 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.0] - 2026-10-29
+### Changed
+- Shader packs see falling leaves as leaves. With an [Iris](https://modrinth.com/mod/iris) shader pack, leaves in the
+  air are shaded the way the pack shades the tree crowns: they light up when the sun shines through them, glowing
+  gold and red against a low sun, instead of being lit like a piece of ground.
+
+### Fixed
+- Leaves floating on the water no longer sink into it with shader packs whose water moves in waves (BSL, Photon,
+  MakeUp and others): they stay on top of the drawn water, sharp and in full colour, instead of showing dimly through
+  it.
+
 ## [2.7.0] - 2026-10-29
 ### Added
 - Conifers drop needles: spruces, pines, firs and other conifers shed a small needle sprig drawn in the style of the

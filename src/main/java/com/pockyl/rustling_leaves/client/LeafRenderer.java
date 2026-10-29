@@ -30,6 +30,7 @@ import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
 import com.pockyl.rustling_leaves.RustlingLeaves;
+import com.pockyl.rustling_leaves.client.compat.IrisBlocks;
 import com.pockyl.rustling_leaves.client.compat.ShaderPacks;
 import com.pockyl.rustling_leaves.sim.LeafPalette;
 import com.pockyl.rustling_leaves.sim.LeafPool;
@@ -1100,6 +1101,9 @@ final class LeafRenderer implements AutoCloseable {
         float sunSlope = (float) simulation.sunSlope();
         float beamPerHeight = Mth.sqrt(1.0F + sunSlope * sunSlope);
         float fadeLength = (float) LeafSimulation.SHADOW_MAX_BEAM - SHADOW_SHARP_BEAM;
+        // With a shader pack the falling leaves are marked as their tree's leaves, so the pack shades them as foliage
+        // (light through the leaf against the sun); litter stays plain terrain, where swaying foliage would look wrong.
+        int[] blockIds = shaderPack ? IrisBlocks.ids() : null;
         for (int i = 0, highWater = pool.highWater(); i < highWater; i++) {
             byte state = pool.state[i];
             if (state == LeafPool.FREE || !drawnChunk(Mth.floor(pool.x[i]) >> 4, Mth.floor(pool.z[i]) >> 4)) {
@@ -1121,6 +1125,9 @@ final class LeafRenderer implements AutoCloseable {
             float yaw = Mth.lerp(partialTick, pool.prevYaw[i], pool.yaw[i]);
             float pitch = Mth.lerp(partialTick, pool.prevPitch[i], pool.pitch[i]);
             float roll = Mth.lerp(partialTick, pool.prevRoll[i], pool.roll[i]);
+            if (blockIds != null) {
+                IrisBlocks.begin(builder, blockIds[pool.shape[i]], Mth.floor(x), Mth.floor(y), Mth.floor(z));
+            }
             emit(builder, x, y, z, yaw, pitch, roll, size, color, pool.light[i], LeafShapes.slot(pool.shape[i], pool.sprite[i], oldTextures));
             float ground = pool.shadow[i];
             if (shadowBuilder != null && state == LeafPool.FALLING && !Float.isNaN(ground)) {
@@ -1139,6 +1146,9 @@ final class LeafRenderer implements AutoCloseable {
                     }
                 }
             }
+        }
+        if (blockIds != null) {
+            IrisBlocks.end(builder);
         }
         MeshData mesh = builder.build();
         movingEmpty = mesh == null;

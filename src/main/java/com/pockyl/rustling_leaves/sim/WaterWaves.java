@@ -1,8 +1,8 @@
 package com.pockyl.rustling_leaves.sim;
 
 /**
- * Waves that another mod draws on the water: the drawn surface rises above and sinks below the still water level the
- * simulation works with. Floating leaves keep drifting on the still water and are only drawn riding the waves, so the
+ * The water surface as it is drawn, which can lie above or below the still water level the simulation works with:
+ * waves of another mod, or a shader pack's swaying water. Floating leaves keep drifting on the still water and are only drawn riding the waves, so the
  * physics stay the same with or without them.
  */
 @FunctionalInterface
