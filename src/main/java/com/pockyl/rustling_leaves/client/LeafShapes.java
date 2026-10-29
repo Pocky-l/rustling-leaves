@@ -50,12 +50,23 @@ final class LeafShapes {
     private static final int[] OLD_FIRST = {6, 9, 10, 11};
     private static final int[] OLD_VARIANTS = {3, 1, 1, 1};
 
-    /** Seamless texture of densely packed leaves for the body of piles. */
+    /**
+     * Seamless texture of densely packed leaves for the body of piles, strewn from the falling leaf sprites (pixel for
+     * pixel the size of a loose leaf).
+     */
     static final ResourceLocation LITTER = RustlingLeaves.id("block/leaf/litter");
     /** Loose leaves with gaps, over a thin carpet: the ground shows through. */
     static final ResourceLocation LITTER_SPARSE = RustlingLeaves.id("block/leaf/litter_sparse");
     /** Denser loose leaves with gaps, over thicker carpets and on top of pile bodies. */
     static final ResourceLocation LITTER_LAYER = RustlingLeaves.id("block/leaf/litter_layer");
+    /** The same three of needle sprigs: the rusty needle mat under conifers. */
+    static final ResourceLocation NEEDLE_LITTER = RustlingLeaves.id("block/leaf/needle_litter");
+    static final ResourceLocation NEEDLE_LITTER_SPARSE = RustlingLeaves.id("block/leaf/needle_litter_sparse");
+    static final ResourceLocation NEEDLE_LITTER_LAYER = RustlingLeaves.id("block/leaf/needle_litter_layer");
+    /** The pile textures before 2.8.0, with the option {@code oldLeafTextures}. */
+    static final ResourceLocation OLD_LITTER = RustlingLeaves.id("block/leaf/old_litter");
+    static final ResourceLocation OLD_LITTER_SPARSE = RustlingLeaves.id("block/leaf/old_litter_sparse");
+    static final ResourceLocation OLD_LITTER_LAYER = RustlingLeaves.id("block/leaf/old_litter_layer");
 
     private static final Map<Block, LeafShape> BY_BLOCK = new IdentityHashMap<>();
 

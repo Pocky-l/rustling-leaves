@@ -547,9 +547,9 @@ public final class LitterField {
         float loose = 0.35F;
         out.roll = (float) Math.atan(gradX * cos - gradZ * sin) + (unit(tilt, 0) - 0.5F) * 2.0F * loose;
         out.pitch = (float) -Math.atan(gradX * sin + gradZ * cos) + (unit(tilt, 10) - 0.5F) * 2.0F * loose;
-        if (unit(tilt, 20) < 0.2F) {
-            // A curled leaf standing up from the pile.
-            float curl = (0.5F + unit(tilt, 30) * 0.4F) * (unit(tilt, 40) < 0.5F ? -1.0F : 1.0F);
+        if (unit(tilt, 20) < 0.1F) {
+            // A curled leaf standing up from the pile (steeper ones read as dark shards between the leaves).
+            float curl = (0.35F + unit(tilt, 30) * 0.3F) * (unit(tilt, 40) < 0.5F ? -1.0F : 1.0F);
             if (unit(tilt, 50) < 0.5F) {
                 out.pitch += curl;
             } else {
