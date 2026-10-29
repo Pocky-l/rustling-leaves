@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   gold and red against a low sun, instead of being lit like a piece of ground.
 
 ### Fixed
+- No more short stutters caused by the leaf litter: the game froze for 50-70 ms every half minute while the litter was
+  saved, and for up to 100 ms after joining a world or teleporting while it was loaded. Saving and loading now go a
+  little at a time and the files are read in the background; a tick of the mod stays under about 3 ms.
 - Leaves floating on the water no longer sink into it with shader packs whose water moves in waves (BSL, Photon,
   MakeUp and others): they stay on top of the drawn water, sharp and in full colour, instead of showing dimly through
   it.

@@ -163,6 +163,11 @@ public final class LitterChunk {
         dirty = true;
     }
 
+    /** Whether the chunk changed since it was last saved. */
+    public boolean isDirty() {
+        return dirty;
+    }
+
     /** Whether the chunk changed since it was last saved; clears the flag. */
     public boolean takeDirty() {
         boolean was = dirty;
