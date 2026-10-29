@@ -2,6 +2,7 @@ package com.pockyl.rustling_leaves.client;
 
 import it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import net.minecraft.client.Camera;
@@ -25,6 +26,7 @@ import net.minecraft.tags.ItemTags;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
@@ -113,8 +115,8 @@ public final class LeafManager {
     /** Vertical movement of each entity in the previous tick, to detect landings. */
     private static final Int2FloatOpenHashMap LAST_FALL = new Int2FloatOpenHashMap();
     private static final Int2IntOpenHashMap SOUND_READY = new Int2IntOpenHashMap();
-    /** Swing progress of the other players in the previous tick, to see a new swing start. */
-    private static final Int2IntOpenHashMap LAST_SWING = new Int2IntOpenHashMap();
+    /** The swing of each other player in the previous tick, to see a new swing start. */
+    private static final Int2ObjectOpenHashMap<LivingEntity.SwingDescription> LAST_SWING = new Int2ObjectOpenHashMap<>();
 
     private static volatile boolean configChanged;
     /** How far above the still water floating leaves are drawn while a shader pack draws the water. */
@@ -317,12 +319,10 @@ public final class LeafManager {
             if (player == minecraft.player || player.isSpectator() || player.distanceToSqr(camera) > range * range) {
                 continue;
             }
-            int id = player.getId();
-            int last = LAST_SWING.getOrDefault(id, Integer.MAX_VALUE);
-            int now = player.swinging ? player.swingTime : Integer.MAX_VALUE;
-            LAST_SWING.put(id, now);
-            // A new swing starts over at -1 / 0; a running one only counts up.
-            if (now >= last || player.swingingArm != InteractionHand.MAIN_HAND) {
+            LivingEntity.SwingDescription swing = player.getCurrentSwing();
+            LivingEntity.SwingDescription last = LAST_SWING.put(player.getId(), swing);
+            // Every new swing gets a new description; a running one keeps its own.
+            if (swing == null || swing == last || swing.hand() != InteractionHand.MAIN_HAND) {
                 continue;
             }
             ItemStack stack = player.getMainHandItem();

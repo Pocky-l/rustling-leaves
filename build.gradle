@@ -12,7 +12,7 @@ base {
     archivesName = "${mod_id}-neoforge-${minecraft_version}"
 }
 
-// Minecraft 26.2 runs on Java 25.
+// Minecraft 26.3 runs on Java 25.
 java.toolchain.languageVersion = JavaLanguageVersion.of(25)
 
 sourceSets.main.resources {
@@ -149,7 +149,7 @@ static String extractChangelog(String changelog, String version) {
     return body ?: null
 }
 
-// Versions of ports are tagged with their Minecraft version in the changelog, e.g. 2.8.0+26.2.
+// Versions of ports are tagged with their Minecraft version in the changelog, e.g. 2.8.0+26.3.
 def releaseVersion = "${mod_version}+${minecraft_version}"
 def releaseNotes = extractChangelog(
         providers.fileContents(layout.projectDirectory.file('CHANGELOG.md')).asText.getOrElse(''),

@@ -31,7 +31,7 @@ abstract class FallingLeavesMixin {
         if (LeafManager.replacesFallingLeaves()) {
             ci.cancel();
             if (level.getBlockState(pos).getBlock() instanceof LeavesBlockInvoker leaves) {
-                leaves.rustling_leaves$makeFallingLeavesParticles(level, pos, random, belowState, below);
+                leaves.rustling_leaves$makeFallingLeavesParticles(level, pos, random);
             }
         }
     }

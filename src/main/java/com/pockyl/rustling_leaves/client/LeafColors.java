@@ -45,11 +45,11 @@ final class LeafColors {
                 int n = 0;
                 for (int x = 0; x < width; x++) {
                     for (int y = 0; y < height; y++) {
-                        int abgr = sprite.getPixelRGBA(0, x, y);
-                        if ((abgr >>> 24) > 127) {
-                            r += abgr & 0xFF;
-                            g += abgr >> 8 & 0xFF;
-                            b += abgr >> 16 & 0xFF;
+                        int argb = sprite.getPixelARGB(0, x, y);
+                        if ((argb >>> 24) > 127) {
+                            r += argb >> 16 & 0xFF;
+                            g += argb >> 8 & 0xFF;
+                            b += argb & 0xFF;
                             n++;
                         }
                     }
