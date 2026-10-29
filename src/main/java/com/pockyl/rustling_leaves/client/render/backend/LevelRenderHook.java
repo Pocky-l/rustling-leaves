@@ -25,6 +25,8 @@ public final class LevelRenderHook {
     private static Frustum frustum;
     private static Vec3 camera = Vec3.ZERO;
     private static final Vector3f LOOK = new Vector3f();
+    /** The backend binds the level's projection buffer itself; the matrix is not needed on this version. */
+    private static final Matrix4f UNUSED_PROJECTION = new Matrix4f();
     private static float partialTick;
 
     private LevelRenderHook() {
@@ -44,7 +46,6 @@ public final class LevelRenderHook {
         if (frustum == null) {
             return;
         }
-        // The stub backend does not use the projection; the real one takes it from RenderSystem's projection buffer.
-        LeafManager.render(camera, LOOK, frustum, event.getModelViewMatrix(), new Matrix4f(), partialTick);
+        LeafManager.render(camera, LOOK, frustum, event.getModelViewMatrix(), UNUSED_PROJECTION, partialTick);
     }
 }
