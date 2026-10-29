@@ -794,7 +794,7 @@ final class LeafRenderer implements AutoCloseable {
                         // A leaf lying on the ground: a faint contact shadow half a leaf pixel aside, so it does not
                         // look painted onto the grass.
                         int s = LeafShapes.shadow(pose.shape);
-                        emitShadow(shadowBuilder, px + step * 0.5F, py, pz + step * 0.5F, (float) (base - tile.originY) + SHADOW_LIFT, 0.0F,
+                        emitShadow(shadowBuilder, px + step * 0.5F, py, pz + step * 0.5F, (float) (base - tile.originY) + SHADOW_LIFT, 0.0F, 0.0F,
                                 pose.yaw, pose.pitch, pose.roll, pose.size, s, shadowColor(CONTACT_ALPHA * occlusion), light);
                     }
                     emit(builder, px, py, pz, pose.yaw, pose.pitch, pose.roll, pose.size, shade(pose.color, shade), light, sprite);
@@ -1099,7 +1099,8 @@ final class LeafRenderer implements AutoCloseable {
         BufferBuilder shadowBuilder = shadows && sunStrength > 0.0F
                 ? new BufferBuilder(shadowBytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK) : null;
         float sunSlope = (float) simulation.sunSlope();
-        float beamPerHeight = Mth.sqrt(1.0F + sunSlope * sunSlope);
+        float sunSlopeZ = (float) simulation.sunSlopeZ();
+        float beamPerHeight = Mth.sqrt(1.0F + sunSlope * sunSlope + sunSlopeZ * sunSlopeZ);
         float fadeLength = (float) LeafSimulation.SHADOW_MAX_BEAM - SHADOW_SHARP_BEAM;
         // With a shader pack the falling leaves are marked as their tree's leaves, so the pack shades them as foliage
         // (light through the leaf against the sun); litter stays plain terrain, where swaying foliage would look wrong.
@@ -1141,7 +1142,7 @@ final class LeafRenderer implements AutoCloseable {
                     float alpha = SHADOW_ALPHA * (SHADOW_STEPS - step) / SHADOW_STEPS * sunStrength
                             * (pool.shadowSunlit[i] ? 1.0F : SHADE_SHADOW);
                     if (alpha >= 0.03F) {
-                        emitShadow(shadowBuilder, x, y, z, (float) (ground - cam.y) + SHADOW_LIFT, sunSlope, yaw, pitch, roll, size, s,
+                        emitShadow(shadowBuilder, x, y, z, (float) (ground - cam.y) + SHADOW_LIFT, sunSlope, sunSlopeZ, yaw, pitch, roll, size, s,
                                 shadowColor(alpha), pool.light[i]);
                     }
                 }
@@ -1169,9 +1170,11 @@ final class LeafRenderer implements AutoCloseable {
     /**
      * The shadow of a leaf: its quad (same basis as {@link #emit}) projected along the sunbeam onto the ground at
      * {@code groundY}. {@code sunSlope} = sun x / sun y: 0 at noon (straight down), long shadows to the side towards
-     * sunset and sunrise; a leaf seen edge-on by the sun casts a thin sliver.
+     * sunset and sunrise; {@code sunSlopeZ} the same along Z when a shader pack tilts the sun's path. A leaf seen
+     * edge-on by the sun casts a thin sliver.
      */
-    private void emitShadow(BufferBuilder builder, float x, float y, float z, float groundY, float sunSlope, float yaw, float pitch,
+    private void emitShadow(BufferBuilder builder, float x, float y, float z, float groundY, float sunSlope, float sunSlopeZ,
+            float yaw, float pitch,
             float roll, float half, int s, int color, int light) {
         float sa = Mth.sin(yaw);
         float ca = Mth.cos(yaw);
@@ -1189,7 +1192,11 @@ final class LeafRenderer implements AutoCloseable {
         float x1 = x - ax + bx - sunSlope * (y - ay + by - groundY);
         float x2 = x + ax + bx - sunSlope * (y + ay + by - groundY);
         float x3 = x + ax - bx - sunSlope * (y + ay - by - groundY);
-        flatQuad(builder, groundY, x0, z - az - bz, x1, z - az + bz, x2, z + az + bz, x3, z + az - bz, s, color, light);
+        float z0 = z - az - bz - sunSlopeZ * (y - ay - by - groundY);
+        float z1 = z - az + bz - sunSlopeZ * (y - ay + by - groundY);
+        float z2 = z + az + bz - sunSlopeZ * (y + ay + by - groundY);
+        float z3 = z + az - bz - sunSlopeZ * (y + ay - by - groundY);
+        flatQuad(builder, groundY, x0, z0, x1, z1, x2, z2, x3, z3, s, color, light);
     }
 
     private static int shade(int rgb, float factor) {

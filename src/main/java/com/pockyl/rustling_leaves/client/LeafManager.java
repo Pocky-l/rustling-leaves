@@ -45,6 +45,7 @@ import com.pockyl.rustling_leaves.client.compat.ImmersiveWeathering;
 import com.pockyl.rustling_leaves.client.compat.LivingWind;
 import com.pockyl.rustling_leaves.client.compat.RealisticWaves;
 import com.pockyl.rustling_leaves.client.compat.SereneSeasons;
+import com.pockyl.rustling_leaves.client.compat.WeatherWind;
 import com.pockyl.rustling_leaves.client.compat.ShaderPacks;
 import com.pockyl.rustling_leaves.network.RakePayload;
 import com.pockyl.rustling_leaves.sim.LeafListener;
@@ -114,6 +115,7 @@ public final class LeafManager {
     private static RealisticWaves realisticWaves;
     private static boolean windLookedUp;
     private static LivingWind livingWind;
+    private static WeatherWind weatherWind;
     private static LeafSimulation simulation;
     private static LeafRenderer renderer;
     private static LitterStorage storage;
@@ -172,6 +174,7 @@ public final class LeafManager {
         }
         ticks++;
         shaderWater = ShaderPacks.inUse();
+        simulation.setSunPathRotation(ShaderPacks.sunPathRotation());
         burstsThisTick = 0;
         soundsThisTick = 0;
         Vec3 camera = cameraPosition(minecraft);
@@ -351,16 +354,22 @@ public final class LeafManager {
         return realisticWaves != null ? realisticWaves : WaterWaves.NONE;
     }
 
-    /** The world wind of Living Wind for the leaves, if installed and wanted. */
+    /**
+     * The wind of another mod for the leaves, if installed and wanted: Living Wind's world wind while it has one, else
+     * the course of Petrichor's and Hoarfrost's rain and snow.
+     */
     private static WindSource windSource() {
-        if (!SETTINGS.followWorldWind || !ModList.get().isLoaded(LivingWind.MOD_ID)) {
+        if (!SETTINGS.followWorldWind) {
             return WindSource.NONE;
         }
         if (!windLookedUp) {
             windLookedUp = true;
-            livingWind = LivingWind.find();
+            livingWind = ModList.get().isLoaded(LivingWind.MOD_ID) ? LivingWind.find() : null;
+            weatherWind = WeatherWind.find();
         }
-        return livingWind != null ? livingWind : WindSource.NONE;
+        WindSource world = livingWind != null ? livingWind : WindSource.NONE;
+        WindSource weather = weatherWind != null ? weatherWind : WindSource.NONE;
+        return out -> world.read(out) || weather.read(out);
     }
 
     public static boolean replaceCherryPetal(Level particleLevel, BlockPos pos, BlockState state) {

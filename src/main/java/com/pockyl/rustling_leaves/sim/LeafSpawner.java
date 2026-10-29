@@ -6,6 +6,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.CherryLeavesBlock;
+import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 
@@ -51,7 +52,7 @@ public final class LeafSpawner {
                 continue;
             }
             BlockState state = level.getBlockState(cursor.set(x, top, z));
-            if (!state.is(BlockTags.LEAVES)) {
+            if (!sheds(state, settings)) {
                 continue;
             }
             // Stronger wind at this spot shakes more leaves off: gust waves, squall fronts, storms. Vanilla cherry trees
@@ -70,6 +71,15 @@ public final class LeafSpawner {
             }
             detach(level, simulation, state, x, z, bottom, top, windHere * 0.8F, wind);
         }
+    }
+
+    /**
+     * Whether a block is the crown of a tree that drops leaves: any leaves block, but leaves placed by players
+     * (persistent) only with {@link LeafSettings#placedLeaves}.
+     */
+    public static boolean sheds(BlockState state, LeafSettings settings) {
+        return state.is(BlockTags.LEAVES) && (settings.placedLeaves || !state.hasProperty(LeavesBlock.PERSISTENT)
+                || !state.getValue(LeavesBlock.PERSISTENT));
     }
 
     private static final int[][] SIDES = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};

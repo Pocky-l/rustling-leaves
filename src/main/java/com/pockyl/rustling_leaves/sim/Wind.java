@@ -255,7 +255,9 @@ public final class Wind {
                 dirX = outer[0] / length;
                 dirZ = outer[1] / length;
             }
-            base = open ? Math.max(0.0F, outer[2]) * settings.windStrength : 0.0F;
+            if (!Float.isNaN(outer[2])) {
+                base = open ? Math.max(0.0F, outer[2]) * settings.windStrength : 0.0F;
+            }
         }
 
         jets.removeIf(jet -> --jet.ttl <= 0);
