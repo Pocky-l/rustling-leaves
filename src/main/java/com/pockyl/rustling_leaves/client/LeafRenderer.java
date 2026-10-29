@@ -1,22 +1,9 @@
 package com.pockyl.rustling_leaves.client;
 
-import com.mojang.blaze3d.shaders.Uniform;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.ByteBufferBuilder;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.MeshData;
-import com.mojang.blaze3d.vertex.VertexBuffer;
-import com.mojang.blaze3d.vertex.VertexFormat;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
-import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.RenderStateShard;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.client.renderer.culling.Frustum;
-import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.resources.ResourceLocation;
@@ -27,11 +14,13 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
-import org.joml.Vector3f;
+import org.joml.Vector3fc;
 
-import com.pockyl.rustling_leaves.RustlingLeaves;
 import com.pockyl.rustling_leaves.client.compat.IrisBlocks;
 import com.pockyl.rustling_leaves.client.compat.ShaderPacks;
+import com.pockyl.rustling_leaves.client.render.QuadSink;
+import com.pockyl.rustling_leaves.client.render.backend.RenderBackend;
+import com.pockyl.rustling_leaves.client.render.backend.RenderBackend.Pass;
 import com.pockyl.rustling_leaves.sim.LeafPalette;
 import com.pockyl.rustling_leaves.sim.LeafPool;
 import com.pockyl.rustling_leaves.sim.LeafShape;
@@ -55,32 +44,13 @@ import java.util.List;
  *   <li>moving leaves, written into one streaming buffer each frame and interpolated between ticks.</li>
  * </ul>
  * Both use the vanilla cutout terrain shader, so fog, lightmap and day/night match the world; with a shader pack Iris
- * swaps it for the pack's terrain program, so the leaves get the pack's lighting like the blocks around them.
+ * swaps it for the pack's terrain program, so the leaves get the pack's lighting like the blocks around them. The
+ * pixel shadows of leaves and piles are a second pass with the translucent terrain shader.
+ * <p>
+ * This class decides what is drawn and writes the quads, the same on every Minecraft version; the GPU side (meshes,
+ * passes, the hook into the level render) is the {@link RenderBackend}, the part a port rewrites.
  */
 final class LeafRenderer implements AutoCloseable {
-    private static final RenderType LEAVES = RenderType.create(RustlingLeaves.MOD_ID + "_leaves", DefaultVertexFormat.BLOCK,
-            VertexFormat.Mode.QUADS, 1 << 16, false, false, RenderType.CompositeState.builder()
-                    .setLightmapState(RenderStateShard.LIGHTMAP)
-                    .setShaderState(RenderStateShard.RENDERTYPE_CUTOUT_MIPPED_SHADER)
-                    .setTextureState(RenderStateShard.BLOCK_SHEET_MIPPED)
-                    .setCullState(RenderStateShard.NO_CULL)
-                    .createCompositeState(false));
-    /**
-     * Pixel shadows: translucent black silhouettes with hard pixel edges, laid on the ground like vanilla's decals -
-     * the vanilla translucent terrain shader (Iris swaps it for the pack's translucent program), the block atlas
-     * WITHOUT mipmaps (the edges stay pixel-sharp at a distance), no depth writes and the decal polygon offset, so
-     * they neither hide what is behind them nor flicker against the ground.
-     */
-    private static final RenderType SHADOWS = RenderType.create(RustlingLeaves.MOD_ID + "_leaf_shadows",
-            DefaultVertexFormat.BLOCK, VertexFormat.Mode.QUADS, 1 << 16, false, false, RenderType.CompositeState.builder()
-                    .setLightmapState(RenderStateShard.LIGHTMAP)
-                    .setShaderState(RenderStateShard.RENDERTYPE_TRANSLUCENT_SHADER)
-                    .setTextureState(RenderStateShard.BLOCK_SHEET)
-                    .setTransparencyState(RenderStateShard.TRANSLUCENT_TRANSPARENCY)
-                    .setWriteMaskState(RenderStateShard.COLOR_WRITE)
-                    .setCullState(RenderStateShard.NO_CULL)
-                    .setLayeringState(RenderStateShard.POLYGON_OFFSET_LAYERING)
-                    .createCompositeState(false));
     /**
      * Opacity of a falling leaf's shadow right at the ground; it keeps it while the sunbeam from the leaf to the ground
      * is shorter than {@link #SHADOW_SHARP_BEAM}, then fades in steps (pixel-art style, no smooth gradient) until
@@ -160,10 +130,9 @@ final class LeafRenderer implements AutoCloseable {
     private final Long2ObjectOpenHashMap<ChunkView> views = new Long2ObjectOpenHashMap<>();
     private final List<Mesh> dirty = new ArrayList<>();
     private final LitterField.Pose pose = new LitterField.Pose();
-    private final ByteBufferBuilder bytes = new ByteBufferBuilder(1 << 18);
-    private final ByteBufferBuilder shadowBytes = new ByteBufferBuilder(1 << 16);
-    private final VertexBuffer moving = new VertexBuffer(VertexBuffer.Usage.DYNAMIC);
-    private final VertexBuffer movingShadows = new VertexBuffer(VertexBuffer.Usage.DYNAMIC);
+    private final RenderBackend backend = new RenderBackend();
+    private final RenderBackend.Mesh moving = RenderBackend.streamingMesh();
+    private final RenderBackend.Mesh movingShadows = RenderBackend.streamingMesh();
     private boolean movingEmpty = true;
     private boolean movingShadowsEmpty = true;
     private boolean shaderPack;
@@ -221,9 +190,9 @@ final class LeafRenderer implements AutoCloseable {
         double originY;
         double originZ;
         AABB bounds;
-        VertexBuffer buffer;
+        final RenderBackend.Mesh buffer = RenderBackend.staticMesh();
         boolean empty = true;
-        VertexBuffer shadowBuffer;
+        final RenderBackend.Mesh shadowBuffer = RenderBackend.staticMesh();
         boolean shadowEmpty = true;
         int builtRevision = Integer.MIN_VALUE;
         double distanceSq;
@@ -238,14 +207,9 @@ final class LeafRenderer implements AutoCloseable {
         }
 
         void close() {
-            if (buffer != null) {
-                buffer.close();
-                buffer = null;
-            }
-            if (shadowBuffer != null) {
-                shadowBuffer.close();
-                shadowBuffer = null;
-            }
+            buffer.close();
+            shadowBuffer.close();
+            empty = true;
             shadowEmpty = true;
             builtRevision = Integer.MIN_VALUE;
         }
@@ -322,9 +286,8 @@ final class LeafRenderer implements AutoCloseable {
     // Rendering
     // ------------------------------------------------------------------------------------------------------------
 
-    void render(Camera camera, Frustum frustum, Matrix4f modelView, Matrix4f projection, float partialTick) {
+    void render(Vec3 cam, Vector3fc look, Frustum frustum, Matrix4f modelView, Matrix4f projection, float partialTick) {
         updateSprites();
-        Vec3 cam = camera.getPosition();
         frame++;
         // While a shader pack is active, Iris reads BLOCK vertices in its larger terrain layout - also from buffers
         // that were built before: switching a pack on or off rebuilds every mesh, otherwise they come out garbled.
@@ -347,94 +310,57 @@ final class LeafRenderer implements AutoCloseable {
         viewChunkZ = Mth.floor(cam.z) >> 4;
         collectTiles(cam);
         rebuildTiles();
-        buildMoving(cam, camera.getLookVector(), partialTick);
+        buildMoving(cam, look, partialTick);
 
-        LEAVES.setupRenderState();
-        ShaderInstance shader = RenderSystem.getShader();
-        if (shader == null) {
-            LEAVES.clearRenderState();
+        if (!backend.beginPass(Pass.LEAVES, modelView, projection, cam.x, cam.y, cam.z)) {
             return;
         }
-        shader.setDefaultUniforms(VertexFormat.Mode.QUADS, modelView, projection, Minecraft.getInstance().getWindow());
-        shader.apply();
-        Uniform offset = shader.CHUNK_OFFSET;
         int quads = 0;
         for (ChunkView view : views.values()) {
             if (!drawnChunk(view.chunk.x, view.chunk.z)) {
                 continue;
             }
             if (view.drawFar()) {
-                quads += draw(view.far, frustum, offset, cam);
+                quads += draw(view.far, frustum);
             } else {
                 for (Tile tile : view.tiles) {
                     if (tile != null) {
-                        quads += draw(tile, frustum, offset, cam);
+                        quads += draw(tile, frustum);
                     }
                 }
             }
         }
         lastTileQuads = quads;
         if (!movingEmpty) {
-            if (offset != null) {
-                offset.set(0.0F, 0.0F, 0.0F);
-                offset.upload();
-            }
-            moving.bind();
-            moving.draw();
+            // Built relative to the camera.
+            backend.draw(moving, cam.x, cam.y, cam.z);
         }
-        if (offset != null) {
-            offset.set(0.0F, 0.0F, 0.0F);
-        }
-        VertexBuffer.unbind();
-        shader.clear();
-        LEAVES.clearRenderState();
+        backend.endPass();
         if (shadows) {
             renderShadows(frustum, modelView, projection, cam);
         }
     }
 
-    /** The shadows of the detailed tiles and of the falling leaves, in their own pass (see {@link #SHADOWS}). */
+    /** The shadows of the detailed tiles and of the falling leaves, in their own pass (see {@link Pass#SHADOWS}). */
     private void renderShadows(Frustum frustum, Matrix4f modelView, Matrix4f projection, Vec3 cam) {
-        SHADOWS.setupRenderState();
-        ShaderInstance shader = RenderSystem.getShader();
-        if (shader == null) {
-            SHADOWS.clearRenderState();
+        if (!backend.beginPass(Pass.SHADOWS, modelView, projection, cam.x, cam.y, cam.z)) {
             return;
         }
-        shader.setDefaultUniforms(VertexFormat.Mode.QUADS, modelView, projection, Minecraft.getInstance().getWindow());
-        shader.apply();
-        Uniform offset = shader.CHUNK_OFFSET;
         for (ChunkView view : views.values()) {
             if (!drawnChunk(view.chunk.x, view.chunk.z) || view.drawFar()) {
                 continue;
             }
             for (Tile tile : view.tiles) {
-                if (tile == null || tile.shadowBuffer == null || tile.shadowEmpty || tile.bounds == null
-                        || !frustum.isVisible(tile.bounds)) {
+                if (tile == null || tile.shadowEmpty || tile.bounds == null || !frustum.isVisible(tile.bounds)) {
                     continue;
                 }
-                if (offset != null) {
-                    offset.set((float) (tile.originX - cam.x), (float) (tile.originY - cam.y), (float) (tile.originZ - cam.z));
-                    offset.upload();
-                }
-                tile.shadowBuffer.bind();
-                tile.shadowBuffer.draw();
+                backend.draw(tile.shadowBuffer, tile.originX, tile.originY, tile.originZ);
             }
         }
         if (!movingShadowsEmpty) {
-            if (offset != null) {
-                offset.set(0.0F, 0.0F, 0.0F);
-                offset.upload();
-            }
-            movingShadows.bind();
-            movingShadows.draw();
+            backend.draw(movingShadows, cam.x, cam.y, cam.z);
         }
-        if (offset != null) {
-            offset.set(0.0F, 0.0F, 0.0F);
-        }
-        VertexBuffer.unbind();
-        shader.clear();
-        SHADOWS.clearRenderState();
+        backend.endPass();
     }
 
     /**
@@ -454,21 +380,16 @@ final class LeafRenderer implements AutoCloseable {
         return dx * dx + dz * dz < reach * reach;
     }
 
-    private static int draw(Mesh mesh, Frustum frustum, Uniform offset, Vec3 cam) {
-        if (mesh.buffer == null || mesh.empty || mesh.bounds == null || !frustum.isVisible(mesh.bounds)) {
+    private int draw(Mesh mesh, Frustum frustum) {
+        if (mesh.empty || mesh.bounds == null || !frustum.isVisible(mesh.bounds)) {
             return 0;
         }
-        if (offset != null) {
-            offset.set((float) (mesh.originX - cam.x), (float) (mesh.originY - cam.y), (float) (mesh.originZ - cam.z));
-            offset.upload();
-        }
-        mesh.buffer.bind();
-        mesh.buffer.draw();
+        backend.draw(mesh.buffer, mesh.originX, mesh.originY, mesh.originZ);
         return mesh.quads;
     }
 
     private void updateSprites() {
-        TextureAtlas atlas = Minecraft.getInstance().getModelManager().getAtlas(TextureAtlas.LOCATION_BLOCKS);
+        TextureAtlas atlas = backend.blockAtlas();
         for (int s = 0; s < LeafShapes.SPRITES.length; s++) {
             TextureAtlasSprite sprite = atlas.getSprite(LeafShapes.SPRITES[s]);
             u0[s] = sprite.getU0();
@@ -585,7 +506,6 @@ final class LeafRenderer implements AutoCloseable {
                 break;
             }
         }
-        VertexBuffer.unbind();
     }
 
     /**
@@ -645,7 +565,7 @@ final class LeafRenderer implements AutoCloseable {
         }
         mesh.originY = Math.floor(minY);
         mesh.bounds = new AABB(mesh.originX, minY - 0.2, mesh.originZ, mesh.originX + 16, maxY + 0.3, mesh.originZ + 16);
-        BufferBuilder builder = new BufferBuilder(bytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
+        QuadSink sink = backend.begin(Pass.LEAVES);
         int quads = 0;
         float half = 2 * LitterField.CELL;
         for (int pz = 0; pz < patches; pz++) {
@@ -662,27 +582,16 @@ final class LeafRenderer implements AutoCloseable {
                 int cellZ = chunk.z * LitterChunk.SIZE + pz * 2;
                 float[] uv = layerUv(TEX_BODY + (farNeedles[p] ? TEX_NEEDLES : 0), cellX, cellZ, 2);
                 int argb = 0xFF000000 | color[p];
-                int overlay = OverlayTexture.NO_OVERLAY;
                 // Counter-clockwise seen from above (shader packs recompute the normal from the winding).
-                builder.addVertex(x0, y, z0, argb, uv[0], uv[2], overlay, light, 0.0F, 1.0F, 0.0F);
-                builder.addVertex(x0, y, z0 + half, argb, uv[0], uv[3], overlay, light, 0.0F, 1.0F, 0.0F);
-                builder.addVertex(x0 + half, y, z0 + half, argb, uv[1], uv[3], overlay, light, 0.0F, 1.0F, 0.0F);
-                builder.addVertex(x0 + half, y, z0, argb, uv[1], uv[2], overlay, light, 0.0F, 1.0F, 0.0F);
+                sink.vertex(x0, y, z0, argb, uv[0], uv[2], light, 0.0F, 1.0F, 0.0F);
+                sink.vertex(x0, y, z0 + half, argb, uv[0], uv[3], light, 0.0F, 1.0F, 0.0F);
+                sink.vertex(x0 + half, y, z0 + half, argb, uv[1], uv[3], light, 0.0F, 1.0F, 0.0F);
+                sink.vertex(x0 + half, y, z0, argb, uv[1], uv[2], light, 0.0F, 1.0F, 0.0F);
                 quads++;
             }
         }
         mesh.quads = quads;
-        MeshData data = builder.build();
-        if (data == null) {
-            mesh.empty = true;
-            return;
-        }
-        if (mesh.buffer == null) {
-            mesh.buffer = new VertexBuffer(VertexBuffer.Usage.STATIC);
-        }
-        mesh.buffer.bind();
-        mesh.buffer.upload(data);
-        mesh.empty = false;
+        mesh.empty = !backend.finish(Pass.LEAVES, mesh.buffer);
     }
 
     /**
@@ -744,9 +653,9 @@ final class LeafRenderer implements AutoCloseable {
         tile.bounds = new AABB(tile.originX - 0.6, minY - 0.3, tile.originZ - 0.6, tile.originX + TILE_BLOCKS + 0.6, maxY + 0.3,
                 tile.originZ + TILE_BLOCKS + 0.6);
         loadRing(tile);
-        BufferBuilder builder = new BufferBuilder(bytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
+        QuadSink sink = backend.begin(Pass.LEAVES);
         boolean detailShadows = shadows && tile.wantDetailed;
-        BufferBuilder shadowBuilder = new BufferBuilder(shadowBytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
+        QuadSink shadowSink = backend.begin(Pass.SHADOWS);
         if (detailShadows) {
             Arrays.fill(footShadow, (byte) 0);
         }
@@ -775,11 +684,11 @@ final class LeafRenderer implements AutoCloseable {
                     // Carpet: a leaf layer with gaps over the ground. Pile: a solid shadowed body under that layer.
                     int textures = chunk.shape[i] == LeafShape.NEEDLE.ordinal() ? TEX_NEEDLES : 0;
                     if (n >= BODY_MIN) {
-                        emitSurface(builder, tile, lx, lz, base, light, TEX_BODY + textures,
+                        emitSurface(sink, tile, lx, lz, base, light, TEX_BODY + textures,
                                 tile.wantDetailed ? BODY_SINK : MID_BODY_SINK, BODY_SHADE * occlusion);
                         quads++;
                     }
-                    emitSurface(builder, tile, lx, lz, base, light, (n >= DENSE_MIN ? TEX_LAYER : TEX_SPARSE) + textures,
+                    emitSurface(sink, tile, lx, lz, base, light, (n >= DENSE_MIN ? TEX_LAYER : TEX_SPARSE) + textures,
                             LAYER_SINK, occlusion);
                     quads++;
                     // Beyond the detail distance the leaf layer stands for the loose leaves: single leaves there are
@@ -800,40 +709,30 @@ final class LeafRenderer implements AutoCloseable {
                     float step = pose.size * 0.4F;
                     if (detailShadows && n >= SURFACE_MIN && depth < 2) {
                         // The leaf's silhouette, darker, one leaf pixel aside and just under it: a pixel-art drop shadow.
-                        emit(builder, px + step, py - 0.004F, pz + step, pose.yaw, pose.pitch, pose.roll, pose.size,
+                        emit(sink, px + step, py - 0.004F, pz + step, pose.yaw, pose.pitch, pose.roll, pose.size,
                                 shade(ringColor[self], DROP_SHADE * occlusion), light, sprite);
                         quads++;
                     } else if (detailShadows && n < SURFACE_MIN) {
                         // A leaf lying on the ground: a faint contact shadow half a leaf pixel aside, so it does not
                         // look painted onto the grass.
                         int s = LeafShapes.shadow(pose.shape);
-                        emitShadow(shadowBuilder, px + step * 0.5F, py, pz + step * 0.5F, (float) (base - tile.originY) + SHADOW_LIFT, 0.0F, 0.0F,
+                        emitShadow(shadowSink, px + step * 0.5F, py, pz + step * 0.5F, (float) (base - tile.originY) + SHADOW_LIFT, 0.0F, 0.0F,
                                 pose.yaw, pose.pitch, pose.roll, pose.size, s, shadowColor(CONTACT_ALPHA * occlusion), light);
                     }
-                    emit(builder, px, py, pz, pose.yaw, pose.pitch, pose.roll, pose.size, shade(pose.color, shade), light, sprite);
+                    emit(sink, px, py, pz, pose.yaw, pose.pitch, pose.roll, pose.size, shade(pose.color, shade), light, sprite);
                     quads++;
                 }
             }
         }
         tile.quads = quads;
-        MeshData mesh = builder.build();
-        if (mesh == null) {
+        if (!backend.finish(Pass.LEAVES, tile.buffer)) {
             tile.empty = true;
-            // Finish the shadow builder too: its bytes would otherwise end up in the next mesh built from them.
-            MeshData unused = shadowBuilder.build();
-            if (unused != null) {
-                unused.close();
-            }
+            backend.discard(Pass.SHADOWS);
             tile.shadowEmpty = true;
             return;
         }
-        if (tile.buffer == null) {
-            tile.buffer = new VertexBuffer(VertexBuffer.Usage.STATIC);
-        }
-        tile.buffer.bind();
-        tile.buffer.upload(mesh);
         tile.empty = false;
-        buildFootShadows(tile, detailShadows, shadowBuilder);
+        buildFootShadows(tile, detailShadows, shadowSink);
     }
 
     /**
@@ -895,7 +794,7 @@ final class LeafRenderer implements AutoCloseable {
         }
     }
 
-    private void buildFootShadows(Tile tile, boolean detailShadows, BufferBuilder builder) {
+    private void buildFootShadows(Tile tile, boolean detailShadows, QuadSink sink) {
         if (detailShadows) {
             for (int f = 0; f < footShadow.length; f++) {
                 byte level = footShadow[f];
@@ -912,20 +811,11 @@ final class LeafRenderer implements AutoCloseable {
                 float x1 = x0 + LitterField.CELL;
                 float z1 = z0 + LitterField.CELL;
                 float y = (float) (ground - tile.originY) + SHADOW_LIFT;
-                flatQuad(builder, y, x0, z0, x0, z1, x1, z1, x1, z0, LeafShapes.SHADOW_CELL,
+                flatQuad(sink, y, x0, z0, x0, z1, x1, z1, x1, z0, LeafShapes.SHADOW_CELL,
                         shadowColor(level == 2 ? FOOT_ALPHA_NEAR : FOOT_ALPHA_FAR), light);
             }
         }
-        MeshData mesh = builder.build();
-        tile.shadowEmpty = mesh == null;
-        if (mesh == null) {
-            return;
-        }
-        if (tile.shadowBuffer == null) {
-            tile.shadowBuffer = new VertexBuffer(VertexBuffer.Usage.STATIC);
-        }
-        tile.shadowBuffer.bind();
-        tile.shadowBuffer.upload(mesh);
+        tile.shadowEmpty = !backend.finish(Pass.SHADOWS, tile.shadowBuffer);
     }
 
     /** Black at {@code alpha} opacity. */
@@ -938,7 +828,7 @@ final class LeafRenderer implements AutoCloseable {
      * corners in the order u0v0, u0v1, u1v1, u1v0), wound counter-clockwise seen from above: shader packs take the
      * normal from the winding.
      */
-    private void flatQuad(BufferBuilder builder, float y, float x0, float z0, float x1, float z1, float x2, float z2, float x3,
+    private void flatQuad(QuadSink sink, float y, float x0, float z0, float x1, float z1, float x2, float z2, float x3,
             float z3, int s, int color, int light) {
         float su0 = shadowU0[s];
         float sv0 = shadowV0[s];
@@ -946,17 +836,16 @@ final class LeafRenderer implements AutoCloseable {
         float sv1 = shadowV1[s];
         // y of (p2 - p0) x (p3 - p1): positive = counter-clockwise from above, else the corners go the other way round.
         float cross = (z2 - z0) * (x3 - x1) - (x2 - x0) * (z3 - z1);
-        int overlay = OverlayTexture.NO_OVERLAY;
         if (cross >= 0.0F) {
-            builder.addVertex(x0, y, z0, color, su0, sv0, overlay, light, 0.0F, 1.0F, 0.0F);
-            builder.addVertex(x1, y, z1, color, su0, sv1, overlay, light, 0.0F, 1.0F, 0.0F);
-            builder.addVertex(x2, y, z2, color, su1, sv1, overlay, light, 0.0F, 1.0F, 0.0F);
-            builder.addVertex(x3, y, z3, color, su1, sv0, overlay, light, 0.0F, 1.0F, 0.0F);
+            sink.vertex(x0, y, z0, color, su0, sv0, light, 0.0F, 1.0F, 0.0F);
+            sink.vertex(x1, y, z1, color, su0, sv1, light, 0.0F, 1.0F, 0.0F);
+            sink.vertex(x2, y, z2, color, su1, sv1, light, 0.0F, 1.0F, 0.0F);
+            sink.vertex(x3, y, z3, color, su1, sv0, light, 0.0F, 1.0F, 0.0F);
         } else {
-            builder.addVertex(x0, y, z0, color, su0, sv0, overlay, light, 0.0F, 1.0F, 0.0F);
-            builder.addVertex(x3, y, z3, color, su1, sv0, overlay, light, 0.0F, 1.0F, 0.0F);
-            builder.addVertex(x2, y, z2, color, su1, sv1, overlay, light, 0.0F, 1.0F, 0.0F);
-            builder.addVertex(x1, y, z1, color, su0, sv1, overlay, light, 0.0F, 1.0F, 0.0F);
+            sink.vertex(x0, y, z0, color, su0, sv0, light, 0.0F, 1.0F, 0.0F);
+            sink.vertex(x3, y, z3, color, su1, sv0, light, 0.0F, 1.0F, 0.0F);
+            sink.vertex(x2, y, z2, color, su1, sv1, light, 0.0F, 1.0F, 0.0F);
+            sink.vertex(x1, y, z1, color, su0, sv1, light, 0.0F, 1.0F, 0.0F);
         }
     }
 
@@ -999,7 +888,7 @@ final class LeafRenderer implements AutoCloseable {
      * them, so carpets and piles are smooth mounds that run down to the ground at their edges. Used for the solid
      * pile body and for the leaf layers with gaps; {@code sink} puts it below the loose top leaves.
      */
-    private void emitSurface(BufferBuilder builder, Tile tile, int lx, int lz, double base, int light, int texture, float sink,
+    private void emitSurface(QuadSink quads, Tile tile, int lx, int lz, double base, int light, int texture, float sink,
             float shadeFactor) {
         currentSink = sink;
         currentTop = ringTop[(lz + 1) * RING + lx + 1];
@@ -1019,14 +908,14 @@ final class LeafRenderer implements AutoCloseable {
         float z0 = lz * LitterField.CELL;
         float x1 = x0 + LitterField.CELL;
         float z1 = z0 + LitterField.CELL;
-        bodyVertex(builder, lx, lz, base, x0, h00, z0, c00, uv[0], uv[2], light, shadeFactor);
-        bodyVertex(builder, lx, lz + 1, base, x0, h01, z1, c01, uv[0], uv[3], light, shadeFactor);
-        bodyVertex(builder, lx + 1, lz + 1, base, x1, h11, z1, c11, uv[1], uv[3], light, shadeFactor);
-        bodyVertex(builder, lx + 1, lz, base, x1, h10, z0, c10, uv[1], uv[2], light, shadeFactor);
+        bodyVertex(quads, lx, lz, base, x0, h00, z0, c00, uv[0], uv[2], light, shadeFactor);
+        bodyVertex(quads, lx, lz + 1, base, x0, h01, z1, c01, uv[0], uv[3], light, shadeFactor);
+        bodyVertex(quads, lx + 1, lz + 1, base, x1, h11, z1, c11, uv[1], uv[3], light, shadeFactor);
+        bodyVertex(quads, lx + 1, lz, base, x1, h10, z0, c10, uv[1], uv[2], light, shadeFactor);
     }
 
     /** One corner of the pile body, shaded with a normal smoothed over the neighboring corners (no facets). */
-    private void bodyVertex(BufferBuilder builder, int cornerX, int cornerZ, double base, float x, float y, float z, int color, float u,
+    private void bodyVertex(QuadSink sink, int cornerX, int cornerZ, double base, float x, float y, float z, int color, float u,
             float v, int light, float shadeFactor) {
         float east = corner(Math.min(LitterChunk.TILE, cornerX + 1), cornerZ, base);
         float west = corner(Math.max(0, cornerX - 1), cornerZ, base);
@@ -1041,7 +930,7 @@ final class LeafRenderer implements AutoCloseable {
         float ny = 1.0F / length;
         float nz = -slopeZ / length;
         float shade = faceShade(nx, ny, nz) * shadeFactor;
-        builder.addVertex(x, y, z, opaque(color, shade), u, v, OverlayTexture.NO_OVERLAY, light, nx, ny, nz);
+        sink.vertex(x, y, z, opaque(color, shade), u, v, light, nx, ny, nz);
     }
 
     /**
@@ -1100,8 +989,8 @@ final class LeafRenderer implements AutoCloseable {
         return chunk.base[i] + n * LitterField.LAYER;
     }
 
-    private void buildMoving(Vec3 cam, Vector3f look, float partialTick) {
-        BufferBuilder builder = new BufferBuilder(bytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
+    private void buildMoving(Vec3 cam, Vector3fc look, float partialTick) {
+        QuadSink sink = backend.begin(Pass.LEAVES);
         // How strong the sun's shadows are: none below SHADOW_MIN_SUN, full from ~30 degrees up (low light is diffuse),
         // weak in rain.
         float sunStrength = (float) Mth.clamp((simulation.sunY() - LeafSimulation.SHADOW_MIN_SUN) / 0.3, 0.0, 1.0);
@@ -1109,8 +998,7 @@ final class LeafRenderer implements AutoCloseable {
         if (level != null) {
             sunStrength *= 1.0F - 0.7F * level.getRainLevel(partialTick);
         }
-        BufferBuilder shadowBuilder = shadows && sunStrength > 0.0F
-                ? new BufferBuilder(shadowBytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK) : null;
+        QuadSink shadowSink = shadows && sunStrength > 0.0F ? backend.begin(Pass.SHADOWS) : null;
         float sunSlope = (float) simulation.sunSlope();
         float sunSlopeZ = (float) simulation.sunSlopeZ();
         float beamPerHeight = Mth.sqrt(1.0F + sunSlope * sunSlope + sunSlopeZ * sunSlopeZ);
@@ -1140,11 +1028,11 @@ final class LeafRenderer implements AutoCloseable {
             float pitch = Mth.lerp(partialTick, pool.prevPitch[i], pool.pitch[i]);
             float roll = Mth.lerp(partialTick, pool.prevRoll[i], pool.roll[i]);
             if (blockIds != null) {
-                IrisBlocks.begin(builder, blockIds[pool.shape[i]], Mth.floor(x), Mth.floor(y), Mth.floor(z));
+                sink.beginBlock(blockIds[pool.shape[i]], Mth.floor(x), Mth.floor(y), Mth.floor(z));
             }
-            emit(builder, x, y, z, yaw, pitch, roll, size, color, pool.light[i], LeafShapes.slot(pool.shape[i], pool.sprite[i], oldTextures));
+            emit(sink, x, y, z, yaw, pitch, roll, size, color, pool.light[i], LeafShapes.slot(pool.shape[i], pool.sprite[i], oldTextures));
             float ground = pool.shadow[i];
-            if (shadowBuilder != null && state == LeafPool.FALLING && !Float.isNaN(ground)) {
+            if (shadowSink != null && state == LeafPool.FALLING && !Float.isNaN(ground)) {
                 float height = y - (float) (ground - cam.y);
                 float beam = height * beamPerHeight;
                 if (height > 0.04F && beam < LeafSimulation.SHADOW_MAX_BEAM) {
@@ -1155,29 +1043,17 @@ final class LeafRenderer implements AutoCloseable {
                     float alpha = SHADOW_ALPHA * (SHADOW_STEPS - step) / SHADOW_STEPS * sunStrength
                             * (pool.shadowSunlit[i] ? 1.0F : SHADE_SHADOW);
                     if (alpha >= 0.03F) {
-                        emitShadow(shadowBuilder, x, y, z, (float) (ground - cam.y) + SHADOW_LIFT, sunSlope, sunSlopeZ, yaw, pitch, roll, size, s,
+                        emitShadow(shadowSink, x, y, z, (float) (ground - cam.y) + SHADOW_LIFT, sunSlope, sunSlopeZ, yaw, pitch, roll, size, s,
                                 shadowColor(alpha), pool.light[i]);
                     }
                 }
             }
         }
         if (blockIds != null) {
-            IrisBlocks.end(builder);
+            sink.endBlock();
         }
-        MeshData mesh = builder.build();
-        movingEmpty = mesh == null;
-        if (mesh != null) {
-            moving.bind();
-            moving.upload(mesh);
-            VertexBuffer.unbind();
-        }
-        MeshData shadowMesh = shadowBuilder == null ? null : shadowBuilder.build();
-        movingShadowsEmpty = shadowMesh == null;
-        if (shadowMesh != null) {
-            movingShadows.bind();
-            movingShadows.upload(shadowMesh);
-            VertexBuffer.unbind();
-        }
+        movingEmpty = !backend.finish(Pass.LEAVES, moving);
+        movingShadowsEmpty = shadowSink == null || !backend.finish(Pass.SHADOWS, movingShadows);
     }
 
     /**
@@ -1186,7 +1062,7 @@ final class LeafRenderer implements AutoCloseable {
      * sunset and sunrise; {@code sunSlopeZ} the same along Z when a shader pack tilts the sun's path. A leaf seen
      * edge-on by the sun casts a thin sliver.
      */
-    private void emitShadow(BufferBuilder builder, float x, float y, float z, float groundY, float sunSlope, float sunSlopeZ,
+    private void emitShadow(QuadSink sink, float x, float y, float z, float groundY, float sunSlope, float sunSlopeZ,
             float yaw, float pitch,
             float roll, float half, int s, int color, int light) {
         float sa = Mth.sin(yaw);
@@ -1209,7 +1085,7 @@ final class LeafRenderer implements AutoCloseable {
         float z1 = z - az + bz - sunSlopeZ * (y - ay + by - groundY);
         float z2 = z + az + bz - sunSlopeZ * (y + ay + by - groundY);
         float z3 = z + az - bz - sunSlopeZ * (y + ay - by - groundY);
-        flatQuad(builder, groundY, x0, z0, x1, z1, x2, z2, x3, z3, s, color, light);
+        flatQuad(sink, groundY, x0, z0, x1, z1, x2, z2, x3, z3, s, color, light);
     }
 
     private static int shade(int rgb, float factor) {
@@ -1223,7 +1099,7 @@ final class LeafRenderer implements AutoCloseable {
      * Writes one leaf as a quad rotated by yaw (Y), pitch (X) and roll (Z), shaded by its normal (both faces of a leaf
      * look the same).
      */
-    private void emit(BufferBuilder builder, float x, float y, float z, float yaw, float pitch, float roll, float half, int rgb,
+    private void emit(QuadSink sink, float x, float y, float z, float yaw, float pitch, float roll, float half, int rgb,
             int light, int sprite) {
         float sa = Mth.sin(yaw);
         float ca = Mth.cos(yaw);
@@ -1245,12 +1121,11 @@ final class LeafRenderer implements AutoCloseable {
         int g = (int) ((rgb >> 8 & 0xFF) * shade);
         int b = (int) ((rgb & 0xFF) * shade);
         int color = 0xFF000000 | r << 16 | g << 8 | b;
-        int overlay = OverlayTexture.NO_OVERLAY;
         // Counter-clockwise seen from the normal's side: shader packs (Iris) recompute the normal from the winding.
-        builder.addVertex(x - ax - bx, y - ay - by, z - az - bz, color, u0[sprite], v0[sprite], overlay, light, nx, ny, nz);
-        builder.addVertex(x - ax + bx, y - ay + by, z - az + bz, color, u0[sprite], v1[sprite], overlay, light, nx, ny, nz);
-        builder.addVertex(x + ax + bx, y + ay + by, z + az + bz, color, u1[sprite], v1[sprite], overlay, light, nx, ny, nz);
-        builder.addVertex(x + ax - bx, y + ay - by, z + az - bz, color, u1[sprite], v0[sprite], overlay, light, nx, ny, nz);
+        sink.vertex(x - ax - bx, y - ay - by, z - az - bz, color, u0[sprite], v0[sprite], light, nx, ny, nz);
+        sink.vertex(x - ax + bx, y - ay + by, z - az + bz, color, u0[sprite], v1[sprite], light, nx, ny, nz);
+        sink.vertex(x + ax + bx, y + ay + by, z + az + bz, color, u1[sprite], v1[sprite], light, nx, ny, nz);
+        sink.vertex(x + ax - bx, y + ay - by, z + az - bz, color, u1[sprite], v0[sprite], light, nx, ny, nz);
     }
 
     /**
@@ -1273,7 +1148,6 @@ final class LeafRenderer implements AutoCloseable {
         views.clear();
         moving.close();
         movingShadows.close();
-        bytes.close();
-        shadowBytes.close();
+        backend.close();
     }
 }

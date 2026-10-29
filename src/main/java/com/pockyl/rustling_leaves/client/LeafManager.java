@@ -9,6 +9,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.ServerData;
+import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
@@ -39,8 +40,9 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.CustomizeGuiOverlayEvent;
 import net.neoforged.neoforge.client.event.InputEvent;
-import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
+import org.joml.Matrix4f;
+import org.joml.Vector3fc;
 
 import com.pockyl.rustling_leaves.Config;
 import com.pockyl.rustling_leaves.RustlingLeaves;
@@ -218,13 +220,12 @@ public final class LeafManager {
         }
     }
 
-    @SubscribeEvent
-    public static void onRenderLevel(RenderLevelStageEvent event) {
-        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_CUTOUT_BLOCKS || renderer == null) {
-            return;
+    /** Draws the leaves into the level; called by the render backend at the right moment of the level render. */
+    public static void render(Vec3 camera, Vector3fc look, Frustum frustum, Matrix4f modelView, Matrix4f projection,
+            float partialTick) {
+        if (renderer != null) {
+            renderer.render(camera, look, frustum, modelView, projection, partialTick);
         }
-        renderer.render(event.getCamera(), event.getFrustum(), event.getModelViewMatrix(), event.getProjectionMatrix(),
-                event.getPartialTick().getGameTimeDeltaPartialTick(false));
     }
 
     @SubscribeEvent
