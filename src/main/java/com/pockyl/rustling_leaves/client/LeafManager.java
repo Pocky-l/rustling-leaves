@@ -30,7 +30,6 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.world.phys.BlockHitResult;
@@ -337,11 +336,6 @@ public final class LeafManager {
         }
     }
 
-    /** Hooked into block updates of the client level. */
-    /**
-     * Called instead of a vanilla falling leaf particle under the leaves at {@code pos}: drops a simulated leaf there
-     * (scaled by the fall rate and the season). Returns false when the simulation is off, so the vanilla particle shows.
-     */
     /**
      * Whether the leaf particles of other leaf mods (Falling Leaves, Living Wind) are left out: the simulation drops the
      * leaves itself (unless the player keeps both). Called from their particle spawners.
@@ -394,14 +388,19 @@ public final class LeafManager {
         return out -> world.read(out) || weather.read(out);
     }
 
+    /**
+     * Called instead of a vanilla falling leaf particle under the leaves at {@code pos}: a cherry petal becomes a
+     * simulated petal there (scaled by the fall rate and the season), the other trees' leaves are left out because the
+     * canopy spawner drops them. Returns false when the simulation is off, so the vanilla particle shows.
+     */
     public static boolean replaceLeafParticle(Level particleLevel, BlockPos pos) {
         if (simulation == null || particleLevel != level) {
             return false;
         }
-        SPAWNER.dropBelow(level, simulation, level.getBlockState(pos), pos);
-        return true;
+        return SPAWNER.replaceVanillaLeaf(level, simulation, level.getBlockState(pos), pos);
     }
 
+    /** Hooked into block updates of the client level. */
     public static void onBlockChanged(ClientLevel changed, BlockPos pos, BlockState oldState, BlockState newState) {
         if (simulation == null || changed != level || oldState == newState) {
             return;
@@ -736,11 +735,6 @@ public final class LeafManager {
         @Override
         public LeafShape shape(BlockState state) {
             return LeafShapes.of(state.getBlock());
-        }
-
-        @Override
-        public boolean dropsVanillaLeaves(BlockState state) {
-            return state.getBlock() instanceof LeavesBlock;
         }
     }
 

@@ -54,8 +54,8 @@ public final class LeafSpawner {
             if (!sheds(state, settings)) {
                 continue;
             }
-            // Stronger wind at this spot shakes more leaves off: gust waves, squall fronts, storms. Vanilla trees already
-            // shed at their own pace through dropBelow, so only the wind adds leaves here.
+            // Stronger wind at this spot shakes more leaves off: gust waves, squall fronts, storms. Vanilla cherry trees
+            // already shed at their own pace through dropBelow, so only the wind adds petals here.
             float windHere = wind.speed(x, top, z);
             float calm = trees.dropsVanillaLeaves(state) ? 0.0F : 1.0F;
             float local = chance * (calm + windHere * 12.0F + wind.squall(x, z) * 10.0F);
@@ -118,18 +118,26 @@ public final class LeafSpawner {
     }
 
     /**
-     * One leaf from under the leaves block at {@code pos}, where vanilla spawns its falling leaf particle; the fall
-     * rate and the season scale how many come (rate 2 = two leaves, 0.5 = every other one). Trees that shed less than
-     * the others (conifers) drop fewer than vanilla, none drops more; placed leaves only with
-     * {@link LeafSettings#placedLeaves}.
+     * A vanilla falling leaf particle is about to spawn under the leaves block at {@code pos} (every leaves block drops
+     * them since 1.21.5). Cherry petals become simulated petals one by one ({@link #dropBelow}); the falling leaves of
+     * every other tree are the canopy spawner's work, as they were before vanilla had them, so their particle is only
+     * left out. Returns whether the vanilla particle is replaced: false while falling leaves are switched off.
+     */
+    public boolean replaceVanillaLeaf(Level level, LeafSimulation simulation, BlockState state, BlockPos pos) {
+        if (trees.dropsVanillaLeaves(state)) {
+            dropBelow(level, simulation, state, pos);
+            return true;
+        }
+        return simulation.settings().fallRate > 0.0F;
+    }
+
+    /**
+     * One leaf from under the leaves block at {@code pos}, where vanilla spawns its cherry petal particle; the fall
+     * rate and the season scale how many come (rate 2 = two leaves, 0.5 = every other one).
      */
     public void dropBelow(Level level, LeafSimulation simulation, BlockState state, BlockPos pos) {
         LeafSettings settings = simulation.settings();
-        if (!sheds(state, settings)) {
-            return;
-        }
-        LeafShape shape = trees.shape(state);
-        float rate = settings.fallRate * settings.seasonRate(shape) * Math.min(1.0F, settings.shedRate(shape));
+        float rate = settings.fallRate * settings.seasonRate(trees.shape(state));
         int count = Mth.floor(rate) + (random.nextFloat() < Mth.frac(rate) ? 1 : 0);
         Wind wind = simulation.wind();
         float push = wind.speed(pos.getX(), pos.getY(), pos.getZ()) * 0.8F;

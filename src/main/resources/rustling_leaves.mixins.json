@@ -4,6 +4,9 @@
   "package": "com.pockyl.rustling_leaves.mixin",
   "plugin": "com.pockyl.rustling_leaves.mixin.CompatMixinPlugin",
   "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "LeafParticleAccessor"
+  ],
   "client": [
     "LeavesBlockMixin",
     "ClientLevelMixin",

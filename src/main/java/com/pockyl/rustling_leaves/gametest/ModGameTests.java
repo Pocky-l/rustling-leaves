@@ -301,18 +301,18 @@ public final class ModGameTests {
     }
 
     /**
-     * Since 1.21.5 every leaves block drops vanilla falling leaves; each one becomes one simulated leaf at its spot (times
-     * the fall rate), and the canopy spawner leaves the calm fall of such trees to them.
+     * Since 1.21.5 every leaves block drops vanilla falling leaves. A cherry petal becomes one simulated petal at its spot
+     * (times the fall rate) and the canopy spawner leaves the calm fall of cherries to them, as on 1.21.1; the other
+     * trees keep the canopy spawner's calm fall and their vanilla particle is only left out.
      */
     public static void vanillaLeafParticlesBecomeLeaves(GameTestHelper helper) {
-        canopy(helper);
+        floor(helper);
         LeafSimulation sim = simulation(helper, 4096, LeafListener.NONE);
         sim.settings().spawnRadius = 4;
         sim.settings().placedLeaves = true;
         SeasonCurve.clear(sim.settings());
-        LeafShape[] shape = {LeafShape.BROAD};
         int[] fallen = new int[1];
-        LeafSpawner spawner = new LeafSpawner(new TreeLeaves() {
+        TreeLeaves trees = new TreeLeaves() {
             @Override
             public int color(BlockState state, Level level, BlockPos pos) {
                 fallen[0]++;
@@ -321,51 +321,50 @@ public final class ModGameTests {
 
             @Override
             public LeafShape shape(BlockState state) {
-                return shape[0];
+                return state.is(Blocks.CHERRY_LEAVES) ? LeafShape.PETAL : LeafShape.BROAD;
             }
-
-            @Override
-            public boolean dropsVanillaLeaves(BlockState state) {
-                return true;
-            }
-        });
+        };
+        helper.assertTrue(trees.dropsVanillaLeaves(Blocks.CHERRY_LEAVES.defaultBlockState()), "cherry leaves drop no petals");
+        helper.assertFalse(trees.dropsVanillaLeaves(Blocks.PALE_OAK_LEAVES.defaultBlockState()), "pale oak leaves drop petals");
+        helper.assertFalse(trees.dropsVanillaLeaves(Blocks.OAK_LEAVES.defaultBlockState()), "oak leaves drop petals");
+        LeafSpawner spawner = new LeafSpawner(trees);
         BlockPos center = helper.absolutePos(new BlockPos(3, 1, 3));
+        BlockPos crown = helper.absolutePos(new BlockPos(3, 5, 3));
+        // Cherries: no calm fall from the canopy spawner, every vanilla petal becomes one of ours.
+        fill(helper, 0, 0, 6, 6, 5, Blocks.CHERRY_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true));
         for (int t = 0; t < 200; t++) {
             sim.tick(helper.getLevel(), center.getX() + 0.5, center.getY(), center.getZ() + 0.5);
             spawner.tick(helper.getLevel(), sim, center.getX() + 0.5, center.getZ() + 0.5);
         }
-        helper.assertTrue(fallen[0] == 0, fallen[0] + " leaves fell in calm air besides the vanilla ones");
-        BlockPos crown = helper.absolutePos(new BlockPos(3, 5, 3));
-        BlockState leaves = helper.getLevel().getBlockState(crown);
-        spawner.dropBelow(helper.getLevel(), sim, leaves, crown);
-        helper.assertTrue(sim.pool().count() == 1, sim.pool().count() + " leaves for one vanilla leaf");
+        helper.assertTrue(fallen[0] == 0, fallen[0] + " petals fell in calm air besides the vanilla ones");
+        BlockState cherry = helper.getLevel().getBlockState(crown);
+        helper.assertTrue(spawner.replaceVanillaLeaf(helper.getLevel(), sim, cherry, crown), "the vanilla petal still shows");
+        helper.assertTrue(sim.pool().count() == 1, sim.pool().count() + " petals for one vanilla petal");
         LeafPool pool = sim.pool();
         for (int i = 0; i < pool.highWater(); i++) {
             if (pool.state[i] != LeafPool.FREE) {
                 helper.assertTrue(pool.x[i] >= crown.getX() && pool.x[i] <= crown.getX() + 1 && pool.z[i] >= crown.getZ()
-                        && pool.z[i] <= crown.getZ() + 1 && Math.abs(pool.y[i] - crown.getY()) < 0.1, "the leaf is not under its block");
+                        && pool.z[i] <= crown.getZ() + 1 && Math.abs(pool.y[i] - crown.getY()) < 0.1, "the petal is not under its block");
             }
         }
         sim.settings().fallRate = 2.0F;
-        spawner.dropBelow(helper.getLevel(), sim, leaves, crown);
-        helper.assertTrue(sim.pool().count() == 3, "fall rate 2 did not drop two leaves");
-        sim.settings().placedLeaves = false;
-        spawner.dropBelow(helper.getLevel(), sim, leaves, crown);
-        helper.assertTrue(sim.pool().count() == 3, "placed leaves shed");
-        // Conifers shed less than vanilla, no tree more.
-        sim.settings().placedLeaves = true;
+        spawner.replaceVanillaLeaf(helper.getLevel(), sim, cherry, crown);
+        helper.assertTrue(sim.pool().count() == 3, "fall rate 2 did not drop two petals");
+        // Oaks: the vanilla leaf is only left out, the canopy spawner drops the calm fall itself.
         sim.settings().fallRate = 1.0F;
-        shape[0] = LeafShape.NEEDLE;
-        for (int n = 0; n < 200; n++) {
-            spawner.dropBelow(helper.getLevel(), sim, leaves, crown);
+        fill(helper, 0, 0, 6, 6, 5, Blocks.OAK_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true));
+        BlockState oak = helper.getLevel().getBlockState(crown);
+        helper.assertTrue(spawner.replaceVanillaLeaf(helper.getLevel(), sim, oak, crown), "the vanilla oak leaf still shows");
+        helper.assertTrue(sim.pool().count() == 3, "a vanilla oak leaf became a leaf");
+        fallen[0] = 0;
+        for (int t = 0; t < 200; t++) {
+            sim.tick(helper.getLevel(), center.getX() + 0.5, center.getY(), center.getZ() + 0.5);
+            spawner.tick(helper.getLevel(), sim, center.getX() + 0.5, center.getZ() + 0.5);
         }
-        int needles = sim.pool().count() - 3;
-        helper.assertTrue(needles > 5 && needles < 70, needles + " needles for 200 vanilla leaves");
-        shape[0] = LeafShape.ROUND;
-        for (int n = 0; n < 50; n++) {
-            spawner.dropBelow(helper.getLevel(), sim, leaves, crown);
-        }
-        helper.assertTrue(sim.pool().count() - 3 - needles == 50, "a birch dropped more leaves than vanilla");
+        helper.assertTrue(fallen[0] > 20, "only " + fallen[0] + " oak leaves fell in calm air");
+        // Falling leaves switched off: the vanilla particles are back.
+        sim.settings().fallRate = 0.0F;
+        helper.assertFalse(spawner.replaceVanillaLeaf(helper.getLevel(), sim, oak, crown), "the vanilla oak leaf is gone with falling leaves off");
         helper.succeed();
     }
 
