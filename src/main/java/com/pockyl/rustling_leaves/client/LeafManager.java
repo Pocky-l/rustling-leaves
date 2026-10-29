@@ -76,8 +76,6 @@ public final class LeafManager {
     private static final int MAX_BURSTS_PER_TICK = 24;
     private static final int MAX_SOUNDS_PER_TICK = 3;
     private static final int SOUND_COOLDOWN = 4;
-    /** Leaves thrown aside from which a landing sounds like a plunge into a pile rather than a step. */
-    private static final int PLUNGE_LEAVES = 12;
     private static final double TELEPORT_DISTANCE = 4.0;
     private static final int SAVE_INTERVAL = 20 * 30;
     private static final float RAKE_RADIUS = 2.0F;
@@ -652,15 +650,7 @@ public final class LeafManager {
     private static final class Listener implements LeafListener {
         @Override
         public void onRustle(double x, double y, double z, int count, boolean wet) {
-            rustle(x, y, z, count, wet ? LeafSounds.WET : LeafSounds.RUSTLE);
-        }
-
-        @Override
-        public void onLanding(double x, double y, double z, int count, boolean wet) {
-            rustle(x, y, z, count, wet ? LeafSounds.WET : count >= PLUNGE_LEAVES ? LeafSounds.PLUNGE : LeafSounds.RUSTLE);
-        }
-
-        private void rustle(double x, double y, double z, int count, SoundEvent sound) {
+            SoundEvent sound = wet ? LeafSounds.WET : LeafSounds.RUSTLE;
             float volume = SETTINGS.rustleVolume;
             if (count < 2 || volume <= 0.0F || soundsThisTick >= MAX_SOUNDS_PER_TICK || SOUND_READY.get(disturbingEntity) > ticks) {
                 return;

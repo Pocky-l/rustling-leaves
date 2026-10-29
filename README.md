@@ -43,8 +43,7 @@ More in detail:
 - The forest floor has patchy litter, drifts against trunks and walls and piles that slump to a natural slope and rot
   away slowly. It is saved with the world.
 - Steps push leaves aside and leave a trail, mobs and arrows stir them, sneaking leaves a carpet untouched. Every step
-  rustles with real field recordings: dry crunch, soggy wet leaves, a whoosh when you land in a pile, the scrape of a
-  rake.
+  rustles with real field recordings: dry crunch, soggy wet leaves, the scrape of a rake.
 - Leaves take the colour of their tree in every biome, modded trees included, with a share of autumn colours.
 - Cached GPU meshes and a simplified far layer keep thousands of leaves cheap out to the render distance.
 
@@ -148,7 +147,7 @@ The jar is written to `build/libs/`.
 - Author: **Pocky**.
 - Falling leaf and petal textures: from newer Minecraft versions, adapted for tinting. Needle sprites, pile textures
   and logo: original, made for this mod. Sounds: CC0 field recordings from [Freesound](https://freesound.org) by
-  Shain_T, SpliceSound, Magdaadga, lolamadeus, Wigglesworth, nickmaysoundmusic, audioninja001, Ryding, Garuda1982 and
+  Shain_T, SpliceSound, Magdaadga, lolamadeus, nickmaysoundmusic, audioninja001, Ryding, Garuda1982 and
   Stefan21100190, cut for the mod. Title font: [Fraunces](https://fonts.google.com/specimen/Fraunces) (OFL).
 
 <!-- more-mods:start -->

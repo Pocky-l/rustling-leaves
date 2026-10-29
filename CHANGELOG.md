@@ -7,8 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.8.0] - 2026-10-29
 ### Added
 - Leaf sounds of their own, cut from real field recordings: a dry crunch and swish when you walk through leaves,
-  soggy steps in wet leaves after rain, a rush of leaves when you jump into a pile and the scrape of a rake. They
-  replace the borrowed block sounds.
+  soggy steps in wet leaves after rain and the scrape of a rake. They replace the borrowed block sounds.
 - A rusty carpet of needles under spruces, pines and other conifers. Fallen needles are mostly brown now, as dead
   needles are, and they cover the forest floor almost everywhere instead of in a few thin patches.
 - Leaves blow the way the rain slants with [Petrichor: Rain & Storms](https://www.curseforge.com/minecraft/mc-mods/petrichor-rain-storms) and the way the snow drifts with

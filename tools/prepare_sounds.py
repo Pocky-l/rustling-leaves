@@ -3,8 +3,8 @@
 Usage: python tools/prepare_sounds.py   (from the mod folder; needs numpy, scipy, soundfile)
 
 The recordings (all Creative Commons 0, see SOURCES) are downloaded into tools/.cache (not committed). From each one the
-clearest single events are cut: a foot swishing through dry leaves, a step into wet leaves, a body landing in a pile,
-a rake stroke. Every cut starts a little before the event, fades out naturally and is normalized to a loudness that
+clearest single events are cut: a foot swishing through dry leaves, a step into wet leaves, a rake
+stroke. Every cut starts a little before the event, fades out naturally and is normalized to a loudness that
 says how loud it is meant to be next to the others; the game only scales them by distance and the rustle volume.
 The files are mono: the game places them where the leaves are.
 """
@@ -28,8 +28,6 @@ SOURCES = {
     218305: ("SpliceSound", "01-20 Footsteps, sneakers on dry leaves"),
     420390: ("Magdaadga", "walking the leaves"),
     179339: ("lolamadeus", "Crunchy Footsteps On Leaves"),
-    # A body landing in leaves.
-    853591: ("Wigglesworth", "A body falling to the ground, with leaf crush"),
     # Wet leaves.
     503262: ("nickmaysoundmusic", "Walking forest wet leaves foley trousers rustle"),
     455063: ("audioninja001", "footsteps-wet-leaves"),
@@ -180,9 +178,6 @@ def main():
     # Into wet leaves: duller and softer.
     one_shots([503262, 455063, 94342], "leaves/wet", 5, before=0.04, length=0.45, rms_db=-30, spacing=0.3,
               lowpass=7000.0)
-    # Landing in a pile: a body dropping into leaves, and the heaviest crunches of the walks, longer.
-    one_shots([853591, 420390, 218305], "leaves/plunge", 3, before=0.06, length=0.95, rms_db=-24, spacing=0.8,
-              lowpass=12000.0, strict=False, max_crest_db=21.0)
     # A rake stroke dragging leaves over the ground.
     one_shots([448966, 593201, 419617], "leaves/rake", 5, before=0.08, length=0.8, rms_db=-27, spacing=0.6,
               strict=False)

@@ -13,8 +13,6 @@ final class LeafSounds {
     static final SoundEvent RUSTLE = event("leaves.rustle");
     /** A step into wet leaves. */
     static final SoundEvent WET = event("leaves.wet");
-    /** Landing in a pile: a big rush of leaves. */
-    static final SoundEvent PLUNGE = event("leaves.plunge");
     /** A rake stroke dragging leaves over the ground. */
     static final SoundEvent RAKE = event("leaves.rake");
 

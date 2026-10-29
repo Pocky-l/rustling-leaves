@@ -9,11 +9,6 @@ public interface LeafListener {
     default void onRustle(double x, double y, double z, int count, boolean wet) {
     }
 
-    /** An entity landed in the litter here and threw {@code count} leaves aside. */
-    default void onLanding(double x, double y, double z, int count, boolean wet) {
-        onRustle(x, y, z, count, wet);
-    }
-
     /** A leaf fell into lava. */
     default void onBurn(double x, double y, double z) {
     }
