@@ -4,21 +4,26 @@ import net.minecraft.util.Mth;
 
 /** Color helpers shared by falling leaves and the leaf litter. Colors are 0xRRGGBB. */
 public final class LeafPalette {
-    private static final int[] AUTUMN = {0xE8B53A, 0xDB8A2C, 0xCF6A2E, 0xBC4E34, 0xA87842, 0xD4AE4A, 0x9C7448};
+    /**
+     * Clean, saturated autumn colors: golden, amber, orange, red-orange, crimson, straw yellow and one warm brown. Muddy
+     * browns and olive tones read as dirt on the ground (owner).
+     */
+    private static final int[] AUTUMN = {0xF0BE45, 0xE69A32, 0xDD782B, 0xCB5530, 0xB73C2F, 0xDCB851, 0xB87239};
 
     private LeafPalette() {
     }
 
     /**
      * Gives one leaf its own color from the tree color: a share of leaves turns to an autumn color, every leaf gets a
-     * slightly different brightness. Deterministic in {@code hash}.
+     * slightly different brightness. A turned leaf keeps at most a fifth of the tree's green: halfway between green and
+     * orange is olive, which looks like dirt. Deterministic in {@code hash}.
      */
     public static int vary(int base, long hash, float autumnShare, LeafShape shape) {
         float pick = (hash & 0xFFFF) / 65536.0F;
         int color = base;
         if (shape.autumn && pick < autumnShare) {
             int autumn = AUTUMN[(int) ((hash >>> 16) & 0xFF) % AUTUMN.length];
-            color = lerp(color, autumn, 0.5F + ((hash >>> 24) & 0xFF) / 255.0F * 0.45F);
+            color = lerp(color, autumn, 0.8F + ((hash >>> 24) & 0xFF) / 255.0F * 0.2F);
         }
         float brightness = 0.93F + ((hash >>> 32) & 0xFF) / 255.0F * 0.17F;
         return scale(color, brightness);

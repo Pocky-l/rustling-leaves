@@ -4,6 +4,22 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.0] - 2026-10-29
+### Added
+- Conifers drop needles: spruces, pines, firs and other conifers shed a small needle sprig drawn in the style of the
+  new falling leaves (three shades, with its own shadow) instead of the broad leaf, in the air and on the forest
+  floor. Needles already lying on the ground switch to it too.
+
+### Changed
+- Cleaner autumn colors. Leaves that turn go all the way to golden, amber, orange, red or a warm brown instead of
+  stopping halfway at olive and khaki, and the muddy browns are gone, so the forest floor looks bright instead of
+  dirty.
+- Softer shading on the ground: leaves deeper in a pile, the sides of piles, the shadows under leaves and around the
+  foot of piles are lighter, so litter no longer looks smudged.
+- Falling leaves and petals are no longer darkened twice with a shader pack (the pack already lights them by the way
+  they face), and without one a leaf turned sideways is only a little darker than one lying flat, as thin leaves let
+  the light through.
+
 ## [2.6.0] - 2026-10-27
 ### Added
 - Shader packs can sway with the leaves' wind: while an [Iris](https://www.curseforge.com/minecraft/mc-mods/irisshaders) shader pack is on, the mod hands its wind

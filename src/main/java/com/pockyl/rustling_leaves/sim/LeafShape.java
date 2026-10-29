@@ -3,16 +3,15 @@ package com.pockyl.rustling_leaves.sim;
 /**
  * Leaf shapes. Each shape has one or more sprites (indices into the client's sprite list), a relative size and how
  * readily its trees shed: birches and cherries drop leaves and petals all the time, conifers hardly ever. The sprites
- * are the falling leaves of newer Minecraft versions: one tinted leaf in three shades for every tree (as vanilla does)
- * and the cherry petal in three shades.
+ * are the falling leaves of newer Minecraft versions: one tinted leaf in three shades for broad-leaved trees (as vanilla
+ * does), the cherry petal in three shades, and a needle sprig in the same style for conifers (vanilla has none).
  */
 public enum LeafShape {
     BROAD(0, 3, 1.0F, true, 1.0F),
     ROUND(0, 3, 0.85F, true, 1.5F),
-    NEEDLE(0, 3, 0.8F, false, 0.15F),
+    NEEDLE(12, 3, 0.8F, false, 0.15F),
     PETAL(3, 3, 0.7F, false, 1.6F);
 
-    public static final int SPRITE_COUNT = 6;
     /** Half-size of an average leaf quad in blocks, before the shape and config multipliers. */
     public static final float BASE_SIZE = 0.1F;
 
