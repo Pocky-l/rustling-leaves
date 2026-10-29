@@ -152,9 +152,9 @@ static String extractChangelog(String changelog, String version) {
     return body ?: null
 }
 
-def releaseNotes = extractChangelog(
-        providers.fileContents(layout.projectDirectory.file('CHANGELOG.md')).asText.getOrElse(''),
-        mod_version)
+// This branch has its own "## [<version>+<minecraft version>]" sections; the plain version is the fallback.
+def changelogText = providers.fileContents(layout.projectDirectory.file('CHANGELOG.md')).asText.getOrElse('')
+def releaseNotes = extractChangelog(changelogText, "${mod_version}+${minecraft_version}".toString()) ?: extractChangelog(changelogText, mod_version)
 def curseforgeToken = providers.gradleProperty('curseforge_token')
         .orElse(providers.environmentVariable('CURSEFORGE_TOKEN'))
 
@@ -186,7 +186,7 @@ publishMods {
     file = tasks.named('jar', Jar).flatMap { it.archiveFile }
     changelog = releaseNotes ?: ''
     type = STABLE
-    displayName = "${mod_name} ${mod_version}"
+    displayName = "${mod_name} ${mod_version}+${minecraft_version}"
     modLoaders.add('neoforge')
     dryRun = providers.gradleProperty('dryRun').map { it != 'false' }.orElse(false)
 
