@@ -61,23 +61,6 @@
     ],
     "subtitle": "subtitles.rustling_leaves.rustle"
   },
-  "leaves.plunge": {
-    "sounds": [
-      {
-        "name": "rustling_leaves:leaves/plunge1",
-        "attenuation_distance": 20
-      },
-      {
-        "name": "rustling_leaves:leaves/plunge2",
-        "attenuation_distance": 20
-      },
-      {
-        "name": "rustling_leaves:leaves/plunge3",
-        "attenuation_distance": 20
-      }
-    ],
-    "subtitle": "subtitles.rustling_leaves.plunge"
-  },
   "leaves.rake": {
     "sounds": [
       {
