@@ -5,7 +5,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [2.8.0] - 2026-10-29
+### Added
+- Leaf sounds of their own, cut from real field recordings: a dry crunch and swish when you walk through leaves,
+  soggy steps in wet leaves after rain, a rush of leaves when you jump into a pile and the scrape of a rake. They
+  replace the borrowed block sounds.
+- A rusty carpet of needles under spruces, pines and other conifers. Fallen needles are mostly brown now, as dead
+  needles are, and they cover the forest floor almost everywhere instead of in a few thin patches.
+- Leaves blow the way the rain slants with [Petrichor: Rain & Storms](https://www.curseforge.com/minecraft/mc-mods/petrichor-rain-storms) and the way the snow drifts with
+  [Hoarfrost: Snow & Blizzards](https://www.curseforge.com/minecraft/mc-mods/hoarfrost-snow-blizzards). Their gusts, squalls and whirlwinds stay. The option
+  `leaves.livingWind` now covers these mods too.
+- Client option `leaves.placedLeaves`: leaves placed by players (hedges, leaf roofs, decorations) no longer shed leaves
+  or get a leaf carpet under them, so builds stay tidy. Turn it on to have them shed like trees.
+
 ### Changed
+- New textures for leaf carpets and piles, strewn from the same small leaf sprites as the falling leaves, so a pile
+  looks like a heap of those very leaves. With `leaves.oldLeafTextures` the piles get their old textures back too.
+- Fewer leaves stick up from piles, and less steeply: piles look fluffy instead of bristling with dark shards.
+- The pixel shadows of falling leaves fall the same way as the shadows of a shader pack that tilts the sun's path
+  (BSL, Complementary Unbound and others), instead of always to the east or west.
 - Shader packs see falling leaves as leaves. With an [Iris](https://modrinth.com/mod/iris) shader pack, leaves in the
   air are shaded the way the pack shades the tree crowns: they light up when the sun shines through them, glowing
   gold and red against a low sun, instead of being lit like a piece of ground.

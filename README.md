@@ -42,7 +42,9 @@ More in detail:
   cast crisp pixel shadows that follow the sun.
 - The forest floor has patchy litter, drifts against trunks and walls and piles that slump to a natural slope and rot
   away slowly. It is saved with the world.
-- Steps push leaves aside and leave a trail, mobs and arrows stir them, sneaking leaves a carpet untouched.
+- Steps push leaves aside and leave a trail, mobs and arrows stir them, sneaking leaves a carpet untouched. Every step
+  rustles with real field recordings: dry crunch, soggy wet leaves, a whoosh when you land in a pile, the scrape of a
+  rake.
 - Leaves take the colour of their tree in every biome, modded trees included, with a share of autumn colours.
 - Cached GPU meshes and a simplified far layer keep thousands of leaves cheap out to the render distance.
 
@@ -72,6 +74,7 @@ thick leaf fall; without a value it shows the current one.
 | `leaves.maxLeaves` | `8000` | Maximum number of moving leaves (0 disables the mod); lying leaves are not counted |
 | `leaves.fallRate` | `1.0` | How often leaves fall from trees (0 = no falling leaves) |
 | `leaves.treeFallRates` | `true` | Birches shed more, conifers less (off = all trees alike) |
+| `leaves.placedLeaves` | `false` | Leaves placed by players (hedges, leaf roofs) shed and get litter like trees |
 | `leaves.spawnRadius` | `32` | Radius around you in which trees drop leaves |
 | `leaves.carpetDepth` | `4` | Natural leaf carpet thickness (leaves per quarter block, 0 = none) |
 | `leaves.naturalPiles` | `true` | Drifts against walls and trunks and occasional piles in forests |
@@ -83,7 +86,7 @@ thick leaf fall; without a value it shows the current one.
 | `leaves.autumnColors` | `0.35` | Share of leaves in autumn colors |
 | `leaves.immersiveWeatheringPiles` | `true` | Draw Immersive Weathering's leaf piles as leaf litter |
 | `leaves.realisticWaves` | `true` | With Realistic Waves: floating leaves ride its waves (off = flat vanilla water level) |
-| `leaves.livingWind` | `true` | With Living Wind: leaves blow with its wind (off = their own wind) |
+| `leaves.livingWind` | `true` | With Living Wind, Petrichor or Hoarfrost: leaves blow with their wind (off = their own wind) |
 | `leaves.fallingLeavesMod` | `false` | With Falling Leaves or Living Wind: keep their falling leaves as well (off = only Rustling Leaves' leaves fall) |
 | `leaves.leavesPerBreak` | `14` | Leaves released by a broken or decayed leaves block |
 | `physics.windStrength` | `1.0` | Wind strength (0 = still air) |
@@ -122,6 +125,10 @@ Leaf litter is saved in `saves/<world>/rustling_leaves/` (singleplayer) or `rust
 
 [![Living Wind](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/compat/living-wind.png)](https://www.curseforge.com/minecraft/mc-mods/living-wind) ✅ **[Living Wind](https://www.curseforge.com/minecraft/mc-mods/living-wind)** (optional) - leaves blow with its wind: the way its wind vanes point and as hard as it blows, calm on a clear day, wild in a storm. Rustling Leaves takes over the leaves it blows out of the crowns (its grass and dust stay).
 
+[![Petrichor](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/more-mods/petrichor.png)](https://www.curseforge.com/minecraft/mc-mods/petrichor-rain-storms) ✅ **[Petrichor: Rain & Storms](https://www.curseforge.com/minecraft/mc-mods/petrichor-rain-storms)** (optional) - leaves blow the same way the rain slants.
+
+[![Hoarfrost](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/more-mods/hoarfrost.png)](https://www.curseforge.com/minecraft/mc-mods/hoarfrost-snow-blizzards) ✅ **[Hoarfrost: Snow & Blizzards](https://www.curseforge.com/minecraft/mc-mods/hoarfrost-snow-blizzards)** (optional) - leaves blow the same way the snow drifts.
+
 ## Installation
 
 1. Install [NeoForge](https://neoforged.net) 21.1.144 or newer for Minecraft 1.21.1.
@@ -140,7 +147,9 @@ The jar is written to `build/libs/`.
 
 - Author: **Pocky**.
 - Falling leaf and petal textures: from newer Minecraft versions, adapted for tinting. Needle sprites, pile textures
-  and logo: original, made for this mod. Sounds: vanilla Minecraft. Title font: [Fraunces](https://fonts.google.com/specimen/Fraunces) (OFL).
+  and logo: original, made for this mod. Sounds: CC0 field recordings from [Freesound](https://freesound.org) by
+  Shain_T, SpliceSound, Magdaadga, lolamadeus, Wigglesworth, nickmaysoundmusic, audioninja001, Ryding, Garuda1982 and
+  Stefan21100190, cut for the mod. Title font: [Fraunces](https://fonts.google.com/specimen/Fraunces) (OFL).
 
 <!-- more-mods:start -->
 ## More mods by Pocky
