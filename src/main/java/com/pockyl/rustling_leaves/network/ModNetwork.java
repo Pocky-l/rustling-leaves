@@ -1,6 +1,5 @@
 package com.pockyl.rustling_leaves.network;
 
-import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.world.item.ItemStack;
@@ -12,12 +11,12 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
 import java.util.Map;
 import java.util.WeakHashMap;
-import java.util.function.Consumer;
 
 /**
  * The only network traffic of the mod: rake strokes, relayed by a server that has the mod to the players around the
  * raker. Everything is optional - without the mod on the server (or on a client) nothing is sent and the leaves stay
- * client-side as before.
+ * client-side as before. Strokes arriving on a client are handled by the client part of the mod, which registers its
+ * own handler (NeoForge 21.11 takes client handlers only from the client side).
  */
 public final class ModNetwork {
     private static final String PROTOCOL_VERSION = "1";
@@ -28,9 +27,6 @@ public final class ModNetwork {
     /** At most one stroke per player this often; holding the use key strokes every 4 ticks. */
     private static final long MIN_INTERVAL = 2L;
 
-    /** Set by the client part of the mod; a dedicated server never loads client classes through this. */
-    private static volatile Consumer<RakePayload> clientRake = payload -> {
-    };
     private static final Map<ServerPlayer, Long> LAST_RAKE = new WeakHashMap<>();
 
     private ModNetwork() {
@@ -41,17 +37,8 @@ public final class ModNetwork {
         registrar.playBidirectional(RakePayload.TYPE, RakePayload.STREAM_CODEC, ModNetwork::handle);
     }
 
-    public static void setClientRake(Consumer<RakePayload> handler) {
-        clientRake = handler;
-    }
-
     private static void handle(RakePayload payload, IPayloadContext context) {
-        if (!payload.isFinite()) {
-            return;
-        }
-        if (context.flow() == PacketFlow.CLIENTBOUND) {
-            clientRake.accept(payload);
-        } else if (context.player() instanceof ServerPlayer player) {
+        if (payload.isFinite() && context.player() instanceof ServerPlayer player) {
             relay(player, payload);
         }
     }
