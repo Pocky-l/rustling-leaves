@@ -1,43 +1,50 @@
 <p align="center">
-  <img src="src/main/resources/logo.png" alt="Rustling Leaves" width="160">
-</p>
-
-<h1 align="center">Rustling Leaves</h1>
-
-<p align="center">
-  <b>Physically simulated leaves</b> - falling leaves, a forest floor you can wade through, rake into piles, gusts and whirlwinds.
+  <img src="docs/showcase/title.gif" alt="Rustling Leaves" width="834">
 </p>
 
 <p align="center">
   <a href="https://www.curseforge.com/minecraft/mc-mods/rustling-leaves"><img alt="CurseForge downloads" src="https://img.shields.io/curseforge/dt/1729578?logo=curseforge&label=CurseForge&color=F16436"></a>
-  <a href="https://www.minecraft.net"><img alt="Minecraft 1.21.1" src="https://img.shields.io/badge/Minecraft-1.21.1-62B47A"></a>
-  <a href="https://neoforged.net"><img alt="NeoForge" src="https://img.shields.io/badge/Loader-NeoForge-F16436"></a>
+  <a href="https://www.curseforge.com/minecraft/mc-mods/rustling-leaves/files"><img alt="Minecraft 1.21.1, 1.20.1" src="https://img.shields.io/badge/Minecraft-1.21.1%20%7C%201.20.1-62B47A"></a>
+  <a href="https://neoforged.net"><img alt="NeoForge" src="https://img.shields.io/badge/Loader-NeoForge%20%7C%20Forge-F16436"></a>
+  <img alt="Client-side" src="https://img.shields.io/badge/Client--side-any%20server-d98a3a">
   <a href="LICENSE"><img alt="License MIT" src="https://img.shields.io/badge/License-MIT-blue"></a>
 </p>
 
-<p align="center">
-  <img src="docs/screenshots/leaf-pile.jpg" alt="A leaf pile under a tree on a river bank, autumn litter all around" width="720">
-</p>
+<p align="center"><i>Leaves fall from the trees, lie on the ground and blow around in the wind.</i></p>
+
+<p align="center"><b>Every tree drops its own leaves: oaks and birches go yellow and red, spruces shed needles, cherries drop petals. The leaves pile up on the ground, float on water and fly off with every gust. The mod only runs on your side, so it works on any server.</b></p>
+
+<p align="center"><img src="docs/showcase/forest.gif" alt="Autumn leaves falling in a forest, a gust blowing through" width="720"></p>
+
+<p align="center"><b>Thousands</b> of leaves at once &middot; <b>Every tree</b>, modded ones too &middot; <b>No blocks or items</b>, nothing to install on the server</p>
 
 ## Features
 
-- 🍂 **Falling leaves** - they let go of the crowns and come down like real leaves: fluttering, gliding in pendulum
-  swings or tumbling; every tree sheds its own way, cherries drop petals. They wear the falling leaf textures of the
-  newest Minecraft versions (the mod's classic leaf shapes are one config switch away) and cast crisp pixel shadows
-  that follow the sun.
-- 🌳 **A real forest floor** - patchy litter, drifts against trunks and walls, leaf piles that slump to a natural slope,
-  fill hollows and rot away slowly; saved with the world.
-- 👣 **Wade through piles** - steps push leaves aside and leave a trail, a jump into a pile splashes it up, mobs and
-  arrows stir the leaves; sneaking leaves a carpet untouched.
-- 🌬️ **Wind you can see** - gust waves skitter leaves over the ground, squalls strip trees, leaf whirlwinds wander over
-  open ground; wind charges and explosions blow rings of leaves away.
-- 🌊 **Leaves on water** - they soak and darken, drift with the current and down waterfalls, gather into rafts and sink.
-- 🧹 **Rake them into piles** with a hoe or shovel while sneaking - your friends see the pile form too.
-- 🖥️ **Client-side** - adds no items or blocks, so it works on any server, with or without the mod. On the server
-  it is optional and only passes on where players rake.
-- 🎨 **Colours of the tree** in every biome, modded trees included, with a share of autumn yellows and reds.
-- ⚡ **Built for huge numbers** - cached GPU meshes and a simplified far layer keep thousands of leaves cheap out to the
-  render distance.
+<h3 align="center">On the water</h3>
+<p align="center"><img src="docs/showcase/lake.gif" alt="Leaves blowing off the trees and settling on a lake" width="720"></p>
+<p align="center"><i>Leaves that land on a lake stay afloat and drift with the current. They gather into little rafts by the shore,<br>soak through and slowly sink.</i></p>
+
+<h3 align="center">Under the spruces</h3>
+<p align="center"><img src="docs/showcase/taiga.gif" alt="Needles falling in a spruce forest" width="720"></p>
+<p align="center"><i>Conifers shed needles instead of leaves, and much less often. Under old spruces the ground is rusty with them.</i></p>
+
+<h3 align="center">Cherry blossom</h3>
+<p align="center"><img src="docs/showcase/cherry.gif" alt="Cherry petals drifting through a cherry grove" width="720"></p>
+<p align="center"><i>Cherry trees drop petals, and a gust carries them through the whole grove.<br>With Serene Seasons the blossom falls in spring and the leaves in autumn.</i></p>
+
+<h3 align="center">Piles, rakes and wind</h3>
+<p align="center"><i>Walk through a pile and the leaves scatter, jump into one and they fly up. Sneak with a hoe or a shovel to rake them into a heap.<br>Squalls strip the trees, whirlwinds wander over open ground, and a wind charge blows the leaves away in a ring.</i></p>
+
+More in detail:
+
+- Leaves let go of the crowns and come down like real ones: fluttering, gliding in pendulum swings or tumbling. They
+  wear the falling leaf textures of newer Minecraft versions (the mod's classic shapes are one config switch away) and
+  cast crisp pixel shadows that follow the sun.
+- The forest floor has patchy litter, drifts against trunks and walls and piles that slump to a natural slope and rot
+  away slowly. It is saved with the world.
+- Steps push leaves aside and leave a trail, mobs and arrows stir them, sneaking leaves a carpet untouched.
+- Leaves take the colour of their tree in every biome, modded trees included, with a share of autumn colours.
+- Cached GPU meshes and a simplified far layer keep thousands of leaves cheap out to the render distance.
 
 ## Controls
 
@@ -132,8 +139,8 @@ The jar is written to `build/libs/`.
 ## Credits
 
 - Author: **Pocky**.
-- Falling leaf and petal textures: from newer Minecraft versions, adapted for tinting. Pile textures and logo:
-  original, made for this mod. Sounds: vanilla Minecraft.
+- Falling leaf and petal textures: from newer Minecraft versions, adapted for tinting. Needle sprites, pile textures
+  and logo: original, made for this mod. Sounds: vanilla Minecraft. Title font: [Fraunces](https://fonts.google.com/specimen/Fraunces) (OFL).
 
 <!-- more-mods:start -->
 ## More mods by Pocky
