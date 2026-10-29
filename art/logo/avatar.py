@@ -1,16 +1,18 @@
-"""Animated CurseForge avatar of Rustling Leaves: a small Minecraft island (3x3 grass blocks) with an autumn oak in the
-back corner and the leaf pile of logo.bbmodel in front; leaves let go of the crown one by one, swing down like real
-leaves and settle on the pile, in a seamless loop. Rendered in Blockbench (desktop, debugging port, like
-tools/blockbench/render_logo.py).
+"""Animated CurseForge avatar of Rustling Leaves: a leaf pile in front, leaves swinging down onto it, and one big leaf
+tumbling past the camera in the foreground (it fills the first frame, which shows while the GIF loads).
+
+The pieces are rendered in Blockbench (desktop, debugging port, like tools/blockbench/render_logo.py): the pile of
+logo.bbmodel without its falling leaves, and the mod's falling leaf sprite (5x5, leaf_mid.png) as a voxel leaf with
+some thickness, in a range of orientations. The frames are composed here: sky, out-of-focus leaves far away, sharp
+leaves in the middle, the big leaf in front.
 
 Run from art/logo:
-    python avatar.py build           writes avatar.bbmodel (island + tree + pile, from logo.bbmodel and diorama_texture.png)
-    python avatar.py render [N]      renders N frames (default 72) into avatar_frames/
-    python avatar.py compose         avatar_frames/ -> avatar_400.gif (CurseForge avatar) + avatar_512.png (still)
+    python avatar.py render      Blockbench -> avatar_parts/pile.png, avatar_parts/leaf_XX.png
+    python avatar.py compose     avatar_parts/ -> avatar_400.gif (CurseForge avatar) + avatar_512.png (first frame)
 """
 import base64
-import copy
 import glob
+import io
 import json
 import math
 import os
@@ -20,223 +22,211 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import uuid
 
+import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[4] / "tools" / "blockbench"))
 from render_logo import ensure_blockbench, evaluate  # noqa: E402
 
 HERE = pathlib.Path(__file__).resolve().parent
-SOURCE = HERE / "logo.bbmodel"
-MODEL = HERE / "avatar.bbmodel"
-ATLAS = HERE / "diorama_texture.png"
-FRAMES = HERE / "avatar_frames"
-PILE_SCALE = 0.8
-PILE_AT = (4.0, 0.0, 6.0)
-YAW, PITCH, TARGET_Y, ZOOM = 45, 28, 30, 0.19
-
-# Atlas cells (128x128 atlas like the project resolution, 16 px each): u, v of the top left corner.
-GRASS_TOP, GRASS_SIDE, DIRT, LOG_SIDE = (0, 0), (16, 0), (32, 0), (48, 0)
-LEAVES = [(0, 16), (16, 16), (32, 16)]  # amber, red-orange, golden
-LOG_TOP = (48, 16)
+PARTS = HERE / "avatar_parts"
+SPRITE = HERE.parents[1] / "src/main/resources/assets/rustling_leaves/textures/block/leaf/leaf_mid.png"
+ORIENTATIONS = 24
+FRAMES, FPS = 72, 18
+# LeafPalette.AUTUMN, the mod's own leaf colours
+COLORS = [0xF0BE45, 0xE69A32, 0xDD782B, 0xCB5530, 0xB73C2F, 0xDCB851, 0xB87239]
 
 
-def face(cell, tex=1):
-    u, v = cell
-    return {"uv": [u, v, u + 16, v + 16], "texture": tex}
+def leaf_texture():
+    """The 5x5 leaf back out of the x3 sprite (one pixel of every 3x3 block)."""
+    src = Image.open(SPRITE).convert("RGBA")
+    out = Image.new("RGBA", (5, 5))
+    for y in range(5):
+        for x in range(5):
+            out.putpixel((x, y), src.getpixel((x * 3 + 1, y * 3 + 1)))
+    return out
 
 
-def cube(name, frm, to, faces):
-    return {"name": name, "box_uv": False, "render_order": "default", "locked": False, "export": True, "scope": 0,
-            "allow_mirror_modeling": True, "from": list(frm), "to": list(to), "autouv": 0, "color": 0,
-            "origin": [0, 0, 0], "faces": faces, "type": "cube", "uuid": str(uuid.uuid4())}
-
-
-def block(name, x, y, z, kind, shade=0):
-    """One block at block coordinates (x, y, z) of the island."""
-    frm, to = (x * 16, y * 16, z * 16), (x * 16 + 16, y * 16 + 16, z * 16 + 16)
-    if kind == "grass":
-        faces = {d: face(GRASS_SIDE) for d in ("north", "east", "south", "west")}
-        faces.update(up=face(GRASS_TOP), down=face(DIRT))
-    elif kind == "log":
-        faces = {d: face(LOG_SIDE) for d in ("north", "east", "south", "west")}
-        faces.update(up=face(LOG_TOP), down=face(LOG_TOP))
-    else:
-        faces = {d: face(LEAVES[shade]) for d in ("north", "east", "south", "west", "up", "down")}
-    return cube(name, frm, to, faces)
-
-
-def build():
-    d = json.loads(SOURCE.read_text(encoding="utf-8"))
-    s = PILE_SCALE
-
-    def move(p):
-        return [p[0] * s + PILE_AT[0], p[1] * s + PILE_AT[1], p[2] * s + PILE_AT[2]]
-
-    for e in d["elements"]:
-        if e["name"].startswith(("stream", "falling")):
-            continue  # the falling leaves are placed by the renderer every frame
-        e["from"], e["to"], e["origin"] = move(e["from"]), move(e["to"]), move(e["origin"])
-    for g in d.get("groups", []):
-        g["origin"] = move(g["origin"])
-    blocks = []
-    for x in (-1, 0, 1):
-        for z in (-1, 0, 1):
-            blocks.append(block(f"grass_{x}_{z}", x, -1, z, "grass"))
-    # An oak in the back corner: three logs, a crown of leaves blocks in three autumn colours.
-    for y in (0, 1):
-        blocks.append(block(f"log_{y}", -1, y, -1, "log"))
-    rnd = random.Random(5)
-    crown = [(x, 2, z) for x in (-2, -1, 0) for z in (-2, -1, 0) if (x, z) != (0, 0)]
-    crown += [(-1, 3, -1), (-2, 3, -1), (-1, 3, -2), (0, 3, -1), (-1, 3, 0)]
-    for i, (x, y, z) in enumerate(crown):
-        blocks.append(block(f"crown_{i}", x, y, z, "leaves", rnd.choice((0, 1, 1, 2))))
-    d["elements"] += blocks
-    d["outliner"] += [b["uuid"] for b in blocks]
-    tex = copy.deepcopy(d["textures"][0])
-    tex.update(name="diorama_texture.png", relative_path="diorama_texture.png", id="1", uuid=str(uuid.uuid4()),
-               width=128, height=128, uv_width=128, uv_height=128,
-               source="data:image/png;base64," + base64.b64encode(ATLAS.read_bytes()).decode())
-    d["textures"].append(tex)
-    d["name"] = "rustling_leaves_avatar"
-    d["meta"]["model_format"] = "free"  # bedrock models have a single texture
-    MODEL.write_text(json.dumps(d), encoding="utf-8")
-    print("wrote", MODEL, len(d["elements"]), "elements")
-
-
-LOAD = """(async () => {
-  const data = %s;
-  newProject(Formats.free);
-  Codecs.project.load(data, {path: ''});
-  await new Promise(r => setTimeout(r, 1800));
+def render():
+    ensure_blockbench()
+    PARTS.mkdir(exist_ok=True)
+    pile = (HERE / "logo.bbmodel").read_text(encoding="utf-8")
+    evaluate(f"""(async () => {{
+  newProject(Formats.bedrock);
+  Codecs.project.load({pile}, {{path: ''}});
+  await new Promise(r => setTimeout(r, 1500));
   Canvas.updateAll();
   three_grid.visible = false;
-  const flying = Cube.all.filter(c => c.name.startsWith('stream') || c.name.startsWith('falling'));
-  window.__av = {items: flying.map(c => ({cube: c, name: c.name, quat: c.mesh.quaternion.clone()}))};
-  return flying.length;
-})()"""
-
-
-def camera_js():
-    return f"""
-  const yaw = {YAW} * Math.PI / 180, pitch = {PITCH} * Math.PI / 180, dist = 400, target = [0, {TARGET_Y}, 0];
+  Cube.all.filter(c => c.name.startsWith('stream') || c.name.startsWith('falling')).forEach(c => c.mesh.visible = false);
+  return 'ok';
+}})()""")
+    evaluate("""(async () => {
+  const yaw = 30 * Math.PI / 180, pitch = 22 * Math.PI / 180, dist = 300, target = [0, 6, 0];
   const position = [dist * Math.sin(yaw) * Math.cos(pitch), target[1] + dist * Math.sin(pitch), dist * Math.cos(yaw) * Math.cos(pitch)];
-  Preview.selected.loadAnglePreset({{projection: 'orthographic', position, target, zoom: {ZOOM}}});
-"""
+  Preview.selected.loadAnglePreset({projection: 'orthographic', position, target, zoom: 0.35});
+  await new Promise(r => setTimeout(r, 400));
+  return await new Promise(resolve => Preview.selected.screenshot({crop: true}, resolve));
+})()""", PARTS / "pile.png")
 
-
-def leaf_paths(count):
-    """Start under the crown, end on the pile; every leaf swings along its own direction."""
-    rnd = random.Random(11)
-    paths = []
-    for j in range(count):
-        # The camera looks from +x +z: x - z runs across the picture, x + z towards the viewer. Leaves start at the left
-        # or right edge of the crown, in front of the trunk, so they glide against the sky into the pile, swinging
-        # across the picture.
-        side = 1 if j % 2 else -1
-        across, depth = side * rnd.uniform(22, 34), rnd.uniform(-4, 10)
-        sx, sz = (depth + across) / 2, (depth - across) / 2
-        ex, ez = PILE_AT[0] + rnd.uniform(-6, 6), PILE_AT[2] + rnd.uniform(-6, 6)
-        paths.append({"s": [sx, rnd.uniform(29, 33), sz], "e": [ex, 8.5, ez], "dir": [0.707, -0.707],
-                      "amp": rnd.uniform(6, 9), "swings": rnd.choice((2, 3)), "phase": j / count,
-                      "spin": rnd.uniform(-1, 1), "size": rnd.uniform(0.95, 1.2)})
-    return paths
-
-
-def render(n):
-    ensure_blockbench()
-    count = int(json.loads(evaluate(LOAD % MODEL.read_text(encoding="utf-8"))))
-    paths = leaf_paths(count)
-    if FRAMES.exists():
-        shutil.rmtree(FRAMES)
-    FRAMES.mkdir()
-    for k in range(n):
-        evaluate(f"""(async () => {{
-  const av = window.__av, t = {k / n}, paths = {json.dumps(paths)};
-  av.items.forEach((it, j) => {{
-    const p = paths[j];
-    const u = (p.phase + t) % 1;
-    const fall = u * u * (3 - 2 * u) * 0.25 + u * 0.75;      // a soft start as the leaf lets go
-    // Pendulum glide: the leaf swings sideways, dipping at the middle of each swing and tilting with it.
-    const swing = Math.sin(u * p.swings * Math.PI * 2);
-    const x = p.s[0] + (p.e[0] - p.s[0]) * fall + p.dir[0] * p.amp * swing;
-    const z = p.s[2] + (p.e[2] - p.s[2]) * fall + p.dir[1] * p.amp * swing;
-    const y = p.s[1] + (p.e[1] - p.s[1]) * fall - 1.5 * Math.abs(Math.cos(u * p.swings * Math.PI * 2));
-    const world = new THREE.Vector3(x, y, z);
-    const inv = new THREE.Matrix4().copy(it.cube.mesh.parent.matrixWorld).invert();
-    it.cube.mesh.position.copy(world.applyMatrix4(inv));
-    const tilt = 0.7 * Math.cos(u * p.swings * Math.PI * 2);
-    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(tilt * p.dir[1], u * Math.PI * 2 * p.spin, -tilt * p.dir[0]));
-    it.cube.mesh.quaternion.copy(it.quat).premultiply(q);
-    const s = Math.min(1, u / 0.06, (1 - u) / 0.08) * p.size;
-    it.cube.mesh.scale.setScalar(Math.max(0.001, s));
+    buf = io.BytesIO()
+    leaf_texture().save(buf, "PNG")
+    data = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+    pixels = [(x, y) for y in range(5) for x in range(5) if leaf_texture().getpixel((x, y))[3] > 0]
+    evaluate(f"""(async () => {{
+  newProject(Formats.free);
+  Project.texture_width = 5; Project.texture_height = 5;
+  const tex = new Texture({{name: 'leaf'}}).fromDataURL({json.dumps(data)}).add(false);
+  await new Promise(r => setTimeout(r, 400));
+  const group = new Group({{name: 'leaf', origin: [0, 0, 0]}}).init();
+  {json.dumps(pixels)}.forEach(([x, y]) => {{
+    const c = new Cube({{name: 'p', from: [x - 2.5, 2.5 - y - 1, -0.3], to: [x - 1.5, 2.5 - y, 0.3]}}).addTo(group).init();
+    for (const f in c.faces) {{ c.faces[f].texture = tex.uuid; c.faces[f].uv = [x, y, x + 1, y + 1]; }}
   }});
-  {camera_js()}
-  await new Promise(r => setTimeout(r, 120));
+  Canvas.updateAll();
+  three_grid.visible = false;
+  Preview.selected.loadAnglePreset({{projection: 'orthographic', position: [0, 0, 300], target: [0, 0, 0], zoom: 2.5}});
+  window.__leaf = group;
+  return 'ok';
+}})()""")
+    for k in range(ORIENTATIONS):
+        a = k / ORIENTATIONS * math.tau
+        evaluate(f"""(async () => {{
+  const g = window.__leaf.mesh;
+  // a tumble: a full turn about a tilted axis, with a gentle wobble, so the leaf shows its face, its edge and its back
+  const axis = new THREE.Vector3(0.85, 0.35, 0.4).normalize();
+  g.quaternion.setFromAxisAngle(axis, {a}).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler({0.25 * math.sin(2 * a)}, 0, {0.2 * math.cos(a)})));
+  await new Promise(r => setTimeout(r, 150));
   return await new Promise(resolve => Preview.selected.screenshot({{crop: false}}, resolve));
-}})()""", FRAMES / f"f{k:03d}.png")
-        print("frame", k, flush=True)
+}})()""", PARTS / f"leaf_{k:02d}.png")
+        print("leaf", k, flush=True)
 
 
-def background(size):
-    top, bottom = (150, 200, 232), (246, 222, 184)  # clear autumn sky into warm haze
-    bg = Image.new("RGBA", (size, size))
-    draw = ImageDraw.Draw(bg)
-    for y in range(size):
-        k = (y / (size - 1)) ** 1.3
-        draw.line([(0, y), (size, y)], fill=tuple(int(top[i] + (bottom[i] - top[i]) * k) for i in range(3)) + (255,))
-    sun = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    ImageDraw.Draw(sun).ellipse([size * 0.5, size * 0.02, size * 1.1, size * 0.62], fill=(255, 244, 214, 150))
-    bg.alpha_composite(sun.filter(ImageFilter.GaussianBlur(size * 0.09)))
-    return bg
+def tint(img, color, shade=1.0):
+    a = np.array(img, np.float32)
+    rgb = np.array([(color >> 16) & 255, (color >> 8) & 255, color & 255], np.float32) / 255.0
+    # the render is grey (leaf_mid x Blockbench light): normalise to the sprite's bright tone, then multiply
+    a[..., :3] = np.clip(a[..., :3] / 240.0 * 255.0 * rgb * shade, 0, 255)
+    return Image.fromarray(a.astype(np.uint8), "RGBA")
+
+
+def load_leaves():
+    shots = [Image.open(f).convert("RGBA") for f in sorted(glob.glob(str(PARTS / "leaf_*.png")))]
+    # one square crop box for all orientations, so a turning leaf does not jump
+    boxes = [s.getbbox() for s in shots]
+    side = max(max(b[2] - b[0], b[3] - b[1]) for b in boxes)
+    cx = sum((b[0] + b[2]) / 2 for b in boxes) / len(boxes)
+    cy = sum((b[1] + b[3]) / 2 for b in boxes) / len(boxes)
+    return [s.crop((int(cx - side / 2), int(cy - side / 2), int(cx + side / 2), int(cy + side / 2))) for s in shots]
+
+
+def sky(size):
+    y = np.linspace(0, 1, size)[:, None, None]
+    x = np.linspace(0, 1, size)[None, :, None]
+    top, bottom = np.array([88, 150, 196], np.float32), np.array([186, 220, 236], np.float32)
+    bg = top * (1 - y) + bottom * y
+    sun = np.exp(-(((x - 0.22) ** 2 + (y - 0.18) ** 2) / 0.09))
+    bg = bg + sun * np.array([120, 96, 40], np.float32)
+    vign = np.clip(np.hypot(x - 0.5, y - 0.5) / 0.75, 0, 1) ** 2
+    bg = bg * (1 - 0.35 * vign)
+    return Image.fromarray(np.clip(bg, 0, 255).astype(np.uint8), "RGB").convert("RGBA")
+
+
+def paste(img, layer, cx, cy):
+    """Alpha-composites layer centred at (cx, cy), clipped to the image."""
+    x, y = int(round(cx - layer.width / 2)), int(round(cy - layer.height / 2))
+    box = (max(0, -x), max(0, -y), min(layer.width, img.width - x), min(layer.height, img.height - y))
+    if box[2] > box[0] and box[3] > box[1]:
+        img.alpha_composite(layer.crop(box), (max(0, x), max(0, y)))
+
+
+def leaf_at(leaves, orientation, size, color, shade=1.0, blur=0.0, alpha=1.0):
+    leaf = tint(leaves[int(orientation) % len(leaves)], color, shade)
+    leaf = leaf.resize((size, size), Image.LANCZOS if blur else Image.BILINEAR)
+    if blur:
+        pad = int(blur * 3)
+        big = Image.new("RGBA", (size + 2 * pad, size + 2 * pad), (0, 0, 0, 0))
+        big.alpha_composite(leaf, (pad, pad))
+        leaf = big.filter(ImageFilter.GaussianBlur(blur))
+    if alpha < 1.0:
+        leaf.putalpha(leaf.getchannel("A").point(lambda v: int(v * alpha)))
+    return leaf
+
+
+def drop_shadow(img, leaf, x, y, offset, blur, strength):
+    ds = Image.new("RGBA", leaf.size, (20, 30, 40, 0))
+    ds.putalpha(leaf.getchannel("A").point(lambda v: int(v * strength)))
+    paste(img, ds.filter(ImageFilter.GaussianBlur(blur)), x + offset[0], y + offset[1])
 
 
 def compose():
-    files = sorted(glob.glob(str(FRAMES / "f*.png")))
-    shots = [Image.open(f).convert("RGBA") for f in files]
-    boxes = [s.getbbox() for s in shots]
-    box = (min(b[0] for b in boxes), min(b[1] for b in boxes), max(b[2] for b in boxes), max(b[3] for b in boxes))
+    S = 512
+    leaves = load_leaves()
+    pile = Image.open(PARTS / "pile.png").convert("RGBA")
+    pile = pile.crop(pile.getbbox())
+    pw = int(S * 0.92)
+    pile = pile.resize((pw, int(pile.height * pw / pile.width)), Image.LANCZOS)
+    pile_cx, pile_cy = S * 0.5, S - pile.height / 2 - S * 0.03
+    pile_top = pile_cy - pile.height * 0.25
+    shadow = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    ImageDraw.Draw(shadow).ellipse([S * 0.08, S * 0.86, S * 0.92, S * 1.04], fill=(30, 40, 50, 110))
+    shadow = shadow.filter(ImageFilter.GaussianBlur(S * 0.03))
 
-    def frame(shot, size):
-        model = shot.crop(box)
-        bg = background(size)
-        scale = min(size * 0.86 / model.width, size * 0.86 / model.height)
-        model = model.resize((int(model.width * scale), int(model.height * scale)), Image.LANCZOS)
-        x, y = (size - model.width) // 2, (size - model.height) // 2 + size // 40
-        shadow = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-        ImageDraw.Draw(shadow).ellipse([size * 0.2, y + model.height - size * 0.07, size * 0.8, y + model.height + size * 0.03],
-                                       fill=(60, 40, 20, 90))
-        bg.alpha_composite(shadow.filter(ImageFilter.GaussianBlur(size * 0.03)))
-        bg.alpha_composite(model, (x, y))
-        mask = Image.new("L", (size, size), 0)
-        ImageDraw.Draw(mask).rounded_rectangle([0, 0, size - 1, size - 1], radius=size // 8, fill=255)
-        out = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-        out.paste(bg, (0, 0), mask)
+    rnd = random.Random(3)
+    far = [dict(x=rnd.uniform(0, S), phase=rnd.random(), size=rnd.randint(26, 44), color=rnd.choice(COLORS),
+                sway=rnd.uniform(10, 30), k=rnd.choice((1, 2)), rot=rnd.random() * 24) for _ in range(0)]
+    mid = [dict(x0=rnd.uniform(S * 0.12, S * 0.88), x1=pile_cx + rnd.uniform(-S * 0.3, S * 0.3), phase=j / 8,
+                size=rnd.randint(54, 72), color=COLORS[j % len(COLORS)], sway=rnd.uniform(22, 38),
+                swings=rnd.choice((2, 3)), rot=rnd.random() * 24, spin=rnd.choice((1, 2))) for j in range(8)]
+
+    def frame(t):
+        img = sky(S)
+        for f in far:  # far away, out of focus, slow
+            u = (f["phase"] + t) % 1.0
+            y = -60 + (S * 0.75 + 60) * u
+            x = f["x"] + f["sway"] * math.sin(math.tau * (f["k"] * t + f["phase"]))
+            paste(img, leaf_at(leaves, f["rot"] + 24 * t * f["k"], f["size"], f["color"], 1.05, blur=2.5, alpha=0.45), x, y)
+        img.alpha_composite(shadow)
+        paste(img, pile, pile_cx, pile_cy)
+        for m in mid:  # sharp leaves swinging down onto the pile
+            u = (m["phase"] + t) % 1.0
+            y = -50 + (pile_top + 60) * u
+            x = m["x0"] + (m["x1"] - m["x0"]) * u + m["sway"] * math.sin(u * m["swings"] * math.tau)
+            leaf = leaf_at(leaves, 4.5 * math.sin(u * m["swings"] * math.tau + m["rot"]), m["size"], m["color"], alpha=min(1.0, (1.0 - u) / 0.12))
+            drop_shadow(img, leaf, x, y, (6, 10), 4, 0.25)
+            paste(img, leaf, x, y)
+        # The big leaf in front crosses the picture in the first 60% of the loop (off screen the rest of it). At t = 0
+        # it is face-on in the upper right over the pile, so the first frame shows it.
+        v0 = 0.55
+        v = ((t + v0 * 0.6) % 1.0) / 0.6
+        if v < 1.0:
+            hx = S * (-0.2 + 1.55 * v) + S * 0.05 * math.sin((v - v0) * math.tau * 1.5)
+            hy = S * (-0.42 + 1.15 * v) + S * 0.04 * math.cos((v - v0) * math.tau * 1.5)
+            big = leaf_at(leaves, 4.5 * math.sin((v - v0) * math.tau * 0.8), int(S * 0.4), 0xCB5530)
+            drop_shadow(img, big, hx, hy, (14, 22), 10, 0.3)
+            paste(img, big, hx, hy)
+        mask = Image.new("L", (S, S), 0)
+        ImageDraw.Draw(mask).rounded_rectangle([0, 0, S - 1, S - 1], radius=S // 8, fill=255)
+        out = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+        out.paste(img, (0, 0), mask)
         return out
 
-    frame(shots[0], 512).save(HERE / "avatar_512.png")
+    frame(0.0).save(HERE / "avatar_512.png")
     tmp = tempfile.mkdtemp()
-    for k, s in enumerate(shots):
-        frame(s, 400).convert("RGB").save(os.path.join(tmp, "%04d.png" % k))
+    for k in range(FRAMES):
+        frame(k / FRAMES).convert("RGB").resize((400, 400), Image.LANCZOS).save(os.path.join(tmp, "%04d.png" % k))
     import imageio_ffmpeg
     gif = HERE / "avatar_400.gif"
-    subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(), "-y", "-loglevel", "error", "-framerate", "18", "-i",
+    subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(), "-y", "-loglevel", "error", "-framerate", str(FPS), "-i",
                     os.path.join(tmp, "%04d.png"), "-vf",
-                    "split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle",
+                    "split[a][b];[a]palettegen=stats_mode=full[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle",
                     "-loop", "0", str(gif)], check=True)
     shutil.rmtree(tmp)
     gifsicle = HERE.parents[1] / "tools" / "shots" / "bin" / "gifsicle.exe"
     if gifsicle.exists():
         subprocess.run([str(gifsicle), "-O3", "--lossy=40", "--batch", str(gif)], check=True)
-    print(gif, len(shots), "frames", round(os.path.getsize(gif) / 1e6, 2), "MB")
+    print(gif, FRAMES, "frames", round(os.path.getsize(gif) / 1e6, 2), "MB")
 
 
 if __name__ == "__main__":
-    cmd = sys.argv[1] if len(sys.argv) > 1 else "build"
-    if cmd == "build":
-        build()
-    elif cmd == "render":
-        render(int(sys.argv[2]) if len(sys.argv) > 2 else 72)
-    else:
-        compose()
+    {"render": render, "compose": compose}[sys.argv[1] if len(sys.argv) > 1 else "compose"]()
