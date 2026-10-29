@@ -54,4 +54,4 @@
 </p>
 <!-- more-mods:end -->
 
-<p style="text-align:center"><sub>Made by <strong>Pocky</strong>. Falling leaf and petal sprites are adapted from newer Minecraft versions, the needles, piles and logo are made for this mod. Source on <a href="https://github.com/Pocky-l/rustling-leaves">GitHub</a> (MIT).</sub></p>
+<p style="text-align:center"><span style="color:#9a9a9a;font-size:12px">Made by <strong>Pocky</strong>. Falling leaf and petal sprites are adapted from newer Minecraft versions, the needles, piles and logo are made for this mod. Source on <a href="https://github.com/Pocky-l/rustling-leaves">GitHub</a> (MIT).</span></p>
