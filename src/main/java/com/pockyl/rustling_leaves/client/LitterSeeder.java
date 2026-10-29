@@ -8,6 +8,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 
 import com.pockyl.rustling_leaves.sim.LeafPalette;
+import com.pockyl.rustling_leaves.sim.LeafShape;
 import com.pockyl.rustling_leaves.sim.LeafSettings;
 import com.pockyl.rustling_leaves.sim.LeafSpawner;
 import com.pockyl.rustling_leaves.sim.LitterChunk;
@@ -32,6 +33,9 @@ final class LitterSeeder {
     /** Spread of the fall pattern around a crown block, and how far it is carried downwind. */
     private static final float SPREAD = 2.6F;
     private static final float DOWNWIND = 1.6F;
+    /** Patch noise below which ground stays bare (0..1): broadleaf litter in patches, needles nearly everywhere. */
+    private static final float PATCHINESS = 0.38F;
+    private static final float NEEDLE_PATCHINESS = 0.12F;
     /** Direction the wind mostly blows from in this mod's wind field (its mean heading). */
     private static final float PREVAILING_X = Mth.cos(0.7F);
     private static final float PREVAILING_Z = Mth.sin(0.7F);
@@ -160,6 +164,8 @@ final class LitterSeeder {
                 float relief = (float) Mth.clamp(neighborGround(bx, bz, here) - here, -1.0, 1.0);
                 float terrain = Mth.clamp(1.0F + relief * 1.5F, 0.3F, 2.0F);
                 int walls = settings.naturalPiles && d >= 0.3F ? walls(simulation, x, z, here + 0.1) : 0;
+                // Under conifers the needles lie as an almost unbroken mat; broadleaf litter gathers in patches.
+                float patchiness = shape == LeafShape.NEEDLE.ordinal() ? NEEDLE_PATCHINESS : PATCHINESS;
                 for (int c = 0; c < 16; c++) {
                     int cellX = x * 4 + (c & 3);
                     int cellZ = z * 4 + (c >> 2);
@@ -172,7 +178,7 @@ final class LitterSeeder {
                     ground[b * 16 + c] = surface;
                     // Soft patches of a few blocks, with a little grain inside them.
                     float pattern = 0.7F * patchNoise(cx, cz) + 0.3F * unit(LeafPalette.hash(cellX, cellZ, 0x5EED));
-                    int leaves = Math.round(d * terrain * carpet * 2.4F * (pattern - 0.38F) * season);
+                    int leaves = Math.round(d * terrain * carpet * 2.4F * (pattern - patchiness) * season);
                     if (leaves <= 0) {
                         // Away from the patches only the odd stray leaf (out of season, nearly all there is).
                         leaves = unit(LeafPalette.hash(cellZ, cellX, 0x57A7)) < d * 0.3F * Math.min(1.0F, season * 3.0F) ? 1 : 0;

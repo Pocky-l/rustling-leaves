@@ -128,6 +128,8 @@ final class LeafRenderer implements AutoCloseable {
     private static final int TEX_BODY = 0;
     private static final int TEX_SPARSE = 1;
     private static final int TEX_LAYER = 2;
+    /** Added to a layer texture index for litter of conifers: the same three layers made of needles. */
+    private static final int TEX_NEEDLES = 3;
     private static final int RING = LitterChunk.TILE + 2;
     /** The tile and two cells around it, the reach of the shadow at the foot of a stack. */
     private static final int FOOT = LitterChunk.TILE + 4;
@@ -168,10 +170,10 @@ final class LeafRenderer implements AutoCloseable {
     private int ringCellX;
     private int ringCellZ;
     private final int[] ringColor = new int[RING * RING];
-    private final float[] layerU0 = new float[3];
-    private final float[] layerV0 = new float[3];
-    private final float[] layerU1 = new float[3];
-    private final float[] layerV1 = new float[3];
+    private final float[] layerU0 = new float[6];
+    private final float[] layerV0 = new float[6];
+    private final float[] layerU1 = new float[6];
+    private final float[] layerV1 = new float[6];
     private double currentOriginY;
     private float currentSink;
     /** Stack top of the cell whose surface is being built (see {@link #corner}). */
@@ -535,7 +537,12 @@ final class LeafRenderer implements AutoCloseable {
             shadowU1[s] = sprite.getU1();
             shadowV1[s] = sprite.getV1();
         }
-        ResourceLocation[] layers = {LeafShapes.LITTER, LeafShapes.LITTER_SPARSE, LeafShapes.LITTER_LAYER};
+        // The old leaf textures bring back the old pile textures too, for conifers as well.
+        ResourceLocation[] layers = oldTextures
+                ? new ResourceLocation[] {LeafShapes.OLD_LITTER, LeafShapes.OLD_LITTER_SPARSE, LeafShapes.OLD_LITTER_LAYER,
+                        LeafShapes.OLD_LITTER, LeafShapes.OLD_LITTER_SPARSE, LeafShapes.OLD_LITTER_LAYER}
+                : new ResourceLocation[] {LeafShapes.LITTER, LeafShapes.LITTER_SPARSE, LeafShapes.LITTER_LAYER,
+                        LeafShapes.NEEDLE_LITTER, LeafShapes.NEEDLE_LITTER_SPARSE, LeafShapes.NEEDLE_LITTER_LAYER};
         for (int t = 0; t < layers.length; t++) {
             TextureAtlasSprite sprite = atlas.getSprite(layers[t]);
             layerU0[t] = sprite.getU0();
@@ -646,6 +653,7 @@ final class LeafRenderer implements AutoCloseable {
         int patches = LitterChunk.SIZE / 2;
         float[] height = new float[patches * patches];
         int[] color = new int[patches * patches];
+        boolean[] farNeedles = new boolean[patches * patches];
         double minY = Double.MAX_VALUE;
         double maxY = -Double.MAX_VALUE;
         for (int pz = 0; pz < patches; pz++) {
@@ -655,6 +663,7 @@ final class LeafRenderer implements AutoCloseable {
                 double base = 0.0;
                 int filled = 0;
                 int rgb = 0;
+                int needles = 0;
                 for (int c = 0; c < 4; c++) {
                     int i = LitterField.index(chunk.x * LitterChunk.SIZE + px * 2 + (c & 1), chunk.z * LitterChunk.SIZE + pz * 2 + (c >> 1));
                     int n = chunk.count[i];
@@ -663,6 +672,7 @@ final class LeafRenderer implements AutoCloseable {
                         topSum += chunk.base[i] + n * LitterField.LAYER;
                         base = chunk.base[i];
                         rgb = chunk.color[i];
+                        needles += chunk.shape[i] == LeafShape.NEEDLE.ordinal() ? 1 : 0;
                         filled++;
                     }
                 }
@@ -675,7 +685,9 @@ final class LeafRenderer implements AutoCloseable {
                 height[p] = (float) y;
                 int cellX = chunk.x * LitterChunk.SIZE + px * 2;
                 int cellZ = chunk.z * LitterChunk.SIZE + pz * 2;
-                color[p] = LeafPalette.vary(rgb, LeafPalette.hash(cellX, cellZ, 0x7A), aged, LeafShape.BROAD);
+                farNeedles[p] = needles * 2 > filled;
+                color[p] = LeafPalette.vary(rgb, LeafPalette.hash(cellX, cellZ, 0x7A), aged,
+                        farNeedles[p] ? LeafShape.NEEDLE : LeafShape.BROAD);
                 minY = Math.min(minY, y);
                 maxY = Math.max(maxY, y);
             }
@@ -703,7 +715,7 @@ final class LeafRenderer implements AutoCloseable {
                 int light = simulation.lightAt(mesh.originX + x0 + half * 0.5, height[p] + 0.1, mesh.originZ + z0 + half * 0.5);
                 int cellX = chunk.x * LitterChunk.SIZE + px * 2;
                 int cellZ = chunk.z * LitterChunk.SIZE + pz * 2;
-                float[] uv = layerUv(TEX_BODY, cellX, cellZ, 2);
+                float[] uv = layerUv(TEX_BODY + (farNeedles[p] ? TEX_NEEDLES : 0), cellX, cellZ, 2);
                 int argb = 0xFF000000 | color[p];
                 int overlay = OverlayTexture.NO_OVERLAY;
                 // Counter-clockwise seen from above (shader packs recompute the normal from the winding).
@@ -818,13 +830,14 @@ final class LeafRenderer implements AutoCloseable {
                 int layers = topLayers;
                 if (n >= SURFACE_MIN) {
                     // Carpet: a leaf layer with gaps over the ground. Pile: a solid shadowed body under that layer.
+                    int textures = chunk.shape[i] == LeafShape.NEEDLE.ordinal() ? TEX_NEEDLES : 0;
                     if (n >= BODY_MIN) {
-                        emitSurface(builder, tile, lx, lz, base, light, TEX_BODY, tile.wantDetailed ? BODY_SINK : MID_BODY_SINK,
-                                BODY_SHADE * occlusion);
+                        emitSurface(builder, tile, lx, lz, base, light, TEX_BODY + textures,
+                                tile.wantDetailed ? BODY_SINK : MID_BODY_SINK, BODY_SHADE * occlusion);
                         quads++;
                     }
-                    emitSurface(builder, tile, lx, lz, base, light, n >= DENSE_MIN ? TEX_LAYER : TEX_SPARSE, LAYER_SINK,
-                            occlusion);
+                    emitSurface(builder, tile, lx, lz, base, light, (n >= DENSE_MIN ? TEX_LAYER : TEX_SPARSE) + textures,
+                            LAYER_SINK, occlusion);
                     quads++;
                     // Beyond the detail distance the leaf layer stands for the loose leaves: single leaves there are
                     // smaller than a few pixels and only flicker.

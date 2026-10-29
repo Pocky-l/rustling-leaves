@@ -9,6 +9,10 @@ public final class LeafPalette {
      * browns and olive tones read as dirt on the ground (owner).
      */
     private static final int[] AUTUMN = {0xF0BE45, 0xE69A32, 0xDD782B, 0xCB5530, 0xB73C2F, 0xDCB851, 0xB87239};
+    /** Dead conifer needles: rust, copper and cinnamon, the colour of the floor under old spruces. */
+    private static final int[] NEEDLE_RUST = {0xB8743A, 0xC98A45, 0xA5612F, 0xD09A55, 0x9C5A34};
+    /** Share of shed needles that are dead (brown); the rest fell green. */
+    private static final float DEAD_NEEDLES = 0.8F;
 
     private LeafPalette() {
     }
@@ -16,12 +20,16 @@ public final class LeafPalette {
     /**
      * Gives one leaf its own color from the tree color: a share of leaves turns to an autumn color, every leaf gets a
      * slightly different brightness. A turned leaf keeps at most a fifth of the tree's green: halfway between green and
-     * orange is olive, which looks like dirt. Deterministic in {@code hash}.
+     * orange is olive, which looks like dirt. Most conifer needles are dead and brown. Deterministic in {@code hash}.
      */
     public static int vary(int base, long hash, float autumnShare, LeafShape shape) {
         float pick = (hash & 0xFFFF) / 65536.0F;
         int color = base;
-        if (shape.autumn && pick < autumnShare) {
+        if (shape == LeafShape.NEEDLE && pick < DEAD_NEEDLES) {
+            // Conifers shed their old needles, which have died and turned brown, whatever the season.
+            int rust = NEEDLE_RUST[(int) ((hash >>> 16) & 0xFF) % NEEDLE_RUST.length];
+            color = lerp(color, rust, 0.85F + ((hash >>> 24) & 0xFF) / 255.0F * 0.15F);
+        } else if (shape.autumn && pick < autumnShare) {
             int autumn = AUTUMN[(int) ((hash >>> 16) & 0xFF) % AUTUMN.length];
             color = lerp(color, autumn, 0.8F + ((hash >>> 24) & 0xFF) / 255.0F * 0.2F);
         }
