@@ -19,6 +19,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Iterator;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -27,8 +28,9 @@ import java.util.zip.GZIPOutputStream;
 
 /**
  * Keeps the leaf litter of one dimension on disk, so piles stay where they were made. Chunks are grouped into
- * 32x32-chunk region files ({@code r.<x>.<z>.bin}, gzipped). Regions are read on the main thread when first needed
- * (small files) and written by a background thread from a snapshot.
+ * 32x32-chunk region files ({@code r.<x>.<z>.bin}, gzipped). Regions are read and written by a background thread (in
+ * order, so a read sees every write queued before it): the game asks {@link #ready} until a region is in memory, so
+ * crossing into new land never waits for the disk.
  */
 final class LitterStorage implements AutoCloseable {
     /** Bumped when natural seeding changes, so that ground seen before is seeded again (3: fall pattern). */
@@ -36,6 +38,8 @@ final class LitterStorage implements AutoCloseable {
 
     private final Path directory;
     private final Long2ObjectOpenHashMap<Region> regions = new Long2ObjectOpenHashMap<>();
+    /** Regions being read in the background. */
+    private final Long2ObjectOpenHashMap<CompletableFuture<Region>> reading = new Long2ObjectOpenHashMap<>();
     private final ExecutorService writer = Executors.newSingleThreadExecutor(runnable -> {
         Thread thread = new Thread(runnable, "Rustling Leaves storage");
         thread.setDaemon(true);
@@ -49,6 +53,30 @@ final class LitterStorage implements AutoCloseable {
 
     LitterStorage(Path directory) {
         this.directory = directory;
+    }
+
+    /**
+     * Whether the region of a chunk is in memory, so {@link #load} answers without touching the disk; if not, it is
+     * read in the background and this turns true on a later call.
+     */
+    boolean ready(int chunkX, int chunkZ) {
+        long key = ChunkPos.asLong(chunkX >> 5, chunkZ >> 5);
+        if (regions.containsKey(key)) {
+            return true;
+        }
+        CompletableFuture<Region> pending = reading.get(key);
+        if (pending == null) {
+            int regionX = chunkX >> 5;
+            int regionZ = chunkZ >> 5;
+            reading.put(key, CompletableFuture.supplyAsync(() -> read(regionX, regionZ), writer));
+            return false;
+        }
+        if (!pending.isDone()) {
+            return false;
+        }
+        reading.remove(key);
+        regions.put(key, pending.join());
+        return true;
     }
 
     /** The saved litter of a chunk, or null if it was never saved. */
@@ -108,11 +136,13 @@ final class LitterStorage implements AutoCloseable {
         }
     }
 
+    /** A region in memory; one that is not yet (only when storing a chunk that was never asked for) is read now. */
     private Region region(int regionX, int regionZ) {
         long key = ChunkPos.asLong(regionX, regionZ);
         Region region = regions.get(key);
         if (region == null) {
-            region = read(regionX, regionZ);
+            CompletableFuture<Region> pending = reading.remove(key);
+            region = pending != null ? pending.join() : read(regionX, regionZ);
             regions.put(key, region);
         }
         return region;

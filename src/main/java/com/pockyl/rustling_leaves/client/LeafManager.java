@@ -2,6 +2,8 @@ package com.pockyl.rustling_leaves.client;
 
 import it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -22,6 +24,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.LevelResource;
@@ -78,7 +81,14 @@ public final class LeafManager {
     private static final double TELEPORT_DISTANCE = 4.0;
     private static final int SAVE_INTERVAL = 20 * 30;
     private static final float RAKE_RADIUS = 2.0F;
-    private static final long SEED_BUDGET_NANOS = 4_000_000L;
+    private static final long SEED_BUDGET_NANOS = 3_000_000L;
+    /** Time per tick for taking saved litter of chunks coming into range (nearest first). */
+    private static final long LOAD_BUDGET_NANOS = 2_000_000L;
+    /**
+     * Time per tick for packing changed litter for the disk. Packing all of it at once (every {@link #SAVE_INTERVAL})
+     * took 50-70 ms - a stutter every half minute - so it goes a few chunks per tick and the save only writes out.
+     */
+    private static final long STORE_BUDGET_NANOS = 1_000_000L;
     /** Litter chunks per tick whose leaf pile blocks are turned into litter. */
     private static final int PILE_SCANS_PER_TICK = 16;
     /** Seasons change slowly; once a second is plenty (also to follow the biome under the camera). */
@@ -110,6 +120,15 @@ public final class LeafManager {
     private static final float SHADER_WATER_LIFT = 0.04F;
     /** Whether a shader pack is on, checked once per tick (it can be switched in game). */
     private static boolean shaderWater;
+    /** Chunks within range whose saved litter is still to be taken in, nearest first. */
+    private static final LongArrayList toLoad = new LongArrayList();
+    /** Chunks out of range whose changes are still to be packed for the disk. */
+    private static final Long2ObjectOpenHashMap<LitterChunk> leaving = new Long2ObjectOpenHashMap<>();
+    /** Chunks still to be looked at in the current round of packing changed litter. */
+    private static final List<LitterChunk> storeQueue = new ArrayList<>();
+    /** A round of packing starts every this many ticks (well within {@link #SAVE_INTERVAL}). */
+    private static final int STORE_ROUND_TICKS = 100;
+    private static int storeRound;
     private static boolean wavesLookedUp;
     private static RealisticWaves realisticWaves;
     private static boolean windLookedUp;
@@ -191,8 +210,9 @@ public final class LeafManager {
         simulation.finishTick();
         rakeByOtherPlayers(minecraft);
         SPAWNER.tick(level, simulation, camera.x, camera.z);
+        storeSome();
         if (ticks % SAVE_INTERVAL == 0) {
-            save(camera);
+            storage.flush(Mth.floor(camera.x) >> 4, Mth.floor(camera.z) >> 4);
         }
         if (ticks % 200 == 0) {
             LAST_FALL.clear();
@@ -460,29 +480,55 @@ public final class LeafManager {
                 }
             }
             for (LitterChunk chunk : far) {
-                if (chunk.takeDirty()) {
-                    storage.store(chunk);
+                // Packed for the disk over the next ticks (a teleport moves hundreds of chunks out of range at once).
+                if (chunk.isDirty()) {
+                    leaving.put(ChunkPos.asLong(chunk.x, chunk.z), chunk);
                 }
                 field.remove(chunk.x, chunk.z);
             }
+            toLoad.clear();
             for (int cx = camChunkX - reach; cx <= camChunkX + reach; cx++) {
                 for (int cz = camChunkZ - reach; cz <= camChunkZ + reach; cz++) {
-                    if (field.chunk(cx, cz) != null || chunkDistanceSq(cx, cz, camera) > loadSq
-                            || !level.getChunkSource().hasChunk(cx, cz)) {
-                        continue;
-                    }
-                    LitterChunk chunk = storage.load(cx, cz);
-                    if (chunk == null) {
-                        field.put(new LitterChunk(cx, cz));
-                        continue;
-                    }
-                    // The litter rotted while nobody was here, and the trees kept shedding.
-                    field.put(chunk);
-                    simulation.decay(chunk, now);
-                    if (refresh && refreshDue(chunk, now)) {
-                        chunk.unseed();
+                    if (field.chunk(cx, cz) == null && chunkDistanceSq(cx, cz, camera) <= loadSq
+                            && level.getChunkSource().hasChunk(cx, cz)) {
+                        toLoad.add(ChunkPos.asLong(cx, cz));
                     }
                 }
+            }
+            toLoad.sort((a, b) -> Double.compare(chunkDistanceSq(ChunkPos.getX(a), ChunkPos.getZ(a), camera),
+                    chunkDistanceSq(ChunkPos.getX(b), ChunkPos.getZ(b), camera)));
+        }
+        // Saved litter comes in nearest first within a time budget; regions still being read wait for a later tick.
+        long loadDeadline = System.nanoTime() + LOAD_BUDGET_NANOS;
+        for (int n = 0; n < toLoad.size() && System.nanoTime() < loadDeadline; n++) {
+            long key = toLoad.getLong(n);
+            int cx = ChunkPos.getX(key);
+            int cz = ChunkPos.getZ(key);
+            if (field.chunk(cx, cz) != null || !level.getChunkSource().hasChunk(cx, cz)) {
+                toLoad.removeLong(n--);
+                continue;
+            }
+            LitterChunk back = leaving.remove(key);
+            if (back != null) {
+                // Back in range before its changes reached the disk: the chunk itself, not the older saved copy.
+                toLoad.removeLong(n--);
+                field.put(back);
+                continue;
+            }
+            if (!storage.ready(cx, cz)) {
+                continue;
+            }
+            toLoad.removeLong(n--);
+            LitterChunk chunk = storage.load(cx, cz);
+            if (chunk == null) {
+                field.put(new LitterChunk(cx, cz));
+                continue;
+            }
+            // The litter rotted while nobody was here, and the trees kept shedding.
+            field.put(chunk);
+            simulation.decay(chunk, now);
+            if (refresh && refreshDue(chunk, now)) {
+                chunk.unseed();
             }
         }
         // Seed new ground nearest first, within a time budget per tick, once a chunk's neighbors are there for the
@@ -503,9 +549,12 @@ public final class LeafManager {
         unseeded.sort((a, b) -> Double.compare(chunkDistanceSq(a.x, a.z, camera), chunkDistanceSq(b.x, b.z, camera)));
         long deadline = System.nanoTime() + SEED_BUDGET_NANOS;
         for (LitterChunk chunk : unseeded) {
+            // At least one chunk per tick; another only if one more, as long as the last one took, still fits.
+            long before = System.nanoTime();
             SEEDER.seed(level, simulation, chunk);
             chunk.markSeeded(now);
-            if (System.nanoTime() > deadline) {
+            long after = System.nanoTime();
+            if (after + (after - before) > deadline) {
                 break;
             }
         }
@@ -546,13 +595,33 @@ public final class LeafManager {
         return dx * dx + dz * dz;
     }
 
-    private static void save(Vec3 camera) {
-        for (LitterChunk chunk : simulation.field().chunks()) {
+    /** Packs the changed litter of a few chunks for the disk, going round all chunks within a time budget per tick. */
+    private static void storeSome() {
+        long deadline = System.nanoTime() + STORE_BUDGET_NANOS;
+        // Chunks that went out of range first: they are not in the field any more.
+        while (!leaving.isEmpty() && System.nanoTime() < deadline) {
+            long key = leaving.keySet().iterator().nextLong();
+            LitterChunk chunk = leaving.remove(key);
             if (chunk.takeDirty()) {
                 storage.store(chunk);
             }
         }
-        storage.flush(Mth.floor(camera.x) >> 4, Mth.floor(camera.z) >> 4);
+        while (System.nanoTime() < deadline) {
+            if (storeQueue.isEmpty()) {
+                if (++storeRound % STORE_ROUND_TICKS != 0) {
+                    return;
+                }
+                storeQueue.addAll(simulation.field().chunks());
+                if (storeQueue.isEmpty()) {
+                    return;
+                }
+            }
+            LitterChunk chunk = storeQueue.remove(storeQueue.size() - 1);
+            // Chunks that left the field are stored from the leaving list.
+            if (simulation.field().chunk(chunk.x, chunk.z) == chunk && chunk.takeDirty()) {
+                storage.store(chunk);
+            }
+        }
     }
 
     /** Per world (singleplayer: inside the save) or per server address, then per dimension. */
@@ -619,14 +688,22 @@ public final class LeafManager {
                     storage.store(chunk);
                 }
             }
+            for (LitterChunk chunk : leaving.values()) {
+                if (chunk.takeDirty()) {
+                    storage.store(chunk);
+                }
+            }
             storage.close();
         }
+        leaving.clear();
         storage = null;
         if (renderer != null) {
             renderer.close();
             renderer = null;
         }
         simulation = null;
+        toLoad.clear();
+        storeQueue.clear();
         nextSeasonCheck = 0;
         LAST_FALL.clear();
         SOUND_READY.clear();
