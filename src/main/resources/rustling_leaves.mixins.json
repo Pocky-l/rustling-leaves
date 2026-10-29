@@ -9,6 +9,7 @@
   ],
   "client": [
     "LeavesBlockMixin",
+    "LeavesBlockInvoker",
     "ClientLevelMixin",
     "ClientPacketListenerMixin",
     "FallingLeavesMixin",
