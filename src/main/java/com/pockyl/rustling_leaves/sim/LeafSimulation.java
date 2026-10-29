@@ -1383,7 +1383,9 @@ public final class LeafSimulation {
         float dirZ = horizontal > 1.0E-4 ? (float) (moveZ / horizontal) : 0.0F;
         pushParticles(x, y, z, moveX, moveY, moveZ, dirX, dirZ, speed, width, height, landed ? landing : 0.0F);
         int moved = pushLitter(x, y, z, dirX, dirZ, speed, width, sneaking, landed ? landing * strength : 0.0F);
-        if (moved > 0) {
+        if (moved > 0 && landed) {
+            listener.onLanding(x, y, z, moved, wind.rain() > 0.2F);
+        } else if (moved > 0) {
             listener.onRustle(x, y, z, moved, wind.rain() > 0.2F);
         }
         return moved;

@@ -1,0 +1,106 @@
+{
+  "leaves.rustle": {
+    "sounds": [
+      {
+        "name": "rustling_leaves:leaves/rustle1",
+        "attenuation_distance": 16
+      },
+      {
+        "name": "rustling_leaves:leaves/rustle2",
+        "attenuation_distance": 16
+      },
+      {
+        "name": "rustling_leaves:leaves/rustle3",
+        "attenuation_distance": 16
+      },
+      {
+        "name": "rustling_leaves:leaves/rustle4",
+        "attenuation_distance": 16
+      },
+      {
+        "name": "rustling_leaves:leaves/rustle5",
+        "attenuation_distance": 16
+      },
+      {
+        "name": "rustling_leaves:leaves/rustle6",
+        "attenuation_distance": 16
+      },
+      {
+        "name": "rustling_leaves:leaves/rustle7",
+        "attenuation_distance": 16
+      },
+      {
+        "name": "rustling_leaves:leaves/rustle8",
+        "attenuation_distance": 16
+      }
+    ],
+    "subtitle": "subtitles.rustling_leaves.rustle"
+  },
+  "leaves.wet": {
+    "sounds": [
+      {
+        "name": "rustling_leaves:leaves/wet1",
+        "attenuation_distance": 16
+      },
+      {
+        "name": "rustling_leaves:leaves/wet2",
+        "attenuation_distance": 16
+      },
+      {
+        "name": "rustling_leaves:leaves/wet3",
+        "attenuation_distance": 16
+      },
+      {
+        "name": "rustling_leaves:leaves/wet4",
+        "attenuation_distance": 16
+      },
+      {
+        "name": "rustling_leaves:leaves/wet5",
+        "attenuation_distance": 16
+      }
+    ],
+    "subtitle": "subtitles.rustling_leaves.rustle"
+  },
+  "leaves.plunge": {
+    "sounds": [
+      {
+        "name": "rustling_leaves:leaves/plunge1",
+        "attenuation_distance": 20
+      },
+      {
+        "name": "rustling_leaves:leaves/plunge2",
+        "attenuation_distance": 20
+      },
+      {
+        "name": "rustling_leaves:leaves/plunge3",
+        "attenuation_distance": 20
+      }
+    ],
+    "subtitle": "subtitles.rustling_leaves.plunge"
+  },
+  "leaves.rake": {
+    "sounds": [
+      {
+        "name": "rustling_leaves:leaves/rake1",
+        "attenuation_distance": 16
+      },
+      {
+        "name": "rustling_leaves:leaves/rake2",
+        "attenuation_distance": 16
+      },
+      {
+        "name": "rustling_leaves:leaves/rake3",
+        "attenuation_distance": 16
+      },
+      {
+        "name": "rustling_leaves:leaves/rake4",
+        "attenuation_distance": 16
+      },
+      {
+        "name": "rustling_leaves:leaves/rake5",
+        "attenuation_distance": 16
+      }
+    ],
+    "subtitle": "subtitles.rustling_leaves.rake"
+  }
+}

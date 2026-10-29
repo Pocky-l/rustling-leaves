@@ -37,5 +37,8 @@
   "rustling_leaves.configuration.winterFallRate": "Fall Rate in Winter",
   "rustling_leaves.configuration.springSummerFallRate": "Fall Rate in Spring and Summer",
   "rustling_leaves.configuration.seasonAutumnColors": "Autumn Colors in Late Autumn",
-  "rustling_leaves.configuration.seasonalDecay": "Leaf Rot in Late Autumn and Winter"
+  "rustling_leaves.configuration.seasonalDecay": "Leaf Rot in Late Autumn and Winter",
+  "subtitles.rustling_leaves.rustle": "Leaves rustle",
+  "subtitles.rustling_leaves.plunge": "Leaves scatter",
+  "subtitles.rustling_leaves.rake": "Leaves raked"
 }

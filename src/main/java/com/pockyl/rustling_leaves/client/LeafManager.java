@@ -13,7 +13,7 @@ import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.protocol.game.ClientboundExplodePacket;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.ItemTags;
@@ -76,6 +76,8 @@ public final class LeafManager {
     private static final int MAX_BURSTS_PER_TICK = 24;
     private static final int MAX_SOUNDS_PER_TICK = 3;
     private static final int SOUND_COOLDOWN = 4;
+    /** Leaves thrown aside from which a landing sounds like a plunge into a pile rather than a step. */
+    private static final int PLUNGE_LEAVES = 12;
     private static final double TELEPORT_DISTANCE = 4.0;
     private static final int SAVE_INTERVAL = 20 * 30;
     private static final float RAKE_RADIUS = 2.0F;
@@ -272,10 +274,8 @@ public final class LeafManager {
             return false;
         }
         float volume = Math.min(1.0F, 0.4F + moved / 60.0F) * Math.max(0.3F, SETTINGS.rustleVolume);
-        level.playLocalSound(at.x, at.y, at.z, SoundEvents.AZALEA_LEAVES_STEP, SoundSource.PLAYERS, volume,
-                0.8F + level.random.nextFloat() * 0.2F, false);
-        level.playLocalSound(at.x, at.y, at.z, SoundEvents.BRUSH_GENERIC, SoundSource.PLAYERS, volume * 0.5F,
-                0.7F + level.random.nextFloat() * 0.2F, false);
+        level.playLocalSound(at.x, at.y, at.z, LeafSounds.RAKE, SoundSource.PLAYERS, volume,
+                0.92F + level.random.nextFloat() * 0.16F, false);
         return true;
     }
 
@@ -652,6 +652,15 @@ public final class LeafManager {
     private static final class Listener implements LeafListener {
         @Override
         public void onRustle(double x, double y, double z, int count, boolean wet) {
+            rustle(x, y, z, count, wet ? LeafSounds.WET : LeafSounds.RUSTLE);
+        }
+
+        @Override
+        public void onLanding(double x, double y, double z, int count, boolean wet) {
+            rustle(x, y, z, count, wet ? LeafSounds.WET : count >= PLUNGE_LEAVES ? LeafSounds.PLUNGE : LeafSounds.RUSTLE);
+        }
+
+        private void rustle(double x, double y, double z, int count, SoundEvent sound) {
             float volume = SETTINGS.rustleVolume;
             if (count < 2 || volume <= 0.0F || soundsThisTick >= MAX_SOUNDS_PER_TICK || SOUND_READY.get(disturbingEntity) > ticks) {
                 return;
@@ -659,9 +668,9 @@ public final class LeafManager {
             soundsThisTick++;
             SOUND_READY.put(disturbingEntity, ticks + SOUND_COOLDOWN);
             float loudness = Math.min(1.0F, 0.3F + count / 20.0F) * volume;
-            float pitch = 1.0F + level.random.nextFloat() * 0.4F - Math.min(0.3F, count / 200.0F);
-            level.playLocalSound(x, y, z, wet ? SoundEvents.WET_GRASS_STEP : SoundEvents.AZALEA_LEAVES_STEP, SoundSource.AMBIENT,
-                    loudness, pitch, false);
+            // Field recordings: only a little pitch play, lower for bigger heaps of leaves.
+            float pitch = 0.93F + level.random.nextFloat() * 0.14F - Math.min(0.08F, count / 600.0F);
+            level.playLocalSound(x, y, z, sound, SoundSource.AMBIENT, loudness, pitch, false);
         }
 
         @Override

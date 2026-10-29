@@ -37,5 +37,8 @@
   "rustling_leaves.configuration.winterFallRate": "Листопад зимой",
   "rustling_leaves.configuration.springSummerFallRate": "Листопад весной и летом",
   "rustling_leaves.configuration.seasonAutumnColors": "Осенние цвета поздней осенью",
-  "rustling_leaves.configuration.seasonalDecay": "Гниение листвы поздней осенью и зимой"
+  "rustling_leaves.configuration.seasonalDecay": "Гниение листвы поздней осенью и зимой",
+  "subtitles.rustling_leaves.rustle": "Шуршат листья",
+  "subtitles.rustling_leaves.plunge": "Разлетаются листья",
+  "subtitles.rustling_leaves.rake": "Сгребаются листья"
 }
