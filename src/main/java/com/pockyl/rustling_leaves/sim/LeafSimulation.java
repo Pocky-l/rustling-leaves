@@ -891,18 +891,22 @@ public final class LeafSimulation {
     // ------------------------------------------------------------------------------------------------------------
 
     /**
-     * A leaf coming down over water that another mod draws as a wave crest lands on the crest, where it is seen to
-     * touch the water, instead of passing into the wave down to the still water level.
+     * A leaf coming down over water that is drawn above the still water level (another mod's wave crest, a shader
+     * pack's swaying water) lands on the drawn surface, where it is seen to touch the water, instead of passing into it
+     * down to the still water level.
      */
     private boolean landOnWave(int i, double x, double y, double z) {
+        float lift = waves.lift(x, z);
+        if (!(lift > 0.0F)) {
+            return false;
+        }
         waveProbe.set(Mth.floor(x), Mth.floor(y) - 1, Mth.floor(z));
         FluidState fluid = level.getFluidState(waveProbe);
         if (!fluid.is(FluidTags.WATER)) {
             return false;
         }
         double surface = waveProbe.getY() + fluid.getHeight(level, waveProbe);
-        float lift = waves.lift(x, z);
-        if (!(lift > 0.0F) || y > surface + lift) {
+        if (y > surface + lift) {
             return false;
         }
         startFloating(i, surface);
