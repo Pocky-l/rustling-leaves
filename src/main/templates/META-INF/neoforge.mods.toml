@@ -9,7 +9,8 @@ version="${mod_version}"
 displayName="${mod_name}"
 authors="${mod_authors}"
 displayURL="${mod_url}"
-logoFile="logo.png"
+# Square icon for the mod list (NeoForge 26.2+); a wide "bannerFile" could head the info panel.
+iconFile="logo.png"
 description='''${mod_description}'''
 # Client-side: it works on any server, with or without the mod (installed on a server it also shares rake strokes).
 displayTest="IGNORE_ALL_VERSION"
