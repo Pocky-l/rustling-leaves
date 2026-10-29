@@ -1,26 +1,17 @@
 package com.pockyl.rustling_leaves.client.compat;
 
-import com.mojang.blaze3d.platform.GlStateManager;
-import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.world.level.biome.Biome;
 import net.neoforged.fml.ModList;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL12;
-import org.lwjgl.opengl.GL15;
-import org.lwjgl.opengl.GL21;
-import org.lwjgl.opengl.GL30;
-import org.lwjgl.system.MemoryUtil;
 import org.slf4j.Logger;
 
-import java.nio.FloatBuffer;
+import com.pockyl.rustling_leaves.client.render.backend.DataTexture;
+
 import java.util.Arrays;
 import java.util.Map;
 
@@ -31,7 +22,9 @@ import java.util.Map;
  * texel 3 on. Layout and the wind shares: docs/shader-data.md of Pocky Shaders.
  * <p>
  * The same class lives in Petrichor, Hoarfrost and Rustling Leaves (only the package differs): the wind shares must be
- * computed by all of them in exactly the same way.
+ * computed by all of them in exactly the same way. Rustling Leaves keeps the texture's GL calls in its render backend
+ * ({@link DataTexture}, the part of the mod that differs between Minecraft versions) instead of a nested class; the
+ * texture and the behaviour of this class are the same as in the other two.
  */
 public final class ShaderData {
     public static final int FORMAT = 1;
@@ -96,8 +89,7 @@ public final class ShaderData {
         try {
             if (texture == null) {
                 // Registered before the first pack frame, so Iris finds it instead of a missing texture.
-                texture = new DataTexture(values.length / 4);
-                minecraft.getTextureManager().register(id, texture);
+                texture = DataTexture.register(id, values.length / 4);
             }
         } catch (Throwable e) {
             stop(e);
@@ -173,85 +165,5 @@ public final class ShaderData {
     private void stop(Throwable e) {
         broken = true;
         LOGGER.error("Weather data for shader packs ({}) stopped", modId, e);
-    }
-
-    /** The texture itself; Iris looks it up in the texture manager on every bind. Render thread only. */
-    private static final class DataTexture extends AbstractTexture {
-        private static final int[] UNPACK_PARAMETERS = {GL11.GL_UNPACK_ROW_LENGTH, GL11.GL_UNPACK_SKIP_ROWS,
-                GL11.GL_UNPACK_SKIP_PIXELS, GL11.GL_UNPACK_ALIGNMENT};
-        private static final int[] UNPACK_DEFAULTS = {0, 0, 0, 4};
-
-        private final int width;
-        private final FloatBuffer buffer;
-        private boolean freed;
-
-        DataTexture(int width) {
-            RenderSystem.assertOnRenderThread();
-            this.width = width;
-            this.buffer = MemoryUtil.memAllocFloat(width * 4);
-            bind();
-            // No mipmaps: with the default minifying filter the texture would be incomplete and read as zero.
-            GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST);
-            GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
-            GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL12.GL_CLAMP_TO_EDGE);
-            GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL12.GL_CLAMP_TO_EDGE);
-            int[] saved = cleanUnpackState();
-            GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL30.GL_RGBA32F, width, 1, 0, GL11.GL_RGBA, GL11.GL_FLOAT, (FloatBuffer) null);
-            restoreUnpackState(saved);
-        }
-
-        void upload(float[] values) {
-            if (freed) {
-                return;
-            }
-            buffer.clear();
-            buffer.put(values, 0, width * 4).flip();
-            bind();
-            int[] saved = cleanUnpackState();
-            GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, 0, width, 1, GL11.GL_RGBA, GL11.GL_FLOAT, buffer);
-            restoreUnpackState(saved);
-        }
-
-        /**
-         * Uploads read client memory with the current unpack state, which other renderers leave behind: a pixel buffer
-         * still bound turns the pointer into an offset into it, a row length or skip of a large image made the driver
-         * read far past this small buffer (a native crash in the driver). Clean state for the upload, the old one put
-         * back.
-         */
-        private static int[] cleanUnpackState() {
-            int[] saved = new int[UNPACK_PARAMETERS.length + 1];
-            for (int i = 0; i < UNPACK_PARAMETERS.length; i++) {
-                saved[i] = GL11.glGetInteger(UNPACK_PARAMETERS[i]);
-                GlStateManager._pixelStore(UNPACK_PARAMETERS[i], UNPACK_DEFAULTS[i]);
-            }
-            saved[UNPACK_PARAMETERS.length] = GL11.glGetInteger(GL21.GL_PIXEL_UNPACK_BUFFER_BINDING);
-            if (saved[UNPACK_PARAMETERS.length] != 0) {
-                GL15.glBindBuffer(GL21.GL_PIXEL_UNPACK_BUFFER, 0);
-            }
-            return saved;
-        }
-
-        private static void restoreUnpackState(int[] saved) {
-            for (int i = 0; i < UNPACK_PARAMETERS.length; i++) {
-                GlStateManager._pixelStore(UNPACK_PARAMETERS[i], saved[i]);
-            }
-            if (saved[UNPACK_PARAMETERS.length] != 0) {
-                GL15.glBindBuffer(GL21.GL_PIXEL_UNPACK_BUFFER, saved[UNPACK_PARAMETERS.length]);
-            }
-        }
-
-        @Override
-        public void load(ResourceManager resourceManager) {
-            // Filled from code, nothing to load.
-        }
-
-        @Override
-        public void close() {
-            super.close();
-            if (!freed) {
-                freed = true;
-                MemoryUtil.memFree(buffer);
-            }
-        }
     }
 }
