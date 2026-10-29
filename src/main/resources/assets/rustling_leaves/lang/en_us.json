@@ -26,7 +26,7 @@
   "rustling_leaves.configuration.litterLifetime": "Days Until Leaves Rot Away",
   "rustling_leaves.configuration.windEvents": "Squalls and Whirlwinds",
   "rustling_leaves.configuration.raking": "Raking with Hoe or Shovel",
-  "rustling_leaves.configuration.immersiveWeatheringPiles": "Immersive Weathering Piles as Litter",
+  "rustling_leaves.configuration.vanillaLeafLitter": "Vanilla Leaf Litter as Litter",
   "rustling_leaves.configuration.realisticWaves": "Floating Leaves Ride Realistic Waves",
   "rustling_leaves.configuration.livingWind": "Leaves Blow with Other Mods' Wind",
   "rustling_leaves.configuration.fallingLeavesMod": "Keep Other Mods' Falling Leaves Too",

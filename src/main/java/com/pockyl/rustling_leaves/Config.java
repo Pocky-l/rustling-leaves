@@ -46,7 +46,7 @@ public final class Config {
                     "gradually, leaf by leaf; thick piles last longer than a thin carpet. Under trees new leaves keep falling,",
                     "so the forest floor stays covered. 0 keeps leaves until something moves them. Snow clears leaves anyway;",
                     "with Serene Seasons they also rot faster in late autumn and winter (seasons.seasonalDecay).",
-                    "Leaf piles of Immersive Weathering rot only with their block.")
+                    "Vanilla leaf litter rots only with its block.")
             .translation("rustling_leaves.configuration.litterLifetime")
             .defineInRange("litterLifetime", 10.0, 0.0, 100.0);
     private static final ModConfigSpec.BooleanValue NATURAL_PILES = BUILDER
@@ -78,11 +78,10 @@ public final class Config {
             .translation("rustling_leaves.configuration.litterDistance")
             .defineInRange("litterDistance", 128, 48, 256);
     private static final ModConfigSpec.BooleanValue PILE_BLOCKS = BUILDER
-            .comment("With Immersive Weathering installed, its leaf piles are drawn as leaf litter of this mod: they look like",
-                    "its leaf piles and the leaves on top react to wind and footsteps (the pile itself stays as long as the block).",
-                    "Off: the piles keep their own look and falling leaves land on top of them.")
-            .translation("rustling_leaves.configuration.immersiveWeatheringPiles")
-            .define("immersiveWeatheringPiles", true);
+            .comment("Vanilla leaf litter is drawn as leaf litter of this mod: the same patches of leaves, and the leaves on top",
+                    "react to wind and footsteps (the patch itself stays as long as the block). Off: it keeps its flat vanilla look.")
+            .translation("rustling_leaves.configuration.vanillaLeafLitter")
+            .define("vanillaLeafLitter", true);
     private static final ModConfigSpec.BooleanValue REALISTIC_WAVES = BUILDER
             .comment("With Realistic Waves installed, leaves floating on the water ride its swell and surf, rising and tilting",
                     "with every wave. Off: they lie at the flat water level of vanilla.")

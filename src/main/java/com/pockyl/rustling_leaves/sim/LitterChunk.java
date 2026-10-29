@@ -33,7 +33,7 @@ public final class LitterChunk {
     public final long[] top = new long[AREA];
     public final int[] topColor = new int[AREA];
     /**
-     * Leaves at the bottom of a stack that stand for a leaf pile block of another mod (see {@link PileBlocks}): they
+     * Leaves at the bottom of a stack that stand for a leaf pile block such as leaf litter (see {@link PileBlocks}): they
      * stay as long as the block does and are never saved (the block brings them back).
      */
     public final short[] pinned = new short[AREA];

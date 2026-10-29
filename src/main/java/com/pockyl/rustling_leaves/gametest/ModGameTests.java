@@ -1,6 +1,7 @@
 package com.pockyl.rustling_leaves.gametest;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.FunctionGameTestInstance;
@@ -14,6 +15,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.LeafLitterBlock;
 import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.SlabBlock;
@@ -125,6 +127,7 @@ public final class ModGameTests {
         test("pinned_leaves_are_not_saved", ModGameTests::pinnedLeavesAreNotSaved, BOX);
         test("black_pile_cells_are_repaired_on_load", ModGameTests::blackPileCellsAreRepairedOnLoad, EMPTY);
         test("leaf_lands_on_undrawn_pile", ModGameTests::leafLandsOnUndrawnPile, BOX);
+        test("vanilla_leaf_litter_becomes_litter", ModGameTests::vanillaLeafLitterBecomesLitter, BOX);
         test("litter_survives_saving", ModGameTests::litterSurvivesSaving, EMPTY);
         test("old_litter_format_still_loads", ModGameTests::oldLitterFormatStillLoads, EMPTY);
         test("litter_rots_away_gradually", ModGameTests::litterRotsAwayGradually, BOX);
@@ -1065,11 +1068,78 @@ public final class ModGameTests {
         helper.succeed();
     }
 
+    /**
+     * Vanilla leaf litter becomes pinned litter on the quarters of the block its segments cover (the first one left of
+     * its facing, each further one a quarter turn counter-clockwise, like its model), a thin layer like the block, and
+     * follows the block.
+     */
+    public static void vanillaLeafLitterBecomesLitter(GameTestHelper helper) {
+        floor(helper);
+        BlockPos pos = new BlockPos(3, 1, 3);
+        helper.setBlock(pos, leafLitter(Direction.NORTH, 1));
+        LeafSimulation sim = pileSimulation(helper, PileBlocks.LEAF_LITTER, true);
+        int pinned = pinnedIn(sim, helper, 3, 3);
+        helper.assertTrue(quarter(sim, helper, 0, 0) == pinned && pinned > 0, "one segment: " + pinned + " leaves, "
+                + quarter(sim, helper, 0, 0) + " of them in the north-west quarter");
+        helper.assertTrue(pinned == boxTotal(sim, helper), "pinned " + pinned + " of " + boxTotal(sim, helper) + " leaves");
+        BlockPos at = helper.absolutePos(pos);
+        helper.setBlock(pos, leafLitter(Direction.NORTH, 2));
+        sim.pileChanged(at, false, true);
+        helper.assertTrue(quarter(sim, helper, 0, 0) > 0 && quarter(sim, helper, 0, 1) > 0 && quarter(sim, helper, 1, 0) == 0
+                && quarter(sim, helper, 1, 1) == 0, "two segments facing north do not cover the west half");
+        helper.setBlock(pos, leafLitter(Direction.EAST, 1));
+        sim.pileChanged(at, false, true);
+        helper.assertTrue(quarter(sim, helper, 1, 0) == pinnedIn(sim, helper, 3, 3) && quarter(sim, helper, 1, 0) > 0,
+                "one segment facing east is not in the north-east quarter");
+        helper.setBlock(pos, leafLitter(Direction.EAST, 4));
+        sim.pileChanged(at, false, true);
+        int full = pinnedIn(sim, helper, 3, 3);
+        int thickest = 0;
+        for (int a = 0; a < 4; a++) {
+            for (int b = 0; b < 4; b++) {
+                int[] cell = cellAt(helper, 3 + a * 0.25 + 0.1, 3 + b * 0.25 + 0.1);
+                thickest = Math.max(thickest, sim.field().count(cell[0], cell[1]));
+                helper.assertTrue(sim.field().count(cell[0], cell[1]) > 0, "four segments leave a cell empty");
+            }
+        }
+        helper.assertTrue(thickest * LAYER < 0.13, "leaf litter became a pile " + thickest + " leaves high");
+        // Broken: a few leaves fly up and land as loose litter, the rest goes with the block.
+        helper.setBlock(pos, Blocks.AIR.defaultBlockState());
+        sim.pileChanged(at, true, true);
+        int flying = sim.pool().count();
+        helper.assertTrue(flying > 0 && flying < full, flying + " of " + full + " leaves flew up from the broken leaf litter");
+        run(sim, helper, 300);
+        helper.assertTrue(pinnedIn(sim, helper, 3, 3) == 0 && boxTotal(sim, helper) + sim.pool().count() == flying,
+                "leaves are left pinned or lost");
+        helper.succeed();
+    }
+
+    private static BlockState leafLitter(Direction facing, int segments) {
+        return Blocks.LEAF_LITTER.defaultBlockState().setValue(LeafLitterBlock.FACING, facing).setValue(LeafLitterBlock.AMOUNT, segments);
+    }
+
+    /** Pinned leaves in one quarter of the block at (3, 1, 3): {@code qx} 0 west, 1 east; {@code qz} 0 north, 1 south. */
+    private static int quarter(LeafSimulation sim, GameTestHelper helper, int qx, int qz) {
+        int[] corner = cellAt(helper, 3, 3);
+        int sum = 0;
+        for (int a = qx * 2; a < qx * 2 + 2; a++) {
+            for (int b = qz * 2; b < qz * 2 + 2; b++) {
+                LitterChunk chunk = sim.field().chunkAtCell(corner[0] + a, corner[1] + b);
+                sum += chunk.pinned[LitterField.index(corner[0] + a, corner[1] + b)];
+            }
+        }
+        return sum;
+    }
+
     /** A simulation that knows {@link #SNOW_PILES}, with the piles in the box already scanned. */
     private static LeafSimulation pileSimulation(GameTestHelper helper, boolean draw) {
+        return pileSimulation(helper, SNOW_PILES, draw);
+    }
+
+    private static LeafSimulation pileSimulation(GameTestHelper helper, PileBlocks piles, boolean draw) {
         LeafSimulation sim = simulation(helper, 512, LeafListener.NONE);
         sim.setLevel(helper.getLevel());
-        sim.setPiles(SNOW_PILES, PILE_LOOK, draw);
+        sim.setPiles(piles, PILE_LOOK, draw);
         for (LitterChunk chunk : sim.field().chunks()) {
             sim.scanPiles(chunk);
         }

@@ -2125,12 +2125,13 @@ public final class LeafSimulation {
     }
 
     // ------------------------------------------------------------------------------------------------------------
-    // Leaf pile blocks of other mods
+    // Leaf pile blocks: vanilla leaf litter and the leaf piles of other mods
     // ------------------------------------------------------------------------------------------------------------
 
     /**
-     * Sets which blocks are leaf piles of other mods and how they are shown. Drawn ({@code draw}), the litter stands in
-     * for them: every such block becomes a pinned stack of leaves in each of its cells, which stays as long as the block
+     * Sets which blocks are leaf piles (vanilla leaf litter, piles of other mods) and how they are shown. Drawn
+     * ({@code draw}), the litter stands in for them: every such block becomes a pinned stack of leaves in each of its
+     * cells, which stays as long as the block
      * does, and the block itself is passable. Otherwise they stay blocks that leaves land on. {@code look} colors their
      * leaves.
      */
@@ -2145,7 +2146,7 @@ public final class LeafSimulation {
         }
     }
 
-    /** Whether leaf pile blocks of other mods are drawn as litter. */
+    /** Whether leaf pile blocks are drawn as litter. */
     public boolean drawsPiles() {
         return terrain.piles != PileBlocks.NONE && terrain.drawPiles;
     }
@@ -2209,7 +2210,8 @@ public final class LeafSimulation {
     /**
      * Pins as many leaves in each cell of a pile column as it is high there. The pile is flat in the middle and slopes
      * down to the ground at open edges (or to the height of a neighboring pile), so piles next to each other merge into
-     * one carpet. Leaves a growing pile still lacks are dropped onto it from above ({@link #feedPiles}).
+     * one carpet. Cells the pile block does not cover (leaf litter with fewer than four segments) stay empty. Leaves a
+     * growing pile still lacks are dropped onto it from above ({@link #feedPiles}).
      */
     private void pinPile(int x, int y, int z, boolean burst, boolean instant) {
         int layers = pileHeight(x, y, z);
@@ -2219,6 +2221,7 @@ public final class LeafSimulation {
         int north = 0;
         int color = 0;
         int shape = 0;
+        int cells = 0;
         if (layers > 0) {
             east = neighborPileHeight(x + 1, y, z);
             west = neighborPileHeight(x - 1, y, z);
@@ -2227,6 +2230,7 @@ public final class LeafSimulation {
             BlockState state = level.getBlockState(pileProbe.set(x, y, z));
             color = pileLook.color(state, level, pileProbe);
             shape = pileLook.shape(state).ordinal();
+            cells = terrain.piles.cells(state);
         }
         int missing = 0;
         for (int a = 0; a < 4; a++) {
@@ -2240,7 +2244,7 @@ public final class LeafSimulation {
                 int c = LitterField.index(cx, cz);
                 int target = 0;
                 double ground = Double.NaN;
-                if (layers > 0) {
+                if (layers > 0 && (cells >> (a + 4 * b) & 1) != 0) {
                     float alongX = pileEdge(layers, a < 2 ? west : east, a == 0 || a == 3);
                     float alongZ = pileEdge(layers, b < 2 ? north : south, b == 0 || b == 3);
                     target = Math.min(LitterField.MAX_LAYERS, Math.max(1, Math.round((alongX + alongZ - layers) * LEAVES_PER_PILE_LAYER)));

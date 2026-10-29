@@ -105,7 +105,6 @@ public final class LeafManager {
     private static final long REFRESH_TICKS = 24000L;
     private static final boolean SERENE_SEASONS = ModList.get().isLoaded(SereneSeasons.MOD_ID);
     private static final Identifier DEBUG_ENTRY = RustlingLeaves.id("leaves");
-    private static final PileBlocks PILES = PileBlocks.NONE;
 
     private static final LeafSettings SETTINGS = new LeafSettings();
     private static final LeafColors COLORS = new LeafColors();
@@ -171,10 +170,11 @@ public final class LeafManager {
             if (capacity != SETTINGS.maxLeaves) {
                 reset();
             } else if (simulation != null) {
-                simulation.setPiles(PILES, TREES, SETTINGS.drawPileBlocks);
+                simulation.setPiles(piles(), TREES, true);
                 simulation.setWaves(waves());
                 simulation.setWindSource(windSource());
             }
+            updateLeafLitterModels(minecraft);
         }
         if (minecraft.level != level) {
             reset();
@@ -186,7 +186,7 @@ public final class LeafManager {
         if (simulation == null) {
             simulation = new LeafSimulation(SETTINGS, SETTINGS.maxLeaves, new Listener());
             simulation.setLevel(level);
-            simulation.setPiles(PILES, TREES, SETTINGS.drawPileBlocks);
+            simulation.setPiles(piles(), TREES, true);
             simulation.setWaves(waves());
             simulation.setWindSource(windSource());
             renderer = new LeafRenderer(simulation);
@@ -407,8 +407,9 @@ public final class LeafManager {
             return;
         }
         simulation.blockChanged(pos);
-        if (PILES.layers(oldState) > 0 || PILES.layers(newState) > 0) {
-            simulation.pileChanged(pos, PILES.layers(newState) == 0, placedByHand(pos));
+        PileBlocks piles = piles();
+        if (piles.layers(oldState) > 0 || piles.layers(newState) > 0) {
+            simulation.pileChanged(pos, piles.layers(newState) == 0, placedByHand(pos));
         }
         if (oldState.is(BlockTags.LEAVES) && !newState.is(BlockTags.LEAVES) && burstsThisTick < MAX_BURSTS_PER_TICK) {
             burstsThisTick++;
@@ -436,7 +437,7 @@ public final class LeafManager {
             return false;
         }
         for (InteractionHand hand : InteractionHand.values()) {
-            if (player.getItemInHand(hand).getItem() instanceof BlockItem item && PILES.layers(item.getBlock().defaultBlockState()) > 0) {
+            if (player.getItemInHand(hand).getItem() instanceof BlockItem item && piles().layers(item.getBlock().defaultBlockState()) > 0) {
                 return true;
             }
         }
@@ -561,6 +562,29 @@ public final class LeafManager {
             long after = System.nanoTime();
             if (after + (after - before) > deadline) {
                 break;
+            }
+        }
+    }
+
+    /**
+     * Vanilla leaf litter becomes litter of the simulation (the leaves on it react like any other) while the option is
+     * on. Off, it keeps its own flat model and is no pile at all: it is too thin to stop falling leaves, which lie on
+     * the ground under it.
+     */
+    private static PileBlocks piles() {
+        return SETTINGS.drawPileBlocks ? PileBlocks.LEAF_LITTER : PileBlocks.NONE;
+    }
+
+    /**
+     * Hides the model of vanilla leaf litter while the litter draws it and shows it again when it stops; the chunk
+     * meshes are rebuilt when that changes.
+     */
+    private static void updateLeafLitterModels(Minecraft minecraft) {
+        boolean hide = SETTINGS.drawPileBlocks && SETTINGS.maxLeaves > 0;
+        if (hide != LeafLitterModels.hidden()) {
+            LeafLitterModels.setHidden(hide);
+            if (minecraft.level != null) {
+                minecraft.levelRenderer.allChanged();
             }
         }
     }

@@ -32,7 +32,7 @@ public final class LeafSettings {
     public float rustleVolume = 0.6F;
     /** Rake leaves into piles with a hoe or shovel while sneaking. */
     public boolean raking = true;
-    /** Draw the leaf pile blocks of other mods (Immersive Weathering) as litter instead of their own models. */
+    /** Draw vanilla leaf litter as litter instead of its own model. */
     public boolean drawPileBlocks = true;
     /** Floating leaves ride the waves another mod draws on the water (Realistic Waves). */
     public boolean rideWaves = true;

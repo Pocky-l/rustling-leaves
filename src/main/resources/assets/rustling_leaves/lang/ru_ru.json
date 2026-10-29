@@ -26,7 +26,7 @@
   "rustling_leaves.configuration.litterLifetime": "Дней до перегнивания листвы",
   "rustling_leaves.configuration.windEvents": "Шквалы и вихри",
   "rustling_leaves.configuration.raking": "Грабли (мотыга или лопата)",
-  "rustling_leaves.configuration.immersiveWeatheringPiles": "Кучи Immersive Weathering как листва",
+  "rustling_leaves.configuration.vanillaLeafLitter": "Ванильная опавшая листва в стиле мода",
   "rustling_leaves.configuration.realisticWaves": "Листья на волнах Realistic Waves",
   "rustling_leaves.configuration.livingWind": "Листья летят по ветру других модов",
   "rustling_leaves.configuration.fallingLeavesMod": "Оставить и листья других модов",

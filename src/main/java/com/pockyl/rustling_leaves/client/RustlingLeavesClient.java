@@ -6,6 +6,7 @@ import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.config.ModConfigEvent;
+import net.neoforged.neoforge.client.event.ModelEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 
@@ -21,6 +22,7 @@ public final class RustlingLeavesClient {
         modBus.addListener(ModConfigEvent.Loading.class, event -> onConfig(event.getConfig()));
         modBus.addListener(ModConfigEvent.Reloading.class, event -> onConfig(event.getConfig()));
         ModNetwork.setClientRake(LeafManager::onRemoteRake);
+        modBus.addListener(ModelEvent.ModifyBakingResult.class, LeafLitterModels::wrapModels);
     }
 
     private static void onConfig(ModConfig config) {
