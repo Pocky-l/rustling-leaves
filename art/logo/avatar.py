@@ -175,9 +175,12 @@ def compose():
     rnd = random.Random(3)
     far = [dict(x=rnd.uniform(0, S), phase=rnd.random(), size=rnd.randint(26, 44), color=rnd.choice(COLORS),
                 sway=rnd.uniform(10, 30), k=rnd.choice((1, 2)), rot=rnd.random() * 24) for _ in range(0)]
-    mid = [dict(x0=rnd.uniform(S * 0.12, S * 0.88), x1=pile_cx + rnd.uniform(-S * 0.3, S * 0.3), phase=j / 8,
-                size=rnd.randint(54, 72), color=COLORS[j % len(COLORS)], sway=rnd.uniform(22, 38),
-                swings=rnd.choice((2, 3)), rot=rnd.random() * 24, spin=rnd.choice((1, 2))) for j in range(8)]
+    # Leaf fall: big near leaves and smaller ones further back (drawn first, a little paler), phases spread evenly.
+    count = 20
+    mid = sorted([dict(x0=rnd.uniform(S * 0.06, S * 0.94), x1=pile_cx + rnd.uniform(-S * 0.34, S * 0.34),
+                       phase=(j * 7 % count) / count, size=rnd.choice((40, 46, 52, 60, 66, 72)),
+                       color=COLORS[j % len(COLORS)], sway=rnd.uniform(18, 36), swings=rnd.choice((2, 3)),
+                       rot=rnd.random() * 6.28, spin=1) for j in range(count)], key=lambda m: m["size"])
 
     def frame(t):
         img = sky(S)
@@ -192,7 +195,8 @@ def compose():
             u = (m["phase"] + t) % 1.0
             y = -50 + (pile_top + 60) * u
             x = m["x0"] + (m["x1"] - m["x0"]) * u + m["sway"] * math.sin(u * m["swings"] * math.tau)
-            leaf = leaf_at(leaves, 4.5 * math.sin(u * m["swings"] * math.tau + m["rot"]), m["size"], m["color"], alpha=min(1.0, (1.0 - u) / 0.12))
+            leaf = leaf_at(leaves, 4.5 * math.sin(u * m["swings"] * math.tau + m["rot"]), m["size"], m["color"],
+                           shade=0.88 + m["size"] / 600, alpha=min(1.0, (1.0 - u) / 0.12))
             drop_shadow(img, leaf, x, y, (6, 10), 4, 0.25)
             paste(img, leaf, x, y)
         # The big leaf in front crosses the picture in the first 60% of the loop (off screen the rest of it). At t = 0
