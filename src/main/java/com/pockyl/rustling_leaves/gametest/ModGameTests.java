@@ -514,15 +514,25 @@ public final class ModGameTests {
         float weak = wind.speed(center.getX() + 0.5, center.getY(), center.getZ() + 0.5);
         helper.assertTrue(strong > 0.03F && weak < strong * 0.2F, "the wind speed does not follow: " + strong + " then " + weak);
 
+        // A single leaf glides sideways as much as the wind carries it where the wind is weak (low test worlds), so the
+        // mean drift of a few leaves is checked.
         speed[0] = 0.09F;
-        int leaf = spawn(sim, helper, 3.5, 5.5, 3.5);
         LeafPool pool = sim.pool();
-        double startX = pool.x[leaf];
-        double startZ = pool.z[leaf];
+        int[] leaves = new int[8];
+        double[] start = new double[leaves.length * 2];
+        for (int n = 0; n < leaves.length; n++) {
+            leaves[n] = spawn(sim, helper, 3.5, 5.5, 3.5);
+            start[n * 2] = pool.x[leaves[n]];
+            start[n * 2 + 1] = pool.z[leaves[n]];
+        }
         run(sim, helper, 30);
-        double driftX = pool.x[leaf] - startX;
-        double driftZ = pool.z[leaf] - startZ;
-        helper.assertTrue(driftZ < -0.5 && Math.abs(driftX) < -driftZ * 0.5, "the leaf drifted " + driftX + ", " + driftZ);
+        double driftX = 0.0;
+        double driftZ = 0.0;
+        for (int n = 0; n < leaves.length; n++) {
+            driftX += (pool.x[leaves[n]] - start[n * 2]) / leaves.length;
+            driftZ += (pool.z[leaves[n]] - start[n * 2 + 1]) / leaves.length;
+        }
+        helper.assertTrue(driftZ < -0.5 && Math.abs(driftX) < -driftZ * 0.5, "the leaves drifted " + driftX + ", " + driftZ);
 
         sim.setWindSource(WindSource.NONE);
         run(sim, helper, 1);
