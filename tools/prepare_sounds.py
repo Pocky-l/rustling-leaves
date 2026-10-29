@@ -175,16 +175,16 @@ def clean(folder):
 def main():
     clean("leaves")
     # A foot through dry leaves: short, crisp, the airy top softened a little.
-    one_shots([352963, 218305, 420390, 179339], "leaves/rustle", 8, before=0.05, length=0.5, rms_db=-20, spacing=0.35,
+    one_shots([352963, 218305, 420390, 179339], "leaves/rustle", 8, before=0.05, length=0.5, rms_db=-29, spacing=0.35,
               lowpass=11000.0)
     # Into wet leaves: duller and softer.
-    one_shots([503262, 455063, 94342], "leaves/wet", 5, before=0.04, length=0.45, rms_db=-21, spacing=0.3,
+    one_shots([503262, 455063, 94342], "leaves/wet", 5, before=0.04, length=0.45, rms_db=-30, spacing=0.3,
               lowpass=7000.0)
     # Landing in a pile: a body dropping into leaves, and the heaviest crunches of the walks, longer.
-    one_shots([853591, 420390, 218305], "leaves/plunge", 3, before=0.06, length=0.95, rms_db=-15, spacing=0.8,
+    one_shots([853591, 420390, 218305], "leaves/plunge", 3, before=0.06, length=0.95, rms_db=-24, spacing=0.8,
               lowpass=12000.0, strict=False, max_crest_db=21.0)
     # A rake stroke dragging leaves over the ground.
-    one_shots([448966, 593201, 419617], "leaves/rake", 5, before=0.08, length=0.8, rms_db=-19, spacing=0.6,
+    one_shots([448966, 593201, 419617], "leaves/rake", 5, before=0.08, length=0.8, rms_db=-27, spacing=0.6,
               strict=False)
 
 
