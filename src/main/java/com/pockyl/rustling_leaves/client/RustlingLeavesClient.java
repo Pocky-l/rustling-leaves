@@ -4,16 +4,13 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
-import net.neoforged.fml.ModList;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.config.ModConfigEvent;
-import net.neoforged.neoforge.client.event.ModelEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 
 import com.pockyl.rustling_leaves.Config;
 import com.pockyl.rustling_leaves.RustlingLeaves;
-import com.pockyl.rustling_leaves.client.compat.ImmersiveWeathering;
 import com.pockyl.rustling_leaves.network.ModNetwork;
 
 @Mod(value = RustlingLeaves.MOD_ID, dist = Dist.CLIENT)
@@ -24,9 +21,6 @@ public final class RustlingLeavesClient {
         modBus.addListener(ModConfigEvent.Loading.class, event -> onConfig(event.getConfig()));
         modBus.addListener(ModConfigEvent.Reloading.class, event -> onConfig(event.getConfig()));
         ModNetwork.setClientRake(LeafManager::onRemoteRake);
-        if (ModList.get().isLoaded(ImmersiveWeathering.MOD_ID)) {
-            modBus.addListener(ModelEvent.ModifyBakingResult.class, ImmersiveWeathering::wrapModels);
-        }
     }
 
     private static void onConfig(ModConfig config) {

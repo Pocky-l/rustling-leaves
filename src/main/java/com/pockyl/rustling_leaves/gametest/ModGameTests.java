@@ -1,21 +1,30 @@
 package com.pockyl.rustling_leaves.gametest;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.gametest.framework.GameTest;
+import net.minecraft.core.Holder;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.gametest.framework.FunctionGameTestInstance;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.gametest.framework.TestData;
+import net.minecraft.gametest.framework.TestEnvironmentDefinition;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LeavesBlock;
+import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.SlabBlock;
 import net.minecraft.world.level.block.SnowLayerBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.SlabType;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.neoforge.gametest.GameTestHolder;
-import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.event.RegisterGameTestsEvent;
+import net.neoforged.neoforge.gametest.GameTestHooks;
+import net.neoforged.neoforge.registries.DeferredRegister;
 
 import com.pockyl.rustling_leaves.RustlingLeaves;
 import com.pockyl.rustling_leaves.network.ModNetwork;
@@ -41,31 +50,135 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * In-game tests, run headless by {@code gradlew runGameTestServer}. The simulation only needs a {@code Level}, so it
  * runs here against real blocks; each test steps it synchronously. Tests use the 7x6x7 {@code box} structure with a
  * stone floor placed at y = 0, so the litter lies at relative height 1.
  */
-@GameTestHolder(RustlingLeaves.MOD_ID)
-@PrefixGameTestTemplate(false)
 public final class ModGameTests {
     private static final double EPSILON = 0.05;
     private static final float LAYER = LitterField.LAYER;
+    /** Every test steps the simulation by itself within its first tick; the limit only catches a test that never ends. */
+    private static final int MAX_TICKS = 100;
+    private static final Identifier BOX = RustlingLeaves.id("box");
+    private static final Identifier EMPTY = RustlingLeaves.id("empty");
+    private static final DeferredRegister<Consumer<GameTestHelper>> FUNCTIONS = DeferredRegister.create(Registries.TEST_FUNCTION,
+            RustlingLeaves.MOD_ID);
+    private static final List<Test> TESTS = new ArrayList<>();
+
+    /** A test function, the structure it runs in and whether it is open to the sky. */
+    private record Test(String name, Consumer<GameTestHelper> function, Identifier structure, boolean skyAccess) {
+    }
+
+    /** The body of a test; the save tests may throw while writing and reading litter in memory. */
+    @FunctionalInterface
+    private interface Body {
+        void run(GameTestHelper helper) throws IOException;
+    }
+
+    static {
+        test("mod_loads", ModGameTests::modLoads, EMPTY);
+        test("server_relays_only_plausible_rakes", ModGameTests::serverRelaysOnlyPlausibleRakes, EMPTY);
+        test("trees_shed_at_their_own_rate", ModGameTests::treesShedAtTheirOwnRate, EMPTY);
+        test("season_curve_follows_the_year", ModGameTests::seasonCurveFollowsTheYear, EMPTY);
+        test("leaves_fall_only_in_autumn", ModGameTests::leavesFallOnlyInAutumn, BOX, true);
+        test("placed_leaves_do_not_shed_by_default", ModGameTests::placedLeavesDoNotShedByDefault, BOX, true);
+        test("late_autumn_leaves_fall_in_autumn_colors", ModGameTests::lateAutumnLeavesFallInAutumnColors, BOX, true);
+        test("falling_leaf_joins_the_litter", ModGameTests::fallingLeafJoinsTheLitter, BOX);
+        test("leaf_rests_on_slab", ModGameTests::leafRestsOnSlab, BOX);
+        test("leaf_floats_on_water", ModGameTests::leafFloatsOnWater, BOX);
+        test("floating_leaf_rides_the_waves", ModGameTests::floatingLeafRidesTheWaves, BOX);
+        test("rain_wind_gives_only_the_heading", ModGameTests::rainWindGivesOnlyTheHeading, BOX);
+        test("leaves_blow_with_another_mods_wind", ModGameTests::leavesBlowWithAnotherModsWind, BOX);
+        test("soaked_leaf_sinks_to_the_bottom", ModGameTests::soakedLeafSinksToTheBottom, BOX);
+        test("floating_leaves_drift_together", ModGameTests::floatingLeavesDriftTogether, BOX);
+        test("water_pouring_onto_a_leaf_sinks_it", ModGameTests::waterPouringOntoALeafSinksIt, BOX);
+        test("floating_leaves_stay_on_the_water_and_settle", ModGameTests::floatingLeavesStayOnTheWaterAndSettle, BOX);
+        test("leaf_burns_in_lava", ModGameTests::leafBurnsInLava, BOX);
+        test("pile_surface_stays_level_at_a_slab", ModGameTests::pileSurfaceStaysLevelAtASlab, BOX);
+        test("pile_slumps_to_its_angle_of_repose", ModGameTests::pileSlumpsToItsAngleOfRepose, BOX);
+        test("walking_through_a_pile_thins_it", ModGameTests::walkingThroughAPileThinsIt, BOX);
+        test("sneaking_leaves_thin_carpet_alone", ModGameTests::sneakingLeavesThinCarpetAlone, BOX);
+        test("jumping_into_a_pile_splashes", ModGameTests::jumpingIntoAPileSplashes, BOX);
+        test("wind_charge_blows_litter_away", ModGameTests::windChargeBlowsLitterAway, BOX);
+        test("litter_falls_when_support_is_removed", ModGameTests::litterFallsWhenSupportIsRemoved, BOX);
+        test("full_block_smothers_litter", ModGameTests::fullBlockSmothersLitter, BOX);
+        test("litter_stays_under_a_placed_slab", ModGameTests::litterStaysUnderAPlacedSlab, BOX);
+        test("fence_is_as_high_as_it_is_drawn", ModGameTests::fenceIsAsHighAsItIsDrawn, BOX);
+        test("raking_gathers_a_pile", ModGameTests::rakingGathersAPile, BOX);
+        test("whirlwind_lifts_leaves_up", ModGameTests::whirlwindLiftsLeavesUp, BOX);
+        test("scooped_leaves_pour_back_out", ModGameTests::scoopedLeavesPourBackOut, BOX);
+        test("poured_leaves_fill_a_bowl", ModGameTests::pouredLeavesFillABowl, BOX);
+        test("full_bowl_runs_over", ModGameTests::fullBowlRunsOver, BOX);
+        test("leaf_blower_clears_a_path", ModGameTests::leafBlowerClearsAPath, BOX);
+        test("leaf_bag_sucks_up_leaves", ModGameTests::leafBagSucksUpLeaves, BOX);
+        test("pile_block_becomes_pinned_litter", ModGameTests::pileBlockBecomesPinnedLitter, BOX);
+        test("pile_litter_follows_the_block", ModGameTests::pileLitterFollowsTheBlock, BOX);
+        test("growing_pile_fills_with_falling_leaves", ModGameTests::growingPileFillsWithFallingLeaves, BOX);
+        test("stacked_pile_blocks_make_one_tall_pile", ModGameTests::stackedPileBlocksMakeOneTallPile, BOX);
+        test("pinned_leaves_are_not_saved", ModGameTests::pinnedLeavesAreNotSaved, BOX);
+        test("black_pile_cells_are_repaired_on_load", ModGameTests::blackPileCellsAreRepairedOnLoad, EMPTY);
+        test("leaf_lands_on_undrawn_pile", ModGameTests::leafLandsOnUndrawnPile, BOX);
+        test("litter_survives_saving", ModGameTests::litterSurvivesSaving, EMPTY);
+        test("old_litter_format_still_loads", ModGameTests::oldLitterFormatStillLoads, EMPTY);
+        test("litter_rots_away_gradually", ModGameTests::litterRotsAwayGradually, BOX);
+        test("litter_catches_up_on_the_time_away", ModGameTests::litterCatchesUpOnTheTimeAway, BOX);
+        test("snow_covers_no_leaves", ModGameTests::snowCoversNoLeaves, BOX);
+        test("pile_block_leaves_do_not_rot", ModGameTests::pileBlockLeavesDoNotRot, BOX);
+        test("autumn_litter_is_gone_before_winter", ModGameTests::autumnLitterIsGoneBeforeWinter, BOX);
+    }
 
     private ModGameTests() {
     }
 
-    @GameTest(template = "empty")
+    private static void test(String name, Body body, Identifier structure) {
+        test(name, body, structure, false);
+    }
+
+    private static void test(String name, Body body, Identifier structure, boolean skyAccess) {
+        TESTS.add(new Test(name, helper -> {
+            try {
+                body.run(helper);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }, structure, skyAccess));
+    }
+
+    /** Registers the tests when the game test framework is enabled (dev runs and the game test server). */
+    public static void register(IEventBus modBus) {
+        if (!GameTestHooks.isGametestEnabled()) {
+            return;
+        }
+        for (Test test : TESTS) {
+            FUNCTIONS.register(test.name(), test::function);
+        }
+        FUNCTIONS.register(modBus);
+        modBus.addListener(ModGameTests::registerTests);
+    }
+
+    private static void registerTests(RegisterGameTestsEvent event) {
+        Holder<TestEnvironmentDefinition> environment = event.registerEnvironment(RustlingLeaves.id("default"),
+                new TestEnvironmentDefinition.AllOf(List.of()));
+        for (Test test : TESTS) {
+            Identifier id = RustlingLeaves.id(test.name());
+            TestData<Holder<TestEnvironmentDefinition>> data = new TestData<>(environment, test.structure(), MAX_TICKS, 0, true,
+                    Rotation.NONE, false, 1, 1, test.skyAccess());
+            event.registerTest(id, new FunctionGameTestInstance(ResourceKey.create(Registries.TEST_FUNCTION, id), data));
+        }
+    }
+
     public static void modLoads(GameTestHelper helper) {
         helper.succeed();
     }
 
     /** The server relays a rake stroke only from a sneaking player with a hoe or shovel who can reach the point. */
-    @GameTest(template = "empty")
     public static void serverRelaysOnlyPlausibleRakes(GameTestHelper helper) {
         Vec3 eye = new Vec3(0.0, 1.62, 0.0);
         Vec3 near = new Vec3(3.0, 0.0, 2.0);
@@ -80,7 +193,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "empty")
     public static void treesShedAtTheirOwnRate(GameTestHelper helper) {
         LeafSettings settings = new LeafSettings();
         helper.assertTrue(settings.shedRate(LeafShape.ROUND) > settings.shedRate(LeafShape.BROAD), "birches shed more than oaks");
@@ -102,7 +214,6 @@ public final class ModGameTests {
     private static final float EARLY_WINTER = 9.5F;
     private static final float MID_WINTER = 10.5F;
 
-    @GameTest(template = "empty")
     public static void seasonCurveFollowsTheYear(GameTestHelper helper) {
         LeafSettings settings = new LeafSettings();
         SeasonCurve.apply(settings, MID_SUMMER);
@@ -161,7 +272,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box", skyAccess = true)
     public static void leavesFallOnlyInAutumn(GameTestHelper helper) {
         canopy(helper);
         int spring = shed(helper, MID_SPRING, 400, null);
@@ -175,7 +285,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box", skyAccess = true)
     public static void placedLeavesDoNotShedByDefault(GameTestHelper helper) {
         canopy(helper);
         int placed = shed(helper, Float.NaN, 200, null, false);
@@ -185,7 +294,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box", skyAccess = true)
     public static void lateAutumnLeavesFallInAutumnColors(GameTestHelper helper) {
         canopy(helper);
         // Without seasons a part of the leaves falls in autumn colors (in summer hardly a leaf falls to compare with).
@@ -199,7 +307,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void fallingLeafJoinsTheLitter(GameTestHelper helper) {
         floor(helper);
         LeafSimulation sim = simulation(helper, 64, LeafListener.NONE);
@@ -212,7 +319,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void leafRestsOnSlab(GameTestHelper helper) {
         floor(helper);
         BlockState slab = Blocks.STONE_SLAB.defaultBlockState().setValue(SlabBlock.TYPE, SlabType.BOTTOM);
@@ -225,7 +331,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void leafFloatsOnWater(GameTestHelper helper) {
         floor(helper);
         fill(helper, 0, 0, 6, 6, 1, Blocks.STONE.defaultBlockState());
@@ -240,7 +345,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void floatingLeafRidesTheWaves(GameTestHelper helper) {
         floor(helper);
         fill(helper, 0, 0, 6, 6, 1, Blocks.STONE.defaultBlockState());
@@ -275,7 +379,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void rainWindGivesOnlyTheHeading(GameTestHelper helper) {
         floor(helper);
         LeafSimulation sim = simulation(helper, 64, LeafListener.NONE);
@@ -297,7 +400,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void leavesBlowWithAnotherModsWind(GameTestHelper helper) {
         floor(helper);
         LeafSimulation sim = simulation(helper, 64, LeafListener.NONE);
@@ -337,7 +439,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void soakedLeafSinksToTheBottom(GameTestHelper helper) {
         floor(helper);
         for (int y = 1; y <= 2; y++) {
@@ -354,7 +455,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void floatingLeavesDriftTogether(GameTestHelper helper) {
         floor(helper);
         for (int y = 1; y <= 2; y++) {
@@ -374,7 +474,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void waterPouringOntoALeafSinksIt(GameTestHelper helper) {
         floor(helper);
         for (int y = 1; y <= 2; y++) {
@@ -394,7 +493,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void floatingLeavesStayOnTheWaterAndSettle(GameTestHelper helper) {
         floor(helper);
         // A pond with a low, open shore: the ground around it lies below the water surface.
@@ -416,7 +514,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void leafBurnsInLava(GameTestHelper helper) {
         floor(helper);
         fill(helper, 0, 0, 6, 6, 1, Blocks.STONE.defaultBlockState());
@@ -434,7 +531,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void pileSurfaceStaysLevelAtASlab(GameTestHelper helper) {
         floor(helper);
         helper.setBlock(3, 1, 3, Blocks.STONE_SLAB.defaultBlockState().setValue(SlabBlock.TYPE, SlabType.BOTTOM));
@@ -457,7 +553,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void pileSlumpsToItsAngleOfRepose(GameTestHelper helper) {
         floor(helper);
         LeafSimulation sim = simulation(helper, 512, LeafListener.NONE);
@@ -483,7 +578,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void walkingThroughAPileThinsIt(GameTestHelper helper) {
         floor(helper);
         LeafSimulation sim = simulation(helper, 512, LeafListener.NONE);
@@ -502,7 +596,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void sneakingLeavesThinCarpetAlone(GameTestHelper helper) {
         floor(helper);
         LeafSimulation sim = simulation(helper, 64, LeafListener.NONE);
@@ -515,7 +608,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void jumpingIntoAPileSplashes(GameTestHelper helper) {
         floor(helper);
         LeafSimulation sim = simulation(helper, 512, LeafListener.NONE);
@@ -536,7 +628,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void windChargeBlowsLitterAway(GameTestHelper helper) {
         floor(helper);
         LeafSimulation sim = simulation(helper, 1024, LeafListener.NONE);
@@ -559,7 +650,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void litterFallsWhenSupportIsRemoved(GameTestHelper helper) {
         floor(helper);
         fill(helper, 2, 2, 4, 4, 1, Blocks.OAK_PLANKS.defaultBlockState());
@@ -581,7 +671,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void fullBlockSmothersLitter(GameTestHelper helper) {
         floor(helper);
         LeafSimulation sim = simulation(helper, 64, LeafListener.NONE);
@@ -597,7 +686,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void litterStaysUnderAPlacedSlab(GameTestHelper helper) {
         floor(helper);
         LeafSimulation sim = simulation(helper, 64, LeafListener.NONE);
@@ -618,7 +706,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void fenceIsAsHighAsItIsDrawn(GameTestHelper helper) {
         floor(helper);
         helper.setBlock(3, 1, 3, Blocks.OAK_FENCE.defaultBlockState());
@@ -634,7 +721,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void rakingGathersAPile(GameTestHelper helper) {
         floor(helper);
         LeafSimulation sim = simulation(helper, 256, LeafListener.NONE);
@@ -654,7 +740,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void whirlwindLiftsLeavesUp(GameTestHelper helper) {
         floor(helper);
         LeafSimulation sim = simulation(helper, 512, LeafListener.NONE);
@@ -674,7 +759,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void scoopedLeavesPourBackOut(GameTestHelper helper) {
         floor(helper);
         LeafSimulation sim = simulation(helper, 1024, LeafListener.NONE);
@@ -699,7 +783,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void pouredLeavesFillABowl(GameTestHelper helper) {
         floor(helper);
         // A one block deep hollow in the middle of a raised floor.
@@ -725,7 +808,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void fullBowlRunsOver(GameTestHelper helper) {
         floor(helper);
         fill(helper, 0, 0, 6, 6, 1, Blocks.STONE.defaultBlockState());
@@ -762,7 +844,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void leafBlowerClearsAPath(GameTestHelper helper) {
         floor(helper);
         LeafSimulation sim = simulation(helper, 2048, LeafListener.NONE);
@@ -790,7 +871,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void leafBagSucksUpLeaves(GameTestHelper helper) {
         floor(helper);
         LeafSimulation sim = simulation(helper, 1024, LeafListener.NONE);
@@ -823,7 +903,6 @@ public final class ModGameTests {
         }
     };
 
-    @GameTest(template = "box")
     public static void pileBlockBecomesPinnedLitter(GameTestHelper helper) {
         floor(helper);
         helper.setBlock(3, 1, 3, Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, 4));
@@ -863,7 +942,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void pileLitterFollowsTheBlock(GameTestHelper helper) {
         floor(helper);
         BlockPos pos = new BlockPos(3, 1, 3);
@@ -898,7 +976,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void growingPileFillsWithFallingLeaves(GameTestHelper helper) {
         floor(helper);
         BlockPos pos = new BlockPos(3, 1, 3);
@@ -922,7 +999,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void stackedPileBlocksMakeOneTallPile(GameTestHelper helper) {
         floor(helper);
         helper.setBlock(3, 1, 3, Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, 8));
@@ -944,7 +1020,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void pinnedLeavesAreNotSaved(GameTestHelper helper) throws IOException {
         floor(helper);
         helper.setBlock(3, 1, 3, Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, 3));
@@ -964,7 +1039,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "empty")
     public static void blackPileCellsAreRepairedOnLoad(GameTestHelper helper) throws IOException {
         // Natural piles seeded before 2.3.0 could get color 0 (drawn black) next to the colored carpet around them.
         LitterChunk chunk = new LitterChunk(0, 0);
@@ -979,7 +1053,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void leafLandsOnUndrawnPile(GameTestHelper helper) {
         floor(helper);
         fill(helper, 2, 2, 4, 4, 1, Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, 4));
@@ -1028,7 +1101,6 @@ public final class ModGameTests {
         return sum;
     }
 
-    @GameTest(template = "empty")
     public static void litterSurvivesSaving(GameTestHelper helper) throws IOException {
         LitterChunk chunk = new LitterChunk(5, -3);
         chunk.seedCell(17, 12, 64.5F, 0x123456, LeafShape.NEEDLE.ordinal());
@@ -1048,7 +1120,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "empty")
     public static void oldLitterFormatStillLoads(GameTestHelper helper) throws IOException {
         // A chunk as 1.3 saved it: format 1, without the game times.
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
@@ -1074,7 +1145,6 @@ public final class ModGameTests {
     /** Game ticks in which a natural carpet rots away with the default settings. */
     private static final long LIFETIME = (long) (new LeafSettings().litterLifetime * 24000);
 
-    @GameTest(template = "box")
     public static void litterRotsAwayGradually(GameTestHelper helper) {
         floor(helper);
         LeafSimulation sim = simulation(helper, 64, LeafListener.NONE);
@@ -1107,7 +1177,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void litterCatchesUpOnTheTimeAway(GameTestHelper helper) throws IOException {
         floor(helper);
         LeafSimulation sim = simulation(helper, 64, LeafListener.NONE);
@@ -1141,7 +1210,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void snowCoversNoLeaves(GameTestHelper helper) {
         floor(helper);
         LeafSimulation sim = simulation(helper, 64, LeafListener.NONE);
@@ -1175,7 +1243,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void pileBlockLeavesDoNotRot(GameTestHelper helper) {
         floor(helper);
         helper.setBlock(3, 1, 3, Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, 4));
@@ -1201,7 +1268,6 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "box")
     public static void autumnLitterIsGoneBeforeWinter(GameTestHelper helper) {
         // Whatever the length of the seasons (here the default and a short one of two days per sub-season).
         for (int duration : new int[] {SeasonCurve.DEFAULT_SUB_SEASON_TICKS, 2 * 24000}) {

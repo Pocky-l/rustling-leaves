@@ -6,7 +6,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.neoforge.client.model.data.ModelData;
 
 import com.pockyl.rustling_leaves.sim.LeafPalette;
 
@@ -33,7 +32,7 @@ final class LeafColors {
     private int textureAverage(BlockState state) {
         return textureAverage.computeIfAbsent(state.getBlock(), block -> {
             try {
-                TextureAtlasSprite sprite = Minecraft.getInstance().getBlockRenderer().getBlockModel(state).getParticleIcon(ModelData.EMPTY);
+                TextureAtlasSprite sprite = Minecraft.getInstance().getBlockRenderer().getBlockModel(state).particleIcon();
                 int width = sprite.contents().width();
                 int height = sprite.contents().height();
                 long r = 0;

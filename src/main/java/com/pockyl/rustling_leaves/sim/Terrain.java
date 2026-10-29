@@ -153,7 +153,7 @@ final class Terrain {
         BlockState state = level.getBlockState(lightCursor);
         if (!state.isAir() && !state.is(BlockTags.LEAVES)) {
             lightCursor.move(0, 1, 0);
-            if (state.isSolidRender(level, lightCursor.below())) {
+            if (state.isSolidRender()) {
                 sky = level.getBrightness(LightLayer.SKY, lightCursor);
                 block = level.getBrightness(LightLayer.BLOCK, lightCursor);
             } else {

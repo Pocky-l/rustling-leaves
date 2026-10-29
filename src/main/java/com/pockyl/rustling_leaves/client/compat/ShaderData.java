@@ -4,7 +4,7 @@ import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.biome.Biome;
 import net.neoforged.fml.ModList;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
@@ -45,7 +45,7 @@ public final class ShaderData {
     private static final double DRIFT_WRAP = 100000.0;
 
     private final String modId;
-    private final ResourceLocation id;
+    private final Identifier id;
     private final float[] values;
     private final boolean[] ownsShare = new boolean[3];
     private DataTexture texture;
@@ -59,7 +59,7 @@ public final class ShaderData {
 
     public ShaderData(String modId, int texels) {
         this.modId = modId;
-        this.id = ResourceLocation.fromNamespaceAndPath(modId, "shader_data");
+        this.id = Identifier.fromNamespaceAndPath(modId, "shader_data");
         this.values = new float[texels * 4];
         for (int share = 0; share < OWNERS.length; share++) {
             for (String owner : OWNERS[share]) {
@@ -134,8 +134,8 @@ public final class ShaderData {
         }
         boolean open = level.dimensionType().hasSkyLight() && !level.dimensionType().hasCeiling();
         float rain = open ? level.getRainLevel(partialTick) : 0.0F;
-        BlockPos pos = minecraft.gameRenderer.getMainCamera().getBlockPosition();
-        float snowy = level.getBiome(pos).value().getPrecipitationAt(pos) == Biome.Precipitation.SNOW ? 1.0F : 0.0F;
+        BlockPos pos = minecraft.gameRenderer.getMainCamera().blockPosition();
+        float snowy = level.getBiome(pos).value().getPrecipitationAt(pos, level.getSeaLevel()) == Biome.Precipitation.SNOW ? 1.0F : 0.0F;
         float[] shares = {rain * (1.0F - snowy), rain * snowy, 1.0F - rain};
         float covered = 0.0F;
         for (int share = 0; share < shares.length; share++) {

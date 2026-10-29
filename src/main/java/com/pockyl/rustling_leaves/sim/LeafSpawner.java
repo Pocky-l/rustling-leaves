@@ -5,7 +5,6 @@ import net.minecraft.tags.BlockTags;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.CherryLeavesBlock;
 import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -48,17 +47,17 @@ public final class LeafSpawner {
             int x = Mth.floor(cameraX + Mth.cos(angle) * distance);
             int z = Mth.floor(cameraZ + Mth.sin(angle) * distance);
             int top = level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z) - 1;
-            if (top < level.getMinBuildHeight()) {
+            if (top < level.getMinY()) {
                 continue;
             }
             BlockState state = level.getBlockState(cursor.set(x, top, z));
             if (!sheds(state, settings)) {
                 continue;
             }
-            // Stronger wind at this spot shakes more leaves off: gust waves, squall fronts, storms. Vanilla cherry trees
-            // already shed at their own pace through dropBelow, so only the wind adds petals here.
+            // Stronger wind at this spot shakes more leaves off: gust waves, squall fronts, storms. Vanilla trees already
+            // shed at their own pace through dropBelow, so only the wind adds leaves here.
             float windHere = wind.speed(x, top, z);
-            float calm = state.getBlock() instanceof CherryLeavesBlock ? 0.0F : 1.0F;
+            float calm = trees.dropsVanillaLeaves(state) ? 0.0F : 1.0F;
             float local = chance * (calm + windHere * 12.0F + wind.squall(x, z) * 10.0F);
             // The sampling budget is set by the busiest season multiplier (leaves or petals); each tree gets its own share.
             LeafShape shape = trees.shape(state);
@@ -119,12 +118,18 @@ public final class LeafSpawner {
     }
 
     /**
-     * One leaf from under the leaves block at {@code pos}, where vanilla spawns its cherry petal particle; the fall
-     * rate and the season scale how many come (rate 2 = two leaves, 0.5 = every other one).
+     * One leaf from under the leaves block at {@code pos}, where vanilla spawns its falling leaf particle; the fall
+     * rate and the season scale how many come (rate 2 = two leaves, 0.5 = every other one). Trees that shed less than
+     * the others (conifers) drop fewer than vanilla, none drops more; placed leaves only with
+     * {@link LeafSettings#placedLeaves}.
      */
     public void dropBelow(Level level, LeafSimulation simulation, BlockState state, BlockPos pos) {
         LeafSettings settings = simulation.settings();
-        float rate = settings.fallRate * settings.seasonRate(trees.shape(state));
+        if (!sheds(state, settings)) {
+            return;
+        }
+        LeafShape shape = trees.shape(state);
+        float rate = settings.fallRate * settings.seasonRate(shape) * Math.min(1.0F, settings.shedRate(shape));
         int count = Mth.floor(rate) + (random.nextFloat() < Mth.frac(rate) ? 1 : 0);
         Wind wind = simulation.wind();
         float push = wind.speed(pos.getX(), pos.getY(), pos.getZ()) * 0.8F;

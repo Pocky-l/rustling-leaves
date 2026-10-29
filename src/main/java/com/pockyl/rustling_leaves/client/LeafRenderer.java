@@ -6,7 +6,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ChunkTrackingView;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.ChunkPos;
@@ -405,10 +405,10 @@ final class LeafRenderer implements AutoCloseable {
             shadowV1[s] = sprite.getV1();
         }
         // The old leaf textures bring back the old pile textures too, for conifers as well.
-        ResourceLocation[] layers = oldTextures
-                ? new ResourceLocation[] {LeafShapes.OLD_LITTER, LeafShapes.OLD_LITTER_SPARSE, LeafShapes.OLD_LITTER_LAYER,
+        Identifier[] layers = oldTextures
+                ? new Identifier[] {LeafShapes.OLD_LITTER, LeafShapes.OLD_LITTER_SPARSE, LeafShapes.OLD_LITTER_LAYER,
                         LeafShapes.OLD_LITTER, LeafShapes.OLD_LITTER_SPARSE, LeafShapes.OLD_LITTER_LAYER}
-                : new ResourceLocation[] {LeafShapes.LITTER, LeafShapes.LITTER_SPARSE, LeafShapes.LITTER_LAYER,
+                : new Identifier[] {LeafShapes.LITTER, LeafShapes.LITTER_SPARSE, LeafShapes.LITTER_LAYER,
                         LeafShapes.NEEDLE_LITTER, LeafShapes.NEEDLE_LITTER_SPARSE, LeafShapes.NEEDLE_LITTER_LAYER};
         for (int t = 0; t < layers.length; t++) {
             TextureAtlasSprite sprite = atlas.getSprite(layers[t]);

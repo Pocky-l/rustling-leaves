@@ -58,7 +58,7 @@ public final class ModNetwork {
 
     /** Passes a stroke on to every player around the raker whose client has the mod; checks it is plausible first. */
     private static void relay(ServerPlayer raker, RakePayload payload) {
-        long time = raker.serverLevel().getGameTime();
+        long time = raker.level().getGameTime();
         Long last = LAST_RAKE.get(raker);
         if (last != null && time - last < MIN_INTERVAL && time >= last) {
             return;
@@ -69,7 +69,7 @@ public final class ModNetwork {
         }
         LAST_RAKE.put(raker, time);
         double maxSq = RELAY_DISTANCE * RELAY_DISTANCE;
-        for (ServerPlayer player : raker.serverLevel().players()) {
+        for (ServerPlayer player : raker.level().players()) {
             if (player != raker && player.distanceToSqr(at) < maxSq && player.connection.hasChannel(RakePayload.TYPE)) {
                 PacketDistributor.sendToPlayer(player, payload);
             }

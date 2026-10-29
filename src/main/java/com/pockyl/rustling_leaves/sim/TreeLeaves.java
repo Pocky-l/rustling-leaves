@@ -11,4 +11,13 @@ public interface TreeLeaves {
 
     /** Which leaves a leaves block drops. */
     LeafShape shape(BlockState state);
+
+    /**
+     * Whether the block drops vanilla falling leaves by itself (every leaves block since 1.21.5), which the client turns
+     * into simulated leaves one by one ({@link LeafSpawner#dropBelow}); the canopy spawner then only adds the leaves the
+     * wind shakes off.
+     */
+    default boolean dropsVanillaLeaves(BlockState state) {
+        return false;
+    }
 }

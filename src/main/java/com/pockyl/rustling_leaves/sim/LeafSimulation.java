@@ -6,6 +6,7 @@ import net.minecraft.core.SectionPos;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.util.Mth;
+import net.minecraft.world.attribute.EnvironmentAttributes;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -515,7 +516,9 @@ public final class LeafSimulation {
             sunY = -1.0;
             return;
         }
-        double angle = level.getTimeOfDay(1.0F) * Mth.TWO_PI;
+        // The sun's angle as the sky draws it (0 = noon), an environment attribute since 1.21.11.
+        double angle = level.environmentAttributes().getValue(EnvironmentAttributes.SUN_ANGLE, new Vec3(cameraX, cameraY, cameraZ))
+                * Mth.DEG_TO_RAD;
         // The sky's rotation as shader packs (Iris) place the sun: Ry(-90) Rz(sunPathRotation) Rx(angle) of straight up.
         double tilt = sunPathRotation * Mth.DEG_TO_RAD;
         sunX = -Math.sin(angle);

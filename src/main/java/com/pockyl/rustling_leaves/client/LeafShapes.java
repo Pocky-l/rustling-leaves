@@ -1,7 +1,7 @@
 package com.pockyl.rustling_leaves.client;
 
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.block.Block;
 
@@ -14,7 +14,7 @@ import java.util.Map;
 /** Client side of leaf shapes: the sprite of every sprite index and which shape a tree drops. */
 final class LeafShapes {
     /** The sprite indices of {@link LeafShape}: leaves and petals of newer Minecraft versions, the old sprites, the needle sprig. */
-    static final ResourceLocation[] SPRITES = {
+    static final Identifier[] SPRITES = {
             RustlingLeaves.id("block/leaf/leaf_light"),
             RustlingLeaves.id("block/leaf/leaf_mid"),
             RustlingLeaves.id("block/leaf/leaf_dark"),
@@ -35,7 +35,7 @@ final class LeafShapes {
      * Shadow sprites: white silhouettes with hard pixel edges, drawn translucent black by the renderer - leaf and
      * petal for falling leaves, a square for the ground around piles.
      */
-    static final ResourceLocation[] SHADOW_SPRITES = {
+    static final Identifier[] SHADOW_SPRITES = {
             RustlingLeaves.id("block/leaf/shadow/leaf"),
             RustlingLeaves.id("block/leaf/shadow/petal"),
             RustlingLeaves.id("block/leaf/shadow/cell"),
@@ -54,19 +54,19 @@ final class LeafShapes {
      * Seamless texture of densely packed leaves for the body of piles, strewn from the falling leaf sprites (pixel for
      * pixel the size of a loose leaf).
      */
-    static final ResourceLocation LITTER = RustlingLeaves.id("block/leaf/litter");
+    static final Identifier LITTER = RustlingLeaves.id("block/leaf/litter");
     /** Loose leaves with gaps, over a thin carpet: the ground shows through. */
-    static final ResourceLocation LITTER_SPARSE = RustlingLeaves.id("block/leaf/litter_sparse");
+    static final Identifier LITTER_SPARSE = RustlingLeaves.id("block/leaf/litter_sparse");
     /** Denser loose leaves with gaps, over thicker carpets and on top of pile bodies. */
-    static final ResourceLocation LITTER_LAYER = RustlingLeaves.id("block/leaf/litter_layer");
+    static final Identifier LITTER_LAYER = RustlingLeaves.id("block/leaf/litter_layer");
     /** The same three of needle sprigs: the rusty needle mat under conifers. */
-    static final ResourceLocation NEEDLE_LITTER = RustlingLeaves.id("block/leaf/needle_litter");
-    static final ResourceLocation NEEDLE_LITTER_SPARSE = RustlingLeaves.id("block/leaf/needle_litter_sparse");
-    static final ResourceLocation NEEDLE_LITTER_LAYER = RustlingLeaves.id("block/leaf/needle_litter_layer");
+    static final Identifier NEEDLE_LITTER = RustlingLeaves.id("block/leaf/needle_litter");
+    static final Identifier NEEDLE_LITTER_SPARSE = RustlingLeaves.id("block/leaf/needle_litter_sparse");
+    static final Identifier NEEDLE_LITTER_LAYER = RustlingLeaves.id("block/leaf/needle_litter_layer");
     /** The pile textures before 2.8.0, with the option {@code oldLeafTextures}. */
-    static final ResourceLocation OLD_LITTER = RustlingLeaves.id("block/leaf/old_litter");
-    static final ResourceLocation OLD_LITTER_SPARSE = RustlingLeaves.id("block/leaf/old_litter_sparse");
-    static final ResourceLocation OLD_LITTER_LAYER = RustlingLeaves.id("block/leaf/old_litter_layer");
+    static final Identifier OLD_LITTER = RustlingLeaves.id("block/leaf/old_litter");
+    static final Identifier OLD_LITTER_SPARSE = RustlingLeaves.id("block/leaf/old_litter_sparse");
+    static final Identifier OLD_LITTER_LAYER = RustlingLeaves.id("block/leaf/old_litter_layer");
 
     private static final Map<Block, LeafShape> BY_BLOCK = new IdentityHashMap<>();
 

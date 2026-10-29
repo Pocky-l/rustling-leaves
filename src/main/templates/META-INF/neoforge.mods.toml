@@ -36,13 +36,6 @@ displayTest="IGNORE_ALL_VERSION"
     ordering="NONE"
     side="CLIENT"
 
-# Its leaf piles are drawn as leaf litter.
-[[dependencies.${mod_id}]]
-    modId="immersive_weathering"
-    type="optional"
-    versionRange="*"
-    ordering="NONE"
-    side="CLIENT"
 [[dependencies.${mod_id}]]
     modId="whitecap"
     type="optional"

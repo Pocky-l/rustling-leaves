@@ -5,7 +5,7 @@
   "plugin": "com.pockyl.rustling_leaves.mixin.CompatMixinPlugin",
   "compatibilityLevel": "JAVA_21",
   "client": [
-    "CherryLeavesBlockMixin",
+    "LeavesBlockMixin",
     "ClientLevelMixin",
     "ClientPacketListenerMixin",
     "FallingLeavesMixin",

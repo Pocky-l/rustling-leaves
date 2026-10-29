@@ -6,6 +6,8 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.debug.DebugScreenEntryStatus;
+import net.minecraft.client.gui.components.debug.DebugScreenProfile;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.ServerData;
@@ -14,7 +16,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.protocol.game.ClientboundExplodePacket;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
@@ -28,6 +30,7 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.world.phys.BlockHitResult;
@@ -38,15 +41,14 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
-import net.neoforged.neoforge.client.event.CustomizeGuiOverlayEvent;
+import net.neoforged.neoforge.client.event.RegisterDebugEntriesEvent;
 import net.neoforged.neoforge.client.event.InputEvent;
-import net.neoforged.neoforge.network.PacketDistributor;
+import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 import org.joml.Matrix4f;
 import org.joml.Vector3fc;
 
 import com.pockyl.rustling_leaves.Config;
 import com.pockyl.rustling_leaves.RustlingLeaves;
-import com.pockyl.rustling_leaves.client.compat.ImmersiveWeathering;
 import com.pockyl.rustling_leaves.client.compat.LivingWind;
 import com.pockyl.rustling_leaves.client.compat.RealisticWaves;
 import com.pockyl.rustling_leaves.client.compat.SereneSeasons;
@@ -102,10 +104,8 @@ public final class LeafManager {
      */
     private static final long REFRESH_TICKS = 24000L;
     private static final boolean SERENE_SEASONS = ModList.get().isLoaded(SereneSeasons.MOD_ID);
-    /** Looked up on use: this class loads with the config, before the pile blocks are registered. */
-    private static final PileBlocks PILES = ModList.get().isLoaded(ImmersiveWeathering.MOD_ID)
-            ? state -> ImmersiveWeathering.piles().layers(state)
-            : PileBlocks.NONE;
+    private static final Identifier DEBUG_ENTRY = RustlingLeaves.id("leaves");
+    private static final PileBlocks PILES = PileBlocks.NONE;
 
     private static final LeafSettings SETTINGS = new LeafSettings();
     private static final LeafColors COLORS = new LeafColors();
@@ -175,7 +175,6 @@ public final class LeafManager {
                 simulation.setWaves(waves());
                 simulation.setWindSource(windSource());
             }
-            updatePileModels(minecraft);
         }
         if (minecraft.level != level) {
             reset();
@@ -228,16 +227,20 @@ public final class LeafManager {
         }
     }
 
+    /** The leaf counts on the debug screen (F3), an entry of its own that is shown with the overlay by default. */
     @SubscribeEvent
-    public static void onDebugText(CustomizeGuiOverlayEvent.DebugText event) {
-        if (simulation == null || !Minecraft.getInstance().getDebugOverlay().showDebugScreen()) {
-            return;
-        }
-        LeafPool pool = simulation.pool();
-        event.getRight().add("");
-        event.getRight().add(String.format("Rustling Leaves: %d/%d moving, %d lying", pool.count(), pool.capacity, simulation.field().total()));
-        event.getRight().add(String.format("Litter: %d chunks, %d quads drawn, %d whirlwinds", simulation.field().chunks().size(),
-                renderer.tileQuads(), simulation.wind().whirlwinds().size()));
+    public static void onRegisterDebugEntries(RegisterDebugEntriesEvent event) {
+        event.register(DEBUG_ENTRY, (displayer, debugLevel, clientChunk, serverChunk) -> {
+            if (simulation == null) {
+                return;
+            }
+            LeafPool pool = simulation.pool();
+            displayer.addToGroup(DEBUG_ENTRY, List.of(
+                    String.format("Rustling Leaves: %d/%d moving, %d lying", pool.count(), pool.capacity, simulation.field().total()),
+                    String.format("Litter: %d chunks, %d quads drawn, %d whirlwinds", simulation.field().chunks().size(),
+                            renderer.tileQuads(), simulation.wind().whirlwinds().size())));
+        });
+        event.includeInProfile(DEBUG_ENTRY, DebugScreenProfile.DEFAULT, DebugScreenEntryStatus.IN_OVERLAY);
     }
 
     /**
@@ -265,7 +268,7 @@ public final class LeafManager {
             event.setSwingHand(true);
             ClientPacketListener connection = minecraft.getConnection();
             if (connection != null && connection.hasChannel(RakePayload.TYPE)) {
-                PacketDistributor.sendToServer(new RakePayload(at.x, at.y, at.z));
+                ClientPacketDistributor.sendToServer(new RakePayload(at.x, at.y, at.z));
             }
         }
     }
@@ -336,8 +339,8 @@ public final class LeafManager {
 
     /** Hooked into block updates of the client level. */
     /**
-     * Called instead of a vanilla cherry petal particle under the cherry leaves at {@code pos}: drops a simulated petal
-     * there (scaled by the fall rate and the season). Returns false when the simulation is off, so the vanilla particle shows.
+     * Called instead of a vanilla falling leaf particle under the leaves at {@code pos}: drops a simulated leaf there
+     * (scaled by the fall rate and the season). Returns false when the simulation is off, so the vanilla particle shows.
      */
     /**
      * Whether the leaf particles of other leaf mods (Falling Leaves, Living Wind) are left out: the simulation drops the
@@ -391,11 +394,11 @@ public final class LeafManager {
         return out -> world.read(out) || weather.read(out);
     }
 
-    public static boolean replaceCherryPetal(Level particleLevel, BlockPos pos, BlockState state) {
+    public static boolean replaceLeafParticle(Level particleLevel, BlockPos pos) {
         if (simulation == null || particleLevel != level) {
             return false;
         }
-        SPAWNER.dropBelow(level, simulation, state, pos);
+        SPAWNER.dropBelow(level, simulation, level.getBlockState(pos), pos);
         return true;
     }
 
@@ -445,8 +448,9 @@ public final class LeafManager {
         if (simulation == null) {
             return;
         }
-        boolean windCharge = isGust(packet.getSmallExplosionParticles()) || isGust(packet.getLargeExplosionParticles());
-        simulation.explode(packet.getX(), packet.getY(), packet.getZ(), packet.getPower(), windCharge);
+        boolean windCharge = isGust(packet.explosionParticle());
+        Vec3 center = packet.center();
+        simulation.explode(center.x, center.y, center.z, packet.radius(), windCharge);
     }
 
     private static boolean isGust(ParticleOptions particle) {
@@ -561,20 +565,6 @@ public final class LeafManager {
         }
     }
 
-    /**
-     * Hides the models of leaf pile blocks while the litter draws them and shows them again when it stops; the chunk
-     * meshes are rebuilt when that changes.
-     */
-    private static void updatePileModels(Minecraft minecraft) {
-        boolean hide = PILES != PileBlocks.NONE && SETTINGS.drawPileBlocks && SETTINGS.maxLeaves > 0;
-        if (hide != ImmersiveWeathering.hidden() && PILES != PileBlocks.NONE) {
-            ImmersiveWeathering.setHidden(hide);
-            if (minecraft.level != null) {
-                minecraft.levelRenderer.allChanged();
-            }
-        }
-    }
-
     private static boolean refreshDue(LitterChunk chunk, long now) {
         return chunk.seeded() && chunk.seededAt() != LitterChunk.NEVER && now - chunk.seededAt() >= REFRESH_TICKS;
     }
@@ -637,7 +627,7 @@ public final class LeafManager {
             root = minecraft.gameDirectory.toPath().resolve(RustlingLeaves.MOD_ID).resolve("servers")
                     .resolve(name.replaceAll("[^A-Za-z0-9._-]", "_"));
         }
-        ResourceLocation dimension = level.dimension().location();
+        Identifier dimension = level.dimension().identifier();
         return root.resolve(dimension.getNamespace()).resolve(dimension.getPath());
     }
 
@@ -677,7 +667,7 @@ public final class LeafManager {
     private static Vec3 cameraPosition(Minecraft minecraft) {
         Camera camera = minecraft.gameRenderer.getMainCamera();
         if (camera.isInitialized()) {
-            return camera.getPosition();
+            return camera.position();
         }
         return minecraft.player != null ? minecraft.player.getEyePosition() : Vec3.ZERO;
     }
@@ -722,6 +712,11 @@ public final class LeafManager {
         @Override
         public LeafShape shape(BlockState state) {
             return LeafShapes.of(state.getBlock());
+        }
+
+        @Override
+        public boolean dropsVanillaLeaves(BlockState state) {
+            return state.getBlock() instanceof LeavesBlock;
         }
     }
 
