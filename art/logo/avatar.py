@@ -176,11 +176,25 @@ def compose():
     far = [dict(x=rnd.uniform(0, S), phase=rnd.random(), size=rnd.randint(26, 44), color=rnd.choice(COLORS),
                 sway=rnd.uniform(10, 30), k=rnd.choice((1, 2)), rot=rnd.random() * 24) for _ in range(0)]
     # Leaf fall: big near leaves and smaller ones further back (drawn first, a little paler), phases spread evenly.
-    count = 20
-    mid = sorted([dict(x0=rnd.uniform(S * 0.06, S * 0.94), x1=pile_cx + rnd.uniform(-S * 0.34, S * 0.34),
-                       phase=(j * 7 % count) / count, size=rnd.choice((40, 46, 52, 60, 66, 72)),
-                       color=COLORS[j % len(COLORS)], sway=rnd.uniform(18, 36), swings=rnd.choice((2, 3)),
-                       rot=rnd.random() * 6.28, spin=1) for j in range(count)], key=lambda m: m["size"])
+    # Every leaf moves its own way: a pendulum swing, a glide carried sideways by the wind, a spiral (it comes closer
+    # and goes away again, growing and shrinking) or a quick flutter.
+    count = 22
+    mid = []
+    for j in range(count):
+        kind = ("swing", "glide", "spiral", "flutter")[j % 4]
+        x1 = pile_cx + rnd.uniform(-S * 0.34, S * 0.34)
+        drift = rnd.choice((-1, 1)) * rnd.uniform(S * 0.3, S * 0.5) if kind == "glide" else rnd.uniform(-S * 0.25, S * 0.25)
+        mid.append(dict(kind=kind, x0=x1 - drift, x1=x1, phase=(j * 7 % count) / count,
+                        size=rnd.choice((40, 46, 52, 60, 66, 72)), color=COLORS[j % len(COLORS)],
+                        sway=rnd.uniform(12, 16) if kind == "flutter" else rnd.uniform(18, 36),
+                        swings={"swing": rnd.choice((2, 3)), "glide": 1, "spiral": rnd.choice((1, 2)), "flutter": 6}[kind],
+                        radius=rnd.uniform(S * 0.07, S * 0.11), ease=rnd.uniform(0.8, 1.3), rot=rnd.random() * 6.28))
+    mid.sort(key=lambda m: m["size"])
+    # Big leaves right in front of the camera, out of focus, each crossing in its own time window while the big
+    # leaf of the first frame is away: (start, length, from, to, size, colour).
+    # They cross the sky part of the picture, where they stand out.
+    near = [(0.27, 0.22, (-0.18, 0.02), (1.18, 0.52), 160, 0xDCB851), (0.40, 0.22, (1.18, -0.05), (-0.18, 0.40), 140, 0xE69A32),
+            (0.52, 0.17, (-0.18, 0.30), (1.18, 0.20), 180, 0xB73C2F), (0.04, 0.18, (0.55, -0.18), (1.18, 0.45), 120, 0xF0BE45)]
 
     def frame(t):
         img = sky(S)
@@ -191,12 +205,21 @@ def compose():
             paste(img, leaf_at(leaves, f["rot"] + 24 * t * f["k"], f["size"], f["color"], 1.05, blur=2.5, alpha=0.45), x, y)
         img.alpha_composite(shadow)
         paste(img, pile, pile_cx, pile_cy)
-        for m in mid:  # sharp leaves swinging down onto the pile
+        for m in mid:  # sharp leaves coming down onto the pile
             u = (m["phase"] + t) % 1.0
-            y = -50 + (pile_top + 60) * u
-            x = m["x0"] + (m["x1"] - m["x0"]) * u + m["sway"] * math.sin(u * m["swings"] * math.tau)
-            leaf = leaf_at(leaves, 4.5 * math.sin(u * m["swings"] * math.tau + m["rot"]), m["size"], m["color"],
-                           shade=0.88 + m["size"] / 600, alpha=min(1.0, (1.0 - u) / 0.12))
+            fall = u ** m["ease"]
+            y = -50 + (pile_top + 60) * fall
+            a = u * m["swings"] * math.tau
+            size = m["size"]
+            if m["kind"] == "glide":
+                x = m["x0"] + (m["x1"] - m["x0"]) * (1 - (1 - u) ** 2) + 10 * math.sin(a * 3)
+            elif m["kind"] == "spiral":
+                x = m["x0"] + (m["x1"] - m["x0"]) * u + m["radius"] * math.sin(a + m["rot"])
+                size = int(size * (1 + 0.28 * math.cos(a + m["rot"])))
+            else:
+                x = m["x0"] + (m["x1"] - m["x0"]) * u + m["sway"] * math.sin(a)
+            leaf = leaf_at(leaves, 4.5 * math.sin(a + m["rot"]), size, m["color"],
+                           shade=0.88 + size / 600, alpha=min(1.0, (1.0 - u) / 0.12))
             drop_shadow(img, leaf, x, y, (6, 10), 4, 0.25)
             paste(img, leaf, x, y)
         # The big leaf in front crosses the picture in the first 60% of the loop (off screen the rest of it). At t = 0
@@ -209,6 +232,14 @@ def compose():
             big = leaf_at(leaves, 4.5 * math.sin((v - v0) * math.tau * 0.8), int(S * 0.4), 0xCB5530)
             drop_shadow(img, big, hx, hy, (14, 22), 10, 0.3)
             paste(img, big, hx, hy)
+        for start, length, p0, p1, size, color in near:
+            w = (t - start) % 1.0 / length
+            if w < 1.0:
+                x = S * (p0[0] + (p1[0] - p0[0]) * w) + S * 0.06 * math.sin(w * math.tau)
+                y = S * (p0[1] + (p1[1] - p0[1]) * w) + S * 0.04 * math.sin(w * math.tau * 2)
+                leaf = leaf_at(leaves, 4.5 * math.sin(w * math.tau * 1.3 + size), size, color, blur=1.4)
+                drop_shadow(img, leaf, x, y, (16, 26), 12, 0.22)
+                paste(img, leaf, x, y)
         mask = Image.new("L", (S, S), 0)
         ImageDraw.Draw(mask).rounded_rectangle([0, 0, S - 1, S - 1], radius=S // 8, fill=255)
         out = Image.new("RGBA", (S, S), (0, 0, 0, 0))
@@ -228,7 +259,7 @@ def compose():
     shutil.rmtree(tmp)
     gifsicle = HERE.parents[1] / "tools" / "shots" / "bin" / "gifsicle.exe"
     if gifsicle.exists():
-        subprocess.run([str(gifsicle), "-O3", "--lossy=40", "--batch", str(gif)], check=True)
+        subprocess.run([str(gifsicle), "-O3", "--lossy=60", "--batch", str(gif)], check=True)
     print(gif, FRAMES, "frames", round(os.path.getsize(gif) / 1e6, 2), "MB")
 
 
