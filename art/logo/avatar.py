@@ -32,8 +32,10 @@ from render_logo import ensure_blockbench, evaluate  # noqa: E402
 HERE = pathlib.Path(__file__).resolve().parent
 PARTS = HERE / "avatar_parts"
 SPRITE = HERE.parents[1] / "src/main/resources/assets/rustling_leaves/textures/block/leaf/leaf_mid.png"
-ORIENTATIONS = 24
-FRAMES, FPS = 72, 18
+ORIENTATIONS = 72
+FRAMES, FPS = 80, 20
+# How far a leaf rocks around its face-on pose, in orientations (about 65 degrees).
+ROCK = ORIENTATIONS * 0.18
 # LeafPalette.AUTUMN, the mod's own leaf colours
 COLORS = [0xF0BE45, 0xE69A32, 0xDD782B, 0xCB5530, 0xB73C2F, 0xDCB851, 0xB87239]
 
@@ -192,9 +194,10 @@ def compose():
     mid.sort(key=lambda m: m["size"])
     # Big leaves right in front of the camera, out of focus, each crossing in its own time window while the big
     # leaf of the first frame is away: (start, length, from, to, size, colour).
-    # They cross the sky part of the picture, where they stand out.
-    near = [(0.27, 0.22, (-0.18, 0.02), (1.18, 0.52), 160, 0xDCB851), (0.40, 0.22, (1.18, -0.05), (-0.18, 0.40), 140, 0xE69A32),
-            (0.52, 0.17, (-0.18, 0.30), (1.18, 0.20), 180, 0xB73C2F), (0.04, 0.18, (0.55, -0.18), (1.18, 0.45), 120, 0xF0BE45)]
+    # They cross anywhere: over the sky, through the middle, low over the pile, one lifted up by a gust.
+    near = [(0.24, 0.40, (-0.18, 0.05), (1.18, 0.55), 160, 0xDCB851), (0.42, 0.42, (1.18, 0.35), (-0.18, 0.85), 140, 0xE69A32),
+            (0.62, 0.36, (-0.18, 0.72), (1.18, 0.95), 180, 0xB73C2F), (0.02, 0.32, (0.12, -0.18), (0.42, 1.18), 120, 0xF0BE45),
+            (0.80, 0.34, (1.18, 0.62), (-0.18, 0.30), 130, 0xDD782B)]
 
     def frame(t):
         img = sky(S)
@@ -218,7 +221,7 @@ def compose():
                 size = int(size * (1 + 0.28 * math.cos(a + m["rot"])))
             else:
                 x = m["x0"] + (m["x1"] - m["x0"]) * u + m["sway"] * math.sin(a)
-            leaf = leaf_at(leaves, 4.5 * math.sin(a + m["rot"]), size, m["color"],
+            leaf = leaf_at(leaves, ROCK * math.sin(a + m["rot"]), size, m["color"],
                            shade=0.88 + size / 600, alpha=min(1.0, (1.0 - u) / 0.12))
             drop_shadow(img, leaf, x, y, (6, 10), 4, 0.25)
             paste(img, leaf, x, y)
@@ -229,7 +232,7 @@ def compose():
         if v < 1.0:
             hx = S * (-0.2 + 1.55 * v) + S * 0.05 * math.sin((v - v0) * math.tau * 1.5)
             hy = S * (-0.42 + 1.15 * v) + S * 0.04 * math.cos((v - v0) * math.tau * 1.5)
-            big = leaf_at(leaves, 4.5 * math.sin((v - v0) * math.tau * 0.8), int(S * 0.4), 0xCB5530)
+            big = leaf_at(leaves, ROCK * math.sin((v - v0) * math.tau * 0.8), int(S * 0.4), 0xCB5530)
             drop_shadow(img, big, hx, hy, (14, 22), 10, 0.3)
             paste(img, big, hx, hy)
         for start, length, p0, p1, size, color in near:
@@ -237,7 +240,7 @@ def compose():
             if w < 1.0:
                 x = S * (p0[0] + (p1[0] - p0[0]) * w) + S * 0.06 * math.sin(w * math.tau)
                 y = S * (p0[1] + (p1[1] - p0[1]) * w) + S * 0.04 * math.sin(w * math.tau * 2)
-                leaf = leaf_at(leaves, 4.5 * math.sin(w * math.tau * 1.3 + size), size, color, blur=1.4)
+                leaf = leaf_at(leaves, ROCK * math.sin(w * math.tau * 0.8 + size), size, color, blur=1.4)
                 drop_shadow(img, leaf, x, y, (16, 26), 12, 0.22)
                 paste(img, leaf, x, y)
         mask = Image.new("L", (S, S), 0)
@@ -254,12 +257,12 @@ def compose():
     gif = HERE / "avatar_400.gif"
     subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(), "-y", "-loglevel", "error", "-framerate", str(FPS), "-i",
                     os.path.join(tmp, "%04d.png"), "-vf",
-                    "split[a][b];[a]palettegen=stats_mode=full[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle",
+                    "split[a][b];[a]palettegen=stats_mode=full:max_colors=160[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle",
                     "-loop", "0", str(gif)], check=True)
     shutil.rmtree(tmp)
     gifsicle = HERE.parents[1] / "tools" / "shots" / "bin" / "gifsicle.exe"
     if gifsicle.exists():
-        subprocess.run([str(gifsicle), "-O3", "--lossy=60", "--batch", str(gif)], check=True)
+        subprocess.run([str(gifsicle), "-O3", "--lossy=110", "--batch", str(gif)], check=True)
     print(gif, FRAMES, "frames", round(os.path.getsize(gif) / 1e6, 2), "MB")
 
 
