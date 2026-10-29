@@ -27,6 +27,11 @@ public final class Config {
             .comment("Whether the tree matters: birches shed more leaves, spruces and other conifers hardly any.")
             .translation("rustling_leaves.configuration.treeFallRates")
             .define("treeFallRates", true);
+    private static final ForgeConfigSpec.BooleanValue PLACED_LEAVES = BUILDER
+            .comment("Whether leaves placed by players (hedges, leaf roofs, decorations) shed leaves and get a leaf carpet",
+                    "under them like trees do. Off keeps builds tidy; leaves broken by hand still burst either way.")
+            .translation("rustling_leaves.configuration.placedLeaves")
+            .define("placedLeaves", false);
     private static final ForgeConfigSpec.IntValue SPAWN_RADIUS = BUILDER
             .comment("Radius around the camera, in blocks, in which trees drop leaves.")
             .translation("rustling_leaves.configuration.spawnRadius")
@@ -85,7 +90,8 @@ public final class Config {
             .define("realisticWaves", true);
     private static final ForgeConfigSpec.BooleanValue LIVING_WIND = BUILDER
             .comment("With Living Wind installed, leaves blow the way its wind blows, as strong as it blows, so they fly along",
-                    "with its wind vanes and particles. Gusts, squalls and whirlwinds stay. Off: leaves keep their own wind.")
+                    "with its wind vanes and particles. With Petrichor or Hoarfrost, leaves blow the way the rain and snow slant.",
+                    "Gusts, squalls and whirlwinds stay. Off: leaves keep their own wind.")
             .translation("rustling_leaves.configuration.livingWind")
             .define("livingWind", true);
     private static final ForgeConfigSpec.BooleanValue FALLING_LEAVES_MOD = BUILDER
@@ -197,6 +203,7 @@ public final class Config {
         settings.spawnRadius = SPAWN_RADIUS.get();
         settings.carpetDepth = CARPET_DEPTH.get();
         settings.naturalPiles = NATURAL_PILES.get();
+        settings.placedLeaves = PLACED_LEAVES.get();
         settings.litterLifetime = LITTER_LIFETIME.get().floatValue();
         settings.windEvents = WIND_EVENTS.get().floatValue();
         settings.raking = RAKING.get();

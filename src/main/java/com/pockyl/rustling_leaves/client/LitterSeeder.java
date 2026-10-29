@@ -9,6 +9,7 @@ import net.minecraft.world.level.levelgen.Heightmap;
 
 import com.pockyl.rustling_leaves.sim.LeafPalette;
 import com.pockyl.rustling_leaves.sim.LeafSettings;
+import com.pockyl.rustling_leaves.sim.LeafSpawner;
 import com.pockyl.rustling_leaves.sim.LitterChunk;
 import com.pockyl.rustling_leaves.sim.LitterField;
 import com.pockyl.rustling_leaves.sim.LeafSimulation;
@@ -93,7 +94,7 @@ final class LitterSeeder {
                 int z = originZ + gz - MARGIN;
                 int top = level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z) - 1;
                 BlockState state = level.getBlockState(cursor.set(x, top, z));
-                boolean leaves = state.is(BlockTags.LEAVES);
+                boolean leaves = LeafSpawner.sheds(state, settings);
                 canopy[gz * GRID + gx] = leaves ? state : null;
                 anyCanopy |= leaves;
             }

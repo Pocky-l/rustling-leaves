@@ -217,6 +217,16 @@ public final class ModGameTests {
     }
 
     @GameTest(template = "box")
+    public static void placedLeavesDoNotShedByDefault(GameTestHelper helper) {
+        canopy(helper);
+        int placed = shed(helper, Float.NaN, 200, null, false);
+        int allowed = shed(helper, Float.NaN, 200, null, true);
+        helper.assertTrue(placed == 0, placed + " leaves fell from placed leaves");
+        helper.assertTrue(allowed > 20, "only " + allowed + " leaves fell with placed leaves allowed");
+        helper.succeed();
+    }
+
+    @GameTest(template = "box")
     public static void lateAutumnLeavesFallInAutumnColors(GameTestHelper helper) {
         canopy(helper);
         // Without seasons a part of the leaves falls in autumn colors (in summer hardly a leaf falls to compare with).
@@ -303,6 +313,28 @@ public final class ModGameTests {
         run(sim, helper, 20);
         helper.assertTrue(pool.state[leaf] == LeafPool.FLOATING && pool.lift[leaf] == 0.0F,
                 "without the waves the leaf is not back on the still water: lift " + pool.lift[leaf]);
+        helper.succeed();
+    }
+
+    @GameTest(template = "box")
+    public static void rainWindGivesOnlyTheHeading(GameTestHelper helper) {
+        floor(helper);
+        LeafSimulation sim = simulation(helper, 64, LeafListener.NONE);
+        sim.settings().windStrength = 1.0F;
+        run(sim, helper, 1);
+        float own = sim.wind().base();
+        // The course of Petrichor's and Hoarfrost's wind: a heading (towards +z, south) without a speed.
+        sim.setWindSource(out -> {
+            out[0] = 0.0F;
+            out[1] = 1.0F;
+            out[2] = Float.NaN;
+            return true;
+        });
+        run(sim, helper, 1);
+        Wind wind = sim.wind();
+        helper.assertTrue(Math.abs(wind.directionX()) < 1.0E-4F && Math.abs(wind.directionZ() - 1.0F) < 1.0E-4F,
+                "the wind does not blow south: " + wind.directionX() + ", " + wind.directionZ());
+        helper.assertTrue(own > 0.0F && Math.abs(wind.base() - own) < 1.0E-6F, "the wind speed changed: " + own + " -> " + wind.base());
         helper.succeed();
     }
 
@@ -1256,8 +1288,14 @@ public final class ModGameTests {
      * them (into [1]): the tree is pure green, so any red in a leaf is an autumn color.
      */
     private static int shed(GameTestHelper helper, float season, int ticks, int[] colors) {
+        return shed(helper, season, ticks, colors, true);
+    }
+
+    private static int shed(GameTestHelper helper, float season, int ticks, int[] colors, boolean placedLeaves) {
         LeafSimulation sim = simulation(helper, 4096, LeafListener.NONE);
         sim.settings().spawnRadius = 4;
+        // The test crown is placed (persistent), so it does not decay during the test.
+        sim.settings().placedLeaves = placedLeaves;
         if (Float.isNaN(season)) {
             SeasonCurve.clear(sim.settings());
         } else {

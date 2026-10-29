@@ -15,6 +15,8 @@ public final class LeafSettings {
     public int carpetDepth = 4;
     /** Whether new forest ground starts with drifts against walls and trunks and the odd leaf pile. */
     public boolean naturalPiles = true;
+    /** Whether leaves placed by players shed and get litter like trees. */
+    public boolean placedLeaves = false;
     public float leafSize = 1.0F;
     /** Draw leaves with the mod's original textures instead of the falling leaves of newer Minecraft versions. */
     public boolean oldLeafTextures = false;

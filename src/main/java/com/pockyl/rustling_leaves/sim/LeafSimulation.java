@@ -133,6 +133,11 @@ public final class LeafSimulation {
     /** Direction to the sun (it moves east to west over the X axis); sunY <= 0 at night. */
     private double sunX;
     private double sunY = 1.0;
+    private double sunZ;
+    /** Tilt of the sun's path towards the south in degrees, as a shader pack sets it ({@code sunPathRotation}). */
+    private float sunPathRotation;
+    private double slopeX;
+    private double slopeZ;
     private Level level;
 
     public LeafSimulation(LeafSettings settings, int capacity, LeafListener listener) {
@@ -511,8 +516,27 @@ public final class LeafSimulation {
             return;
         }
         double angle = level.getTimeOfDay(1.0F) * Mth.TWO_PI;
+        // The sky's rotation as shader packs (Iris) place the sun: Ry(-90) Rz(sunPathRotation) Rx(angle) of straight up.
+        double tilt = sunPathRotation * Mth.DEG_TO_RAD;
         sunX = -Math.sin(angle);
-        sunY = Math.cos(angle);
+        sunY = Math.cos(angle) * Math.cos(tilt);
+        sunZ = -Math.cos(angle) * Math.sin(tilt);
+        double up = Math.max(SHADOW_MIN_SUN, sunY);
+        slopeX = sunX / up;
+        slopeZ = sunZ / up;
+        double length = Math.sqrt(slopeX * slopeX + slopeZ * slopeZ);
+        if (length > SHADOW_MAX_SLOPE) {
+            slopeX *= SHADOW_MAX_SLOPE / length;
+            slopeZ *= SHADOW_MAX_SLOPE / length;
+        }
+    }
+
+    /**
+     * Tilts the sun's path towards the south by this many degrees, as the active shader pack does
+     * ({@code sunPathRotation}; 0 without one), so the leaves' shadows fall the way the pack's shadows do.
+     */
+    public void setSunPathRotation(float degrees) {
+        sunPathRotation = Float.isFinite(degrees) ? degrees : 0.0F;
     }
 
     /** Direction to the sun, X part (east is +X); see {@link #sunY()}. */
@@ -526,11 +550,17 @@ public final class LeafSimulation {
     }
 
     /**
-     * How far a shadow moves sideways per block of height: sun x / sun y, but never more than {@link #SHADOW_MAX_SLOPE}
-     * (as if the sun stood at least ~22 degrees high) - lower down the shadows of leaves stretched into long streaks.
+     * How far a shadow moves along X per block of height: sun x / sun y, the sideways shift never more than
+     * {@link #SHADOW_MAX_SLOPE} (as if the sun stood at least ~22 degrees high) - lower down the shadows of leaves
+     * stretched into long streaks.
      */
     public double sunSlope() {
-        return Mth.clamp(sunX / Math.max(SHADOW_MIN_SUN, sunY), -SHADOW_MAX_SLOPE, SHADOW_MAX_SLOPE);
+        return slopeX;
+    }
+
+    /** Like {@link #sunSlope()} along Z: nonzero only when a shader pack tilts the sun's path. */
+    public double sunSlopeZ() {
+        return slopeZ;
     }
 
     /**
@@ -551,22 +581,23 @@ public final class LeafSimulation {
             return Float.NaN;
         }
         double height = y - below;
-        if (height * Math.sqrt(1.0 + sunSlope() * sunSlope()) > SHADOW_MAX_BEAM) {
+        if (height * Math.sqrt(1.0 + slopeX * slopeX + slopeZ * slopeZ) > SHADOW_MAX_BEAM) {
             return Float.NaN;
         }
-        // Along the sunbeam: the shadow lands this far to the side of the leaf (east or west).
-        double sx = x - sunSlope() * height;
-        double surface = surfaceBelow(sx, y, z);
+        // Along the sunbeam: the shadow lands this far to the side of the leaf (away from the sun).
+        double sx = x - slopeX * height;
+        double sz = z - slopeZ * height;
+        double surface = surfaceBelow(sx, y, sz);
         if (Double.isNaN(surface)) {
             return Float.NaN;
         }
         for (int k = 0; k < 4; k++) {
-            double around = surfaceBelow(sx + (k == 0 ? half : k == 1 ? -half : 0.0), y, z + (k == 2 ? half : k == 3 ? -half : 0.0));
+            double around = surfaceBelow(sx + (k == 0 ? half : k == 1 ? -half : 0.0), y, sz + (k == 2 ? half : k == 3 ? -half : 0.0));
             if (Double.isNaN(around) || Math.abs(around - surface) > SHADOW_LEVEL) {
                 return Float.NaN;
             }
         }
-        pool.shadowSunlit[i] = terrain.canSeeSky(sx, surface + 0.5, z);
+        pool.shadowSunlit[i] = terrain.canSeeSky(sx, surface + 0.5, sz);
         return (float) surface;
     }
 
