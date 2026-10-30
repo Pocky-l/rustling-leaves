@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="https://www.curseforge.com/minecraft/mc-mods/rustling-leaves"><img alt="CurseForge downloads" src="https://img.shields.io/curseforge/dt/1729578?logo=curseforge&label=CurseForge&color=F16436"></a>
-  <a href="https://www.curseforge.com/minecraft/mc-mods/rustling-leaves/files"><img alt="Minecraft 1.21.1, 1.20.1" src="https://img.shields.io/badge/Minecraft-1.21.1%20%7C%201.20.1-62B47A"></a>
+  <a href="https://www.curseforge.com/minecraft/mc-mods/rustling-leaves/files"><img alt="Minecraft 1.20.1, 1.21.1, 1.21.11, 26.1.2, 26.2, 26.3" src="https://img.shields.io/badge/Minecraft-1.20.1%20%7C%201.21.1%20%7C%201.21.11%20%7C%2026.1.2%20%7C%2026.2%20%7C%2026.3-62B47A"></a>
   <a href="https://neoforged.net"><img alt="NeoForge" src="https://img.shields.io/badge/Loader-NeoForge%20%7C%20Forge-F16436"></a>
   <img alt="Client-side" src="https://img.shields.io/badge/Client--side-any%20server-d98a3a">
   <a href="LICENSE"><img alt="License MIT" src="https://img.shields.io/badge/License-MIT-blue"></a>
@@ -130,7 +130,8 @@ Leaf litter is saved in `saves/<world>/rustling_leaves/` (singleplayer) or `rust
 
 ## Installation
 
-1. Install [NeoForge](https://neoforged.net) 21.1.144 or newer for Minecraft 1.21.1.
+1. Install [NeoForge](https://neoforged.net) 21.1.144 or newer for Minecraft 1.21.1 (or NeoForge for Minecraft
+   1.21.11, 26.1.2, 26.2 or 26.3; Forge 47 for 1.20.1) and pick the file for your Minecraft version.
 2. Put this mod into the `mods` folder of your client. The server does not need it; installed there as well, it
    shows every player's raking at the exact spot to the players nearby.
 
