@@ -63,6 +63,6 @@ publishMods {
     modLoaders.add('fabric')
 
     curseforge {
-        requires('fabric-api', 'forge-config-api-port-fabric')
+        curseforge_requires_fabric.split(',')*.trim().findAll().each { requires(it) }
     }
 }

@@ -153,10 +153,12 @@ Leaf litter is saved in `saves/<world>/rustling_leaves/` (singleplayer) or `rust
 Supported versions:
 
 - Minecraft 1.21.1 with [NeoForge](https://neoforged.net) - branch `main`.
-- Minecraft 1.20.1 with [Forge](https://files.minecraftforge.net) 47 - branch `1.20.1`.
+- Minecraft 1.20.1 with [Forge](https://files.minecraftforge.net) 47 or [Fabric](https://fabricmc.net) - branch `1.20.1`.
 
-1. Install [NeoForge](https://neoforged.net) for Minecraft 1.21.1 or [Forge](https://files.minecraftforge.net) for
-   Minecraft 1.20.1.
+1. Install [NeoForge](https://neoforged.net) for Minecraft 1.21.1, or [Forge](https://files.minecraftforge.net) or
+   [Fabric](https://fabricmc.net) for Minecraft 1.20.1. On Fabric the mod also needs
+   [Fabric API](https://www.curseforge.com/minecraft/mc-mods/fabric-api) and
+   [Forge Config API Port](https://www.curseforge.com/minecraft/mc-mods/forge-config-api-port-fabric).
 2. Put this mod into the `mods` folder of your client. The server does not need it; installed there as well, it
    shows every player's raking at the exact spot to the players nearby.
 
@@ -166,7 +168,7 @@ Supported versions:
 ./gradlew build
 ```
 
-The jar is written to `build/libs/`.
+The jars are written to `forge/build/libs/` and `fabric/build/libs/` (the shared code is in `common/`).
 
 ## Credits
 

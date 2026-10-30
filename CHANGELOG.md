@@ -4,6 +4,17 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.0+1.20.1-fabric] - Unreleased
+Rustling Leaves now runs on [Fabric](https://fabricmc.net) for Minecraft 1.20.1, with everything of 2.8.0+1.20.1 below.
+
+- Needs [Fabric API](https://www.curseforge.com/minecraft/mc-mods/fabric-api) and
+  [Forge Config API Port](https://www.curseforge.com/minecraft/mc-mods/forge-config-api-port-fabric) (the config file
+  is the same as on Forge: `config/rustling_leaves-client.toml`).
+- Works with [Sodium](https://modrinth.com/mod/sodium) and [Iris](https://modrinth.com/mod/iris) shader packs,
+  [Serene Seasons](https://www.curseforge.com/minecraft/mc-mods/serene-seasons) and
+  [Immersive Weathering](https://www.curseforge.com/minecraft/mc-mods/immersive-weathering).
+- Installed on a Fabric server as well, it shows every player's raking to the players nearby, as on Forge.
+
 ## [2.8.0+1.20.1] - 2026-10-29
 Brings the Minecraft 1.20.1 version up to Rustling Leaves 2.8.0 (also 2.6.0 and 2.7.0).
 
