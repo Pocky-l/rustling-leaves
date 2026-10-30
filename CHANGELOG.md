@@ -4,6 +4,27 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.0+26.3] - 2026-10-30
+The first version for Minecraft 26.3: everything of Rustling Leaves 2.8.0, plus what the newer Minecraft brings.
+
+### Added
+- Vanilla leaf litter becomes leaf litter of the mod: the same patches on the ground, but made of loose leaves that
+  react to wind, footsteps and blasts like every other pile. Breaking the litter scatters its leaves. Client option
+  `leaves.vanillaLeafLitter` keeps the vanilla look.
+- Pale oak leaves stay pale grey-green when the other trees turn gold and red in autumn.
+- The leaf counts moved to an entry of the new debug screen (`rustling_leaves:leaves`), shown with F3 as before.
+
+### Changed
+- Since Minecraft 1.21.5 every tree drops falling leaf particles of its own. They are replaced by the mod's leaves:
+  cherry petals one for one as before, the other trees keep the mod's own leaf fall and lose the flat particles, so
+  leaves never fall twice.
+
+### Compatibility on 26.3
+- [Serene Seasons](https://www.curseforge.com/minecraft/mc-mods/serene-seasons) and [Falling Leaves](https://www.curseforge.com/minecraft/mc-mods/falling-leaves-forge) (its 3.x versions) work as on 1.21.1.
+- The compatibility with [Immersive Weathering](https://www.curseforge.com/minecraft/mc-mods/immersive-weathering), [Realistic Waves](https://www.curseforge.com/minecraft/mc-mods/realistic-waves) and [Living Wind](https://www.curseforge.com/minecraft/mc-mods/living-wind) is missing: these mods have no NeoForge version for Minecraft 26.3.
+- The leaves draw on the new Vulkan renderer as well as on OpenGL, and with improved transparency on.
+- Leaves still cast no shadows in a shader pack's shadow map (as on 1.21.1); the mod's own pixel shadows stay.
+
 ## [2.8.0] - 2026-10-29
 ### Added
 - Leaf sounds of their own, cut from real field recordings: a dry crunch and swish when you walk through leaves,
