@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Rustling Leaves now runs on [Fabric](https://fabricmc.net) for Minecraft 1.20.1, with everything of 2.8.0+1.20.1 below.
 
 - Needs [Fabric API](https://www.curseforge.com/minecraft/mc-mods/fabric-api) and
-  [Forge Config API Port](https://www.curseforge.com/minecraft/mc-mods/forge-config-api-port-fabric) (the config file
+  [Forge Config API Port](https://www.curseforge.com/minecraft/mc-mods/forge-config-api-port) (the config file
   is the same as on Forge: `config/rustling_leaves-client.toml`).
 - Works with [Sodium](https://modrinth.com/mod/sodium) and [Iris](https://modrinth.com/mod/iris) shader packs,
   [Serene Seasons](https://www.curseforge.com/minecraft/mc-mods/serene-seasons) and

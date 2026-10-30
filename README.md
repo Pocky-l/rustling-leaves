@@ -158,7 +158,7 @@ Supported versions:
 1. Install [NeoForge](https://neoforged.net) for Minecraft 1.21.1, or [Forge](https://files.minecraftforge.net) or
    [Fabric](https://fabricmc.net) for Minecraft 1.20.1. On Fabric the mod also needs
    [Fabric API](https://www.curseforge.com/minecraft/mc-mods/fabric-api) and
-   [Forge Config API Port](https://www.curseforge.com/minecraft/mc-mods/forge-config-api-port-fabric).
+   [Forge Config API Port](https://www.curseforge.com/minecraft/mc-mods/forge-config-api-port).
 2. Put this mod into the `mods` folder of your client. The server does not need it; installed there as well, it
    shows every player's raking at the exact spot to the players nearby.
 
