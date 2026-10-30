@@ -3,10 +3,10 @@ package com.pockyl.rustling_leaves.client.compat;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.Mth;
-import net.minecraftforge.fml.ModList;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
+import com.pockyl.rustling_leaves.platform.Platform;
 import com.pockyl.rustling_leaves.sim.WindSource;
 
 import java.lang.invoke.MethodHandle;
@@ -40,7 +40,7 @@ public final class WeatherWind implements WindSource {
     @Nullable
     public static WeatherWind find() {
         for (String[] candidate : COURSES) {
-            if (!ModList.get().isLoaded(candidate[0])) {
+            if (!Platform.INSTANCE.isModLoaded(candidate[0])) {
                 continue;
             }
             try {

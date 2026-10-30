@@ -1,6 +1,7 @@
 package com.pockyl.rustling_leaves.client.compat;
 
-import net.minecraftforge.fml.ModList;
+
+import com.pockyl.rustling_leaves.platform.Platform;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
@@ -24,7 +25,7 @@ public final class ShaderPacks {
         MethodHandle inUse = null;
         MethodHandle pipeline = null;
         MethodHandle sunPath = null;
-        if (ModList.get().isLoaded("iris") || ModList.get().isLoaded("oculus")) {
+        if (Platform.INSTANCE.isModLoaded("iris") || Platform.INSTANCE.isModLoaded("oculus")) {
             MethodHandles.Lookup lookup = MethodHandles.publicLookup();
             try {
                 Class<?> api = Class.forName("net.irisshaders.iris.api.v0.IrisApi");

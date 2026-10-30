@@ -5,9 +5,9 @@ import com.mojang.logging.LogUtils;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraftforge.fml.ModList;
 import org.slf4j.Logger;
 
+import com.pockyl.rustling_leaves.platform.Platform;
 import com.pockyl.rustling_leaves.sim.LeafShape;
 
 import java.lang.invoke.MethodHandle;
@@ -61,7 +61,7 @@ public final class IrisBlocks {
         BlockTagger begin = null;
         MethodHandle end = null;
         MethodHandle blockIds = null;
-        if (ModList.get().isLoaded("iris") || ModList.get().isLoaded("oculus")) {
+        if (Platform.INSTANCE.isModLoaded("iris") || Platform.INSTANCE.isModLoaded("oculus")) {
             MethodHandles.Lookup lookup = MethodHandles.publicLookup();
             for (String[] names : INTERNALS) {
                 try {

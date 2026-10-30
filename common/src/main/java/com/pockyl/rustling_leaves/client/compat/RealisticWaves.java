@@ -6,10 +6,10 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
-import net.minecraftforge.fml.ModList;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
+import com.pockyl.rustling_leaves.platform.Platform;
 import com.pockyl.rustling_leaves.sim.WaterWaves;
 
 import java.lang.invoke.MethodHandle;
@@ -52,7 +52,7 @@ public final class RealisticWaves implements WaterWaves {
     /** The waves of the installed mod, or null when it is not installed or its code is not what this expects. */
     @Nullable
     public static RealisticWaves find() {
-        if (!ModList.get().isLoaded(MOD_ID)) {
+        if (!Platform.INSTANCE.isModLoaded(MOD_ID)) {
             return null;
         }
         try {

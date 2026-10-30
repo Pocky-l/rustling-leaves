@@ -30,6 +30,7 @@ import org.joml.Vector3f;
 import com.pockyl.rustling_leaves.RustlingLeaves;
 import com.pockyl.rustling_leaves.client.compat.IrisBlocks;
 import com.pockyl.rustling_leaves.client.compat.ShaderPacks;
+import com.pockyl.rustling_leaves.platform.ClientPlatform;
 import com.pockyl.rustling_leaves.sim.LeafPalette;
 import com.pockyl.rustling_leaves.sim.LeafPool;
 import com.pockyl.rustling_leaves.sim.LeafShape;
@@ -197,9 +198,12 @@ final class LeafRenderer implements AutoCloseable {
         }
     }
 
-    /** Subclass only to reach the render state shards, which are protected in this version. */
+    /**
+     * Subclass only to reach the render state shards, which are protected in this version; {@code RenderType.create}
+     * is private in vanilla, so the loader makes the types.
+     */
     private static final class LeafRenderType extends RenderType {
-        static final RenderType LEAVES = RenderType.create(RustlingLeaves.MOD_ID + "_leaves", DefaultVertexFormat.BLOCK,
+        static final RenderType LEAVES = ClientPlatform.INSTANCE.createRenderType(RustlingLeaves.MOD_ID + "_leaves", DefaultVertexFormat.BLOCK,
                 VertexFormat.Mode.QUADS, 1 << 16, false, false, RenderType.CompositeState.builder()
                         .setLightmapState(RenderStateShard.LIGHTMAP)
                         .setShaderState(RenderStateShard.RENDERTYPE_CUTOUT_MIPPED_SHADER)
@@ -211,7 +215,7 @@ final class LeafRenderer implements AutoCloseable {
          * the vanilla translucent terrain shader (Oculus swaps it for the pack's translucent program), the block atlas
          * WITHOUT mipmaps (the edges stay pixel-sharp at a distance), no depth writes and the decal polygon offset.
          */
-        static final RenderType SHADOWS = RenderType.create(RustlingLeaves.MOD_ID + "_leaf_shadows", DefaultVertexFormat.BLOCK,
+        static final RenderType SHADOWS = ClientPlatform.INSTANCE.createRenderType(RustlingLeaves.MOD_ID + "_leaf_shadows", DefaultVertexFormat.BLOCK,
                 VertexFormat.Mode.QUADS, 1 << 16, false, false, RenderType.CompositeState.builder()
                         .setLightmapState(RenderStateShard.LIGHTMAP)
                         .setShaderState(RenderStateShard.RENDERTYPE_TRANSLUCENT_SHADER)

@@ -2,27 +2,19 @@ package com.pockyl.rustling_leaves.client.compat;
 
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.renderer.block.BlockModelShaper;
-import net.minecraft.client.renderer.block.model.BakedQuad;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.resources.model.BakedModel;
-import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
-import net.minecraftforge.client.event.ModelEvent;
-import net.minecraftforge.client.model.BakedModelWrapper;
-import net.minecraftforge.client.model.data.ModelData;
-import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 import com.pockyl.rustling_leaves.sim.PileBlocks;
 
+import java.util.HashSet;
 import java.util.IdentityHashMap;
-import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Leaf piles of <a href="https://www.curseforge.com/minecraft/mc-mods/immersive-weathering">Immersive Weathering</a>: the litter draws
@@ -79,20 +71,21 @@ public final class ImmersiveWeathering implements PileBlocks {
         hidden = hide;
     }
 
-    /** Wraps the model of every pile state on the ground, so it can be hidden without reloading resources. */
-    public static void wrapModels(ModelEvent.ModifyBakingResult event) {
-        Map<ResourceLocation, BakedModel> models = event.getModels();
+    /**
+     * The model locations of every pile state on the ground. The loaders wrap these models into ones that draw nothing
+     * while {@link #hidden()}, so the piles can be hidden without reloading resources.
+     */
+    public static Set<ResourceLocation> pileModels() {
         ImmersiveWeathering piles = piles();
-        int wrapped = 0;
+        Set<ResourceLocation> models = new HashSet<>();
         for (Block block : piles.piles.keySet()) {
             for (BlockState state : block.getStateDefinition().getPossibleStates()) {
-                if (piles.layers(state) > 0
-                        && models.computeIfPresent(BlockModelShaper.stateToModelLocation(state), (location, model) -> new HiddenModel(model)) != null) {
-                    wrapped++;
+                if (piles.layers(state) > 0) {
+                    models.add(BlockModelShaper.stateToModelLocation(state));
                 }
             }
         }
-        LOGGER.info("Wrapped {} Immersive Weathering leaf pile models", wrapped);
+        return models;
     }
 
     private static boolean isPile(Class<?> type) {
@@ -102,23 +95,5 @@ public final class ImmersiveWeathering implements PileBlocks {
             }
         }
         return false;
-    }
-
-    /** A pile model that draws nothing while the litter stands in for the pile (breaking particles still work). */
-    private static final class HiddenModel extends BakedModelWrapper<BakedModel> {
-        HiddenModel(BakedModel original) {
-            super(original);
-        }
-
-        @Override
-        public List<BakedQuad> getQuads(@Nullable BlockState state, @Nullable Direction side, RandomSource rand) {
-            return hidden ? List.of() : super.getQuads(state, side, rand);
-        }
-
-        @Override
-        public List<BakedQuad> getQuads(@Nullable BlockState state, @Nullable Direction side, RandomSource rand, ModelData data,
-                @Nullable RenderType renderType) {
-            return hidden ? List.of() : super.getQuads(state, side, rand, data, renderType);
-        }
     }
 }

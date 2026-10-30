@@ -9,6 +9,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.ServerData;
+import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.protocol.game.ClientboundExplodePacket;
@@ -31,14 +32,7 @@ import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.CustomizeGuiOverlayEvent;
-import net.minecraftforge.client.event.InputEvent;
-import net.minecraftforge.client.event.RenderLevelStageEvent;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.ModList;
-import net.minecraftforge.fml.common.Mod;
+import org.joml.Matrix4f;
 
 import com.pockyl.rustling_leaves.Config;
 import com.pockyl.rustling_leaves.RustlingLeaves;
@@ -48,8 +42,9 @@ import com.pockyl.rustling_leaves.client.compat.RealisticWaves;
 import com.pockyl.rustling_leaves.client.compat.SereneSeasons;
 import com.pockyl.rustling_leaves.client.compat.WeatherWind;
 import com.pockyl.rustling_leaves.client.compat.ShaderPacks;
-import com.pockyl.rustling_leaves.network.ModNetwork;
 import com.pockyl.rustling_leaves.network.RakePayload;
+import com.pockyl.rustling_leaves.platform.ClientPlatform;
+import com.pockyl.rustling_leaves.platform.Platform;
 import com.pockyl.rustling_leaves.sim.LeafListener;
 import com.pockyl.rustling_leaves.sim.LeafPool;
 import com.pockyl.rustling_leaves.sim.LeafSettings;
@@ -73,7 +68,6 @@ import java.util.List;
  * loaded, saved and seeded, feeds the simulation entities, explosions, block changes and rake strokes, spawns leaves
  * from trees and renders everything.
  */
-@Mod.EventBusSubscriber(modid = RustlingLeaves.MOD_ID, value = Dist.CLIENT)
 public final class LeafManager {
     private static final int MAX_BURSTS_PER_TICK = 24;
     private static final int MAX_SOUNDS_PER_TICK = 3;
@@ -98,9 +92,9 @@ public final class LeafManager {
      * trees around the camera keep it covered with falling leaves anyway.
      */
     private static final long REFRESH_TICKS = 24000L;
-    private static final boolean SERENE_SEASONS = ModList.get().isLoaded(SereneSeasons.MOD_ID);
+    private static final boolean SERENE_SEASONS = Platform.INSTANCE.isModLoaded(SereneSeasons.MOD_ID);
     /** Looked up on use: this class loads with the config, before the pile blocks are registered. */
-    private static final PileBlocks PILES = ModList.get().isLoaded(ImmersiveWeathering.MOD_ID)
+    private static final PileBlocks PILES = Platform.INSTANCE.isModLoaded(ImmersiveWeathering.MOD_ID)
             ? state -> ImmersiveWeathering.piles().layers(state)
             : PileBlocks.NONE;
 
@@ -152,16 +146,13 @@ public final class LeafManager {
         return simulation;
     }
 
-    /** Called from the config event, possibly on another thread; applied on the next client tick. */
-    static void onConfigChanged() {
+    /** Called when the config loads or changes, possibly on another thread; applied on the next client tick. */
+    public static void onConfigChanged() {
         configChanged = true;
     }
 
-    @SubscribeEvent
-    public static void onClientTick(TickEvent.ClientTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) {
-            return;
-        }
+    /** Called by the loaders at the end of every client tick. */
+    public static void onClientTick() {
         Minecraft minecraft = Minecraft.getInstance();
         if (configChanged) {
             configChanged = false;
@@ -220,56 +211,55 @@ public final class LeafManager {
         }
     }
 
-    @SubscribeEvent
-    public static void onRenderLevel(RenderLevelStageEvent event) {
-        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_CUTOUT_BLOCKS || renderer == null) {
-            return;
+    /**
+     * Called by the loaders right after the solid and cutout terrain is drawn. {@code modelView} is the pose of the
+     * level pose stack: it holds the camera rotation and is the model-view matrix the terrain is drawn with.
+     */
+    public static void onRenderLevel(Camera camera, Frustum frustum, Matrix4f modelView, Matrix4f projection, float partialTick) {
+        if (renderer != null) {
+            renderer.render(camera, frustum, modelView, projection, partialTick);
         }
-        // The level pose stack holds the camera rotation: it is the model-view matrix the terrain is drawn with.
-        renderer.render(event.getCamera(), event.getFrustum(), event.getPoseStack().last().pose(), event.getProjectionMatrix(),
-                event.getPartialTick());
     }
 
-    @SubscribeEvent
-    public static void onDebugText(CustomizeGuiOverlayEvent.DebugText event) {
+    /** Adds the leaf counts to the right side of the debug screen (F3). */
+    public static void onDebugText(List<String> right) {
         if (simulation == null || !Minecraft.getInstance().options.renderDebug) {
             return;
         }
         LeafPool pool = simulation.pool();
-        event.getRight().add("");
-        event.getRight().add(String.format("Rustling Leaves: %d/%d moving, %d lying", pool.count(), pool.capacity, simulation.field().total()));
-        event.getRight().add(String.format("Litter: %d chunks, %d quads drawn, %d whirlwinds", simulation.field().chunks().size(),
+        right.add("");
+        right.add(String.format("Rustling Leaves: %d/%d moving, %d lying", pool.count(), pool.capacity, simulation.field().total()));
+        right.add(String.format("Litter: %d chunks, %d quads drawn, %d whirlwinds", simulation.field().chunks().size(),
                 renderer.tileQuads(), simulation.wind().whirlwinds().size()));
     }
 
     /**
      * Sneak + right click with a hoe or shovel on leaf litter rakes it together instead of tilling or making a path;
-     * without sneaking the tool works as in vanilla.
+     * without sneaking the tool works as in vanilla. Called by the loaders when the use key is about to use the item in
+     * {@code hand}; true means the stroke took its place: the loader cancels the use and swings the hand.
      */
-    @SubscribeEvent
-    public static void onUseKey(InputEvent.InteractionKeyMappingTriggered event) {
+    public static boolean onUseKey(InteractionHand hand) {
         Minecraft minecraft = Minecraft.getInstance();
-        if (!event.isUseItem() || event.getHand() != InteractionHand.MAIN_HAND || simulation == null || minecraft.player == null) {
-            return;
+        if (hand != InteractionHand.MAIN_HAND || simulation == null || minecraft.player == null) {
+            return false;
         }
         ItemStack stack = minecraft.player.getMainHandItem();
         if (!SETTINGS.raking || !(minecraft.hitResult instanceof BlockHitResult hit) || hit.getType() != HitResult.Type.BLOCK) {
-            return;
+            return false;
         }
         if (!minecraft.player.isShiftKeyDown() || !stack.is(ItemTags.HOES) && !stack.is(ItemTags.SHOVELS)) {
-            return;
+            return false;
         }
         Vec3 at = hit.getLocation();
-        if (rakeAt(at)) {
-            event.setCanceled(true);
-            // The swing reaches the other players through vanilla; clients without the server channel guess the
-            // stroke from it (rakeByOtherPlayers), with the channel the exact point follows.
-            event.setSwingHand(true);
-            ClientPacketListener connection = minecraft.getConnection();
-            if (connection != null && ModNetwork.present(connection.getConnection())) {
-                ModNetwork.sendToServer(new RakePayload(at.x, at.y, at.z));
-            }
+        if (!rakeAt(at)) {
+            return false;
         }
+        // The swing reaches the other players through vanilla; clients without the server channel guess the stroke
+        // from it (rakeByOtherPlayers), with the channel the exact point follows.
+        if (minecraft.getConnection() != null && ClientPlatform.INSTANCE.serverHasRake()) {
+            ClientPlatform.INSTANCE.sendRakeToServer(new RakePayload(at.x, at.y, at.z));
+        }
+        return true;
     }
 
     /** A player nearby raked at a point (relayed by a server with the mod): the same stroke in our own litter. */
@@ -307,7 +297,7 @@ public final class LeafManager {
      */
     private static void rakeByOtherPlayers(Minecraft minecraft) {
         ClientPacketListener connection = minecraft.getConnection();
-        if (!SETTINGS.raking || connection == null || ModNetwork.present(connection.getConnection())) {
+        if (!SETTINGS.raking || connection == null || ClientPlatform.INSTANCE.serverHasRake()) {
             LAST_SWING.clear();
             return;
         }
@@ -329,7 +319,7 @@ public final class LeafManager {
             if (!player.isShiftKeyDown() || !stack.is(ItemTags.HOES) && !stack.is(ItemTags.SHOVELS)) {
                 continue;
             }
-            if (player.pick(player.getBlockReach(), 1.0F, false) instanceof BlockHitResult hit
+            if (player.pick(Platform.INSTANCE.blockReach(player), 1.0F, false) instanceof BlockHitResult hit
                     && hit.getType() == HitResult.Type.BLOCK) {
                 rakeAt(hit.getLocation());
             }
@@ -364,7 +354,7 @@ public final class LeafManager {
 
     /** The waves of Realistic Waves, if installed and wanted. */
     private static WaterWaves modWaves() {
-        if (!SETTINGS.rideWaves || !ModList.get().isLoaded(RealisticWaves.MOD_ID)) {
+        if (!SETTINGS.rideWaves || !Platform.INSTANCE.isModLoaded(RealisticWaves.MOD_ID)) {
             return WaterWaves.NONE;
         }
         if (!wavesLookedUp) {
@@ -385,7 +375,7 @@ public final class LeafManager {
         }
         if (!windLookedUp) {
             windLookedUp = true;
-            livingWind = ModList.get().isLoaded(LivingWind.MOD_ID) ? LivingWind.find() : null;
+            livingWind = Platform.INSTANCE.isModLoaded(LivingWind.MOD_ID) ? LivingWind.find() : null;
             weatherWind = WeatherWind.find();
         }
         WindSource world = livingWind != null ? livingWind : WindSource.NONE;

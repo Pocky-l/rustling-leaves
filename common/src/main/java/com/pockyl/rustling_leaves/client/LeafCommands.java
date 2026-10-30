@@ -1,45 +1,46 @@
 package com.pockyl.rustling_leaves.client;
 
 import com.mojang.brigadier.arguments.DoubleArgumentType;
-import net.minecraft.commands.Commands;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import net.minecraft.network.chat.Component;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.client.event.RegisterClientCommandsEvent;
 
 import com.pockyl.rustling_leaves.Config;
-import com.pockyl.rustling_leaves.RustlingLeaves;
 
 import java.util.Locale;
+import java.util.function.BiConsumer;
 
 /**
  * Client commands (work on any server, nothing is sent to it): {@code /rustlingleaves fallrate [value]} shows or sets
  * how many leaves fall from the trees (option {@code leaves.fallRate}, saved to the config file).
  */
-@Mod.EventBusSubscriber(modid = RustlingLeaves.MOD_ID, value = Dist.CLIENT)
 public final class LeafCommands {
     private LeafCommands() {
     }
 
-    @SubscribeEvent
-    public static void register(RegisterClientCommandsEvent event) {
-        event.getDispatcher().register(Commands.literal("rustlingleaves")
-                .then(Commands.literal("fallrate")
+    /**
+     * The command tree for the loader's client command source {@code S}.
+     *
+     * @param feedback shows a message to the player
+     */
+    public static <S> LiteralArgumentBuilder<S> command(BiConsumer<S, Component> feedback) {
+        return LiteralArgumentBuilder.<S>literal("rustlingleaves")
+                .then(LiteralArgumentBuilder.<S>literal("fallrate")
                         .executes(context -> {
-                            context.getSource().sendSuccess(() -> Component.translatable("commands.rustling_leaves.fallrate.get",
-                                    format(Config.fallRate())), false);
+                            feedback.accept(context.getSource(), Component.translatable("commands.rustling_leaves.fallrate.get",
+                                    format(Config.fallRate())));
                             return 1;
                         })
-                        .then(Commands.argument("value", DoubleArgumentType.doubleArg(Config.MIN_FALL_RATE, Config.MAX_FALL_RATE))
+                        .then(RequiredArgumentBuilder.<S, Double>argument("value",
+                                        DoubleArgumentType.doubleArg(Config.MIN_FALL_RATE, Config.MAX_FALL_RATE))
                                 .executes(context -> {
                                     double value = DoubleArgumentType.getDouble(context, "value");
                                     Config.setFallRate(value);
                                     LeafManager.onConfigChanged();
-                                    context.getSource().sendSuccess(() -> Component.translatable(
-                                            "commands.rustling_leaves.fallrate.set", format(value)), false);
+                                    feedback.accept(context.getSource(), Component.translatable(
+                                            "commands.rustling_leaves.fallrate.set", format(value)));
                                     return 1;
-                                }))));
+                                })));
     }
 
     private static String format(double value) {

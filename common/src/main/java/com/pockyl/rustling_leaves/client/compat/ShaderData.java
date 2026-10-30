@@ -10,8 +10,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.world.level.biome.Biome;
-import net.minecraftforge.fml.ModList;
-import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
 import org.lwjgl.opengl.GL15;
@@ -19,6 +17,8 @@ import org.lwjgl.opengl.GL21;
 import org.lwjgl.opengl.GL30;
 import org.lwjgl.system.MemoryUtil;
 import org.slf4j.Logger;
+
+import com.pockyl.rustling_leaves.platform.Platform;
 
 import java.nio.FloatBuffer;
 import java.util.Arrays;
@@ -79,9 +79,7 @@ public final class ShaderData {
     }
 
     private static boolean publishes(String modId) {
-        return ModList.get().getModContainerById(modId)
-                .map(container -> container.getModInfo().getVersion().compareTo(new DefaultArtifactVersion(FIRST_VERSION.get(modId))) >= 0)
-                .orElse(false);
+        return Platform.INSTANCE.isModLoaded(modId, FIRST_VERSION.get(modId));
     }
 
     /**
@@ -90,7 +88,7 @@ public final class ShaderData {
      */
     public boolean begin(boolean packInUse) {
         Minecraft minecraft = Minecraft.getInstance();
-        if (broken || !(ModList.get().isLoaded("iris") || ModList.get().isLoaded("oculus"))) {
+        if (broken || !(Platform.INSTANCE.isModLoaded("iris") || Platform.INSTANCE.isModLoaded("oculus"))) {
             return false;
         }
         try {

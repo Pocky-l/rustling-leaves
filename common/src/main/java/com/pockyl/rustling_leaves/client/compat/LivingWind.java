@@ -2,10 +2,10 @@ package com.pockyl.rustling_leaves.client.compat;
 
 import com.mojang.logging.LogUtils;
 import net.minecraft.util.Mth;
-import net.minecraftforge.fml.ModList;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
+import com.pockyl.rustling_leaves.platform.Platform;
 import com.pockyl.rustling_leaves.sim.WindSource;
 
 import java.lang.invoke.MethodHandle;
@@ -43,7 +43,7 @@ public final class LivingWind implements WindSource {
     /** The wind of the installed mod, or null when it is not installed or its code is not what this expects. */
     @Nullable
     public static LivingWind find() {
-        if (!ModList.get().isLoaded(MOD_ID)) {
+        if (!Platform.INSTANCE.isModLoaded(MOD_ID)) {
             return null;
         }
         try {

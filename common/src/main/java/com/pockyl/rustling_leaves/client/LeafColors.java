@@ -6,8 +6,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraftforge.client.model.data.ModelData;
 
+import com.pockyl.rustling_leaves.platform.ClientPlatform;
 import com.pockyl.rustling_leaves.sim.LeafPalette;
 
 import java.util.IdentityHashMap;
@@ -33,7 +33,8 @@ final class LeafColors {
     private int textureAverage(BlockState state) {
         return textureAverage.computeIfAbsent(state.getBlock(), block -> {
             try {
-                TextureAtlasSprite sprite = Minecraft.getInstance().getBlockRenderer().getBlockModel(state).getParticleIcon(ModelData.EMPTY);
+                TextureAtlasSprite sprite = ClientPlatform.INSTANCE.particleIcon(
+                        Minecraft.getInstance().getBlockRenderer().getBlockModel(state));
                 int width = sprite.contents().width();
                 int height = sprite.contents().height();
                 long r = 0;
@@ -42,7 +43,7 @@ final class LeafColors {
                 int n = 0;
                 for (int x = 0; x < width; x++) {
                     for (int y = 0; y < height; y++) {
-                        int abgr = sprite.getPixelRGBA(0, x, y);
+                        int abgr = ClientPlatform.INSTANCE.pixelRGBA(sprite, x, y);
                         if ((abgr >>> 24) > 127) {
                             r += abgr & 0xFF;
                             g += abgr >> 8 & 0xFF;
