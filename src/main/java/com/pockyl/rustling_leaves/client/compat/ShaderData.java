@@ -22,7 +22,7 @@ import java.util.Map;
  * texel 3 on. Layout and the wind shares: docs/shader-data.md of Pocky Shaders.
  * <p>
  * The same class lives in Petrichor, Hoarfrost and Rustling Leaves (only the package differs): the wind shares must be
- * computed by all of them in exactly the same way. Rustling Leaves keeps the texture's GL calls in its render backend
+ * computed by all of them in exactly the same way. Rustling Leaves keeps the texture's GPU calls in its render backend
  * ({@link DataTexture}, the part of the mod that differs between Minecraft versions) instead of a nested class; the
  * texture and the behaviour of this class are the same as in the other two.
  */
