@@ -14,20 +14,18 @@ import java.lang.invoke.MethodType;
  * Iris is not needed to build or run the mod.
  * <p>
  * The leaves are drawn with render pipelines made from vanilla's block pipelines; Iris draws a pipeline with the
- * pack's program it was told about ({@link #assignProgram}, {@link #assignShadowProgram}). What else changes with a pack
- * is the vertex layout of the meshes (see {@code LeafRenderer}).
+ * pack's program it was told about ({@link #assignProgram}). What else changes with a pack is the vertex layout of the
+ * meshes (see {@code LeafRenderer}).
  */
 public final class ShaderPacks {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final MethodHandle ASSIGN_PIPELINE;
-    private static final MethodHandle ASSIGN_SHADOW_PIPELINE;
     private static final MethodHandle IN_USE;
     private static final MethodHandle SUN_PATH_ROTATION;
     private static boolean sunPathBroken;
 
     static {
         MethodHandle assign = null;
-        MethodHandle assignShadow = null;
         MethodHandle inUse = null;
         MethodHandle sunPath = null;
         if (ModList.get().isLoaded("iris")) {
@@ -52,18 +50,9 @@ public final class ShaderPacks {
                 } catch (ReflectiveOperationException | LinkageError | RuntimeException e) {
                     LOGGER.warn("Iris' API has no programs for other mods' pipelines; shader packs may draw the leaves oddly", e);
                 }
-                try {
-                    assignShadow = lookup.findVirtual(type, "assignPipelineShadow", MethodType.methodType(void.class,
-                                    RenderPipeline.class, Class.forName("net.irisshaders.iris.api.v0.IrisShadowProgram")))
-                            .bindTo(api).asType(MethodType.methodType(void.class, RenderPipeline.class, Object.class));
-                } catch (ReflectiveOperationException | LinkageError | RuntimeException e) {
-                    // Older Iris: the leaves are never drawn into the shadow map anyway.
-                    assignShadow = null;
-                }
             }
         }
         ASSIGN_PIPELINE = assign;
-        ASSIGN_SHADOW_PIPELINE = assignShadow;
         IN_USE = inUse;
         SUN_PATH_ROTATION = sunPath;
     }
@@ -78,25 +67,13 @@ public final class ShaderPacks {
      * left as it is.
      */
     public static void assignProgram(RenderPipeline pipeline, String program) {
-        assign(ASSIGN_PIPELINE, "net.irisshaders.iris.api.v0.IrisProgram", pipeline, program);
-    }
-
-    /**
-     * Tells Iris which program draws {@code pipeline} into the pack's shadow map ({@code IrisShadowProgram} constant
-     * name), should it ever be drawn there; like {@link #assignProgram}.
-     */
-    public static void assignShadowProgram(RenderPipeline pipeline, String program) {
-        assign(ASSIGN_SHADOW_PIPELINE, "net.irisshaders.iris.api.v0.IrisShadowProgram", pipeline, program);
-    }
-
-    private static void assign(MethodHandle assign, String programClass, RenderPipeline pipeline, String program) {
-        if (assign == null) {
+        if (ASSIGN_PIPELINE == null) {
             return;
         }
         try {
             @SuppressWarnings({"unchecked", "rawtypes"})
-            Object constant = Enum.valueOf((Class<Enum>) Class.forName(programClass), program);
-            assign.invokeExact(pipeline, constant);
+            Object constant = Enum.valueOf((Class<Enum>) Class.forName("net.irisshaders.iris.api.v0.IrisProgram"), program);
+            ASSIGN_PIPELINE.invokeExact(pipeline, constant);
         } catch (IllegalStateException e) {
             // Already assigned (copied from the vanilla pipeline it was made from).
         } catch (Throwable e) {
