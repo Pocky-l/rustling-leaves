@@ -32,15 +32,15 @@ final class LeafPipelines {
             .withCull(false)
             .build();
     /**
-     * Pixel shadows: the block shader with translucent blending, keeping everything above 1% alpha like vanilla's
-     * translucent terrain (the faintest shadows are 3%; vanilla's translucent block pipeline cuts out below 10%), no
+     * Pixel shadows: the block shader with translucent blending and no alpha cutout (the faintest shadows are 3%;
+     * vanilla's translucent block pipeline cuts out below 10%, and with blending and no depth writes a cutout changes
+     * nothing; without one Iris also picks the pack's translucent terrain program, not its Sodium chunk program), no
      * depth writes and the decal depth bias, so they neither hide what is behind them nor flicker against the ground.
      * Since 26.2 the depth buffer is reversed (near is 1): the test is "greater or equal" and the bias pulls towards
      * the camera with positive values, like vanilla's crumbling decal.
      */
     static final RenderPipeline SHADOWS = RenderPipeline.builder(RenderPipelines.BLOCK_SNIPPET)
             .withLocation(Identifier.fromNamespaceAndPath(RustlingLeaves.MOD_ID, "pipeline/leaf_shadows"))
-            .withShaderDefine("ALPHA_CUTOUT", 0.01F)
             .withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT))
             .withDepthStencilState(new DepthStencilState(CompareOp.GREATER_THAN_OR_EQUAL, false, 1.0F, 10.0F))
             .withCull(false)
