@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://www.curseforge.com/minecraft/mc-mods/rustling-leaves"><img alt="CurseForge downloads" src="https://img.shields.io/curseforge/dt/1729578?logo=curseforge&label=CurseForge&color=F16436"></a>
   <a href="https://www.curseforge.com/minecraft/mc-mods/rustling-leaves/files"><img alt="Minecraft 1.20.1, 1.21.1, 1.21.11, 26.1.2, 26.2, 26.3" src="https://img.shields.io/badge/Minecraft-1.20.1%20%7C%201.21.1%20%7C%201.21.11%20%7C%2026.1.2%20%7C%2026.2%20%7C%2026.3-62B47A"></a>
-  <a href="https://neoforged.net"><img alt="NeoForge" src="https://img.shields.io/badge/Loader-NeoForge%20%7C%20Forge-F16436"></a>
+  <a href="https://neoforged.net"><img alt="NeoForge, Forge or Fabric" src="https://img.shields.io/badge/Loader-NeoForge%20%7C%20Forge%20%7C%20Fabric-F16436"></a>
   <img alt="Client-side" src="https://img.shields.io/badge/Client--side-any%20server-d98a3a">
   <a href="LICENSE"><img alt="License MIT" src="https://img.shields.io/badge/License-MIT-blue"></a>
 </p>
@@ -120,7 +120,7 @@ Leaf litter is saved in `saves/<world>/rustling_leaves/` (singleplayer) or `rust
 
 [![Realistic Waves](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/compat/realistic-waves.png)](https://www.curseforge.com/minecraft/mc-mods/realistic-waves) ✅ **[Realistic Waves](https://www.curseforge.com/minecraft/mc-mods/realistic-waves)** (optional) - leaves floating on the sea ride its swell and surf, rising, sinking and tilting with every wave.
 
-[![Falling Leaves](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/compat/falling-leaves.png)](https://www.curseforge.com/minecraft/mc-mods/falling-leaves-forge) ✅ **[Falling Leaves](https://www.curseforge.com/minecraft/mc-mods/falling-leaves-forge)** - Rustling Leaves takes over its falling leaves, so trees do not shed twice (its snow from snowy leaves stays; a config option keeps both).
+[![Falling Leaves](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/compat/falling-leaves.png)](https://www.curseforge.com/minecraft/mc-mods/falling-leaves-forge) ✅ **[Falling Leaves](https://www.curseforge.com/minecraft/mc-mods/falling-leaves-forge)** (NeoForge and Forge) - Rustling Leaves takes over its falling leaves, so trees do not shed twice (its snow from snowy leaves stays; a config option keeps both).
 
 [![Living Wind](https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/compat/living-wind.png)](https://www.curseforge.com/minecraft/mc-mods/living-wind) ✅ **[Living Wind](https://www.curseforge.com/minecraft/mc-mods/living-wind)** (optional) - leaves blow with its wind: the way its wind vanes point and as hard as it blows, calm on a clear day, wild in a storm. Rustling Leaves takes over the leaves it blows out of the crowns (its grass and dust stay).
 
@@ -131,7 +131,9 @@ Leaf litter is saved in `saves/<world>/rustling_leaves/` (singleplayer) or `rust
 ## Installation
 
 1. Install [NeoForge](https://neoforged.net) 21.1.144 or newer for Minecraft 1.21.1 (or NeoForge for Minecraft
-   1.21.11, 26.1.2, 26.2 or 26.3; Forge 47 for 1.20.1) and pick the file for your Minecraft version.
+   1.21.11, 26.1.2, 26.2 or 26.3; Forge 47 or [Fabric](https://fabricmc.net) for 1.20.1) and pick the file for your
+   Minecraft version and loader. On Fabric the mod also needs [Fabric API](https://www.curseforge.com/minecraft/mc-mods/fabric-api)
+   and [Forge Config API Port](https://www.curseforge.com/minecraft/mc-mods/forge-config-api-port).
 2. Put this mod into the `mods` folder of your client. The server does not need it; installed there as well, it
    shows every player's raking at the exact spot to the players nearby.
 
