@@ -149,11 +149,11 @@ static String extractChangelog(String changelog, String version) {
     return body ?: null
 }
 
-// Versions of ports are tagged with their Minecraft version in the changelog, e.g. 2.8.0+26.3.
-def releaseVersion = "${mod_version}+${minecraft_version}"
-def releaseNotes = extractChangelog(
-        providers.fileContents(layout.projectDirectory.file('CHANGELOG.md')).asText.getOrElse(''),
-        releaseVersion)
+// Versions of ports are tagged with their Minecraft version in the changelog, e.g. 2.8.0+26.3; the plain version
+// is the fallback.
+def releaseVersion = "${mod_version}+${minecraft_version}".toString()
+def changelogText = providers.fileContents(layout.projectDirectory.file('CHANGELOG.md')).asText.getOrElse('')
+def releaseNotes = extractChangelog(changelogText, releaseVersion) ?: extractChangelog(changelogText, mod_version)
 def curseforgeToken = providers.gradleProperty('curseforge_token')
         .orElse(providers.environmentVariable('CURSEFORGE_TOKEN'))
 
