@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.pockyl.rustling_leaves.fabric.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "DebugScreenOverlayMixin",
+    "MinecraftMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
