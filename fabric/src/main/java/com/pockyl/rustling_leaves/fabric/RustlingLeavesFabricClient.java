@@ -17,12 +17,11 @@ import com.pockyl.rustling_leaves.Config;
 import com.pockyl.rustling_leaves.RustlingLeaves;
 import com.pockyl.rustling_leaves.client.LeafCommands;
 import com.pockyl.rustling_leaves.client.LeafManager;
-import com.pockyl.rustling_leaves.client.compat.PackWeather;
 import com.pockyl.rustling_leaves.client.render.backend.LevelRenderHook;
 
 /**
- * Hooks the client part into Fabric. The use key, the debug screen entry and the compiling of the render pipelines
- * have no Fabric events: see the mixins in {@code fabric.mixin}. The config runs on Forge Config API Port: the same
+ * Hooks the client part into Fabric. The use key, the start of a frame, the debug screen entry and the compiling of
+ * the render pipelines have no Fabric events: see the mixins in {@code fabric.mixin}. The config runs on Forge Config API Port: the same
  * file and, with Mod Menu, the same config screen as on NeoForge.
  */
 public final class RustlingLeavesFabricClient implements ClientModInitializer {
@@ -40,11 +39,8 @@ public final class RustlingLeavesFabricClient implements ClientModInitializer {
         FabricPipelines.register();
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> LeafManager.onClientTick());
-        // Once per frame, before the level is drawn (NeoForge: the start of the frame, then the extraction).
         WorldRenderEvents.END_EXTRACTION.register(context -> {
-            float partialTick = context.tickCounter().getGameTimeDeltaPartialTick(false);
-            PackWeather.onFrameStart(partialTick);
-            LevelRenderHook.extract(context.camera(), context.frustum(), partialTick);
+            LevelRenderHook.extract(context.camera(), context.frustum(), context.tickCounter().getGameTimeDeltaPartialTick(false));
             MODEL_VIEW.set(context.viewMatrix());
         });
         // Right after the opaque and cutout terrain, like NeoForge's AfterOpaqueBlocks.
