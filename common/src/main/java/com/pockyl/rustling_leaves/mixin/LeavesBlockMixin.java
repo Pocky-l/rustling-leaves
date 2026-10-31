@@ -16,9 +16,11 @@ import com.pockyl.rustling_leaves.client.LeafManager;
  * ignore everything. Each cherry petal becomes a simulated petal at the same spot instead, so cherry trees shed as often
  * as in vanilla (times the fall rate and the season); the other leaves are left out, the simulation drops those itself.
  * Wrapped where all leaves blocks decide to drop one, so modded leaves that extend {@link LeavesBlock} follow too. Only
- * applied on the client, where animateTick runs. There is no event for block particles, hence the mixin.
+ * applied on the client, where animateTick runs. There is no event for block particles, hence the mixin. Falling Leaves
+ * on Fabric wraps the same call; the higher priority makes this the outer wrapper, so it decides first and Falling
+ * Leaves only runs while the simulation lets the vanilla particle through.
  */
-@Mixin(LeavesBlock.class)
+@Mixin(value = LeavesBlock.class, priority = 1100)
 abstract class LeavesBlockMixin {
     @WrapOperation(method = "makeFallingLeavesParticles", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/block/LeavesBlock;"
             + "spawnFallingLeavesParticle(Lnet/minecraft/world/level/Level;Lnet/minecraft/core/BlockPos;Lnet/minecraft/util/RandomSource;)V"))
