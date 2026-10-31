@@ -4,6 +4,19 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.1+26.1.2-fabric] - 2026-10-31
+Rustling Leaves now runs on [Fabric](https://fabricmc.net) for Minecraft 26.1.2, with everything of 2.8.1+26.1.2 below.
+
+- Needs [Fabric API](https://www.curseforge.com/minecraft/mc-mods/fabric-api) and
+  [Forge Config API Port](https://www.curseforge.com/minecraft/mc-mods/forge-config-api-port) (the config file
+  is the same as on NeoForge: `config/rustling_leaves-client.toml`). With [Mod Menu](https://modrinth.com/mod/modmenu)
+  the options can also be changed in game, on the same config screen as on NeoForge.
+- Works with [Sodium](https://modrinth.com/mod/sodium) and [Iris](https://modrinth.com/mod/iris) shader packs and
+  [Falling Leaves](https://modrinth.com/mod/fallingleaves) (its leaves are left out while this mod drops them; cherry
+  petals still turn into the mod's petals). The [Serene Seasons](https://www.curseforge.com/minecraft/mc-mods/serene-seasons)
+  compatibility is in place as on NeoForge.
+- Installed on a Fabric server as well, it shows every player's raking to the players nearby, as on NeoForge.
+
 ## [2.8.1+26.1.2] - 2026-10-31
 ### Fixed
 - Leaves of trees whose texture carries their colour had red and blue swapped: falling cherry leaves were lilac

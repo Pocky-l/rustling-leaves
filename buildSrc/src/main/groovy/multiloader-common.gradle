@@ -27,6 +27,15 @@ repositories {
     exclusiveContent {
         forRepository {
             maven {
+                name = 'Fabric'
+                url = 'https://maven.fabricmc.net/'
+            }
+        }
+        filter { includeGroupAndSubgroups('net.fabricmc') }
+    }
+    exclusiveContent {
+        forRepository {
+            maven {
                 name = 'Fuzs'
                 url = 'https://raw.githubusercontent.com/Fuzss/modresources/main/maven/'
             }
