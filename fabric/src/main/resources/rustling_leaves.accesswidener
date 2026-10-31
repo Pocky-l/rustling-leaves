@@ -1,0 +1,6 @@
+accessWidener v2 named
+# What NeoForge opens itself: the block snippet of the leaf pipelines, the sprite image for the leaf colors and the
+# registry of debug screen entries (the last two Fabric API opens too).
+accessible field net/minecraft/client/renderer/RenderPipelines BLOCK_SNIPPET Lcom/mojang/blaze3d/pipeline/RenderPipeline$Snippet;
+accessible field net/minecraft/client/renderer/texture/SpriteContents originalImage Lcom/mojang/blaze3d/platform/NativeImage;
+accessible method net/minecraft/client/gui/components/debug/DebugScreenEntries register (Lnet/minecraft/resources/Identifier;Lnet/minecraft/client/gui/components/debug/DebugScreenEntry;)Lnet/minecraft/resources/Identifier;
