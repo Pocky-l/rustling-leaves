@@ -10,3 +10,7 @@ plugins {
 }
 
 rootProject.name = 'rustling_leaves'
+
+// common: the code shared by the loaders, compiled against vanilla Minecraft; neoforge: the loader glue. Each loader
+// project compiles the common sources into its own jar.
+include 'common', 'neoforge'
