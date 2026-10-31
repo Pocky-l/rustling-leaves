@@ -30,10 +30,11 @@ public final class RustlingLeavesFabricClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        ConfigRegistry.INSTANCE.register(RustlingLeaves.MOD_ID, ModConfig.Type.CLIENT, Config.SPEC);
-        ConfigScreenFactoryRegistry.INSTANCE.register(RustlingLeaves.MOD_ID, ConfigurationScreen::new);
+        // Forge Config API Port loads a client config right when it is registered, so the listeners come first.
         ModConfigEvents.loading(RustlingLeaves.MOD_ID).register(RustlingLeavesFabricClient::onConfig);
         ModConfigEvents.reloading(RustlingLeaves.MOD_ID).register(RustlingLeavesFabricClient::onConfig);
+        ConfigRegistry.INSTANCE.register(RustlingLeaves.MOD_ID, ModConfig.Type.CLIENT, Config.SPEC);
+        ConfigScreenFactoryRegistry.INSTANCE.register(RustlingLeaves.MOD_ID, ConfigurationScreen::new);
         FabricNetwork.registerClient();
         ModelLoadingPlugin.register(LitterModels::register);
         FabricPipelines.register();
