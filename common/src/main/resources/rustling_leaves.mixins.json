@@ -1,0 +1,22 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.pockyl.rustling_leaves.mixin",
+  "plugin": "com.pockyl.rustling_leaves.mixin.CompatMixinPlugin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "LeafParticleAccessor"
+  ],
+  "client": [
+    "LeavesBlockMixin",
+    "LeavesBlockInvoker",
+    "ClientLevelMixin",
+    "ClientPacketListenerMixin",
+    "FallingLeavesFabricMixin",
+    "FallingLeavesMixin",
+    "LivingWindMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

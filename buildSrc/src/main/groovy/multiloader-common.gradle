@@ -1,0 +1,71 @@
+// Shared by common and the loader projects: Java version, repositories, jar naming and contents.
+plugins {
+    id 'java-library'
+}
+
+version = mod_version
+group = mod_group_id
+
+base {
+    archivesName = "${mod_id}-${project.name}-${minecraft_version}"
+}
+
+// Minecraft 26.3 runs on Java 25.
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+
+repositories {
+    mavenCentral()
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = 'Sponge'
+                url = 'https://repo.spongepowered.org/repository/maven-public'
+            }
+        }
+        filter { includeGroupAndSubgroups('org.spongepowered') }
+    }
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = 'Fabric'
+                url = 'https://maven.fabricmc.net/'
+            }
+        }
+        filter { includeGroupAndSubgroups('net.fabricmc') }
+    }
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = 'Fuzs'
+                url = 'https://raw.githubusercontent.com/Fuzss/modresources/main/maven/'
+            }
+        }
+        filter { includeGroup('fuzs.forgeconfigapiport') }
+    }
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = 'Glitchfiend (Serene Seasons)'
+                url = 'https://maven.minecraftforge.net/'
+            }
+        }
+        filter { includeGroup('com.github.glitchfiend') }
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.compilerArgs.addAll(['-Xmaxerrs', '50000'])
+}
+
+tasks.named('jar', Jar) {
+    def licenseName = "LICENSE_${mod_id}"
+    from(rootProject.file('LICENSE')) {
+        rename { licenseName }
+    }
+    manifest.attributes(
+            'Implementation-Title': mod_name,
+            'Implementation-Version': mod_version,
+            'Implementation-Vendor': mod_authors,
+    )
+}
