@@ -10,9 +10,9 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Applies the mixins into other mods ({@link FallingLeavesMixin}, {@link LivingWindMixin}) only when the class they
- * hook into is there. Those mods are optional and do not exist for every Minecraft version; without them the mixins
- * are skipped up front instead of waiting for a class that never loads. Whether the class is there is asked of the
+ * Applies the mixins into other mods ({@link FallingLeavesMixin}, {@link FallingLeavesFabricMixin}, {@link
+ * LivingWindMixin}) only when the class they hook into is there. Those mods are optional and do not exist for every
+ * Minecraft version or loader; without them the mixins are skipped up front instead of waiting for a class that never loads. Whether the class is there is asked of the
  * class loader of the mods, so this works the same on every loader version. Mixins into the game always apply.
  */
 public final class CompatMixinPlugin implements IMixinConfigPlugin {

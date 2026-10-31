@@ -8,6 +8,7 @@
     "CherryLeavesBlockMixin",
     "ClientLevelMixin",
     "ClientPacketListenerMixin",
+    "FallingLeavesFabricMixin",
     "FallingLeavesMixin",
     "LivingWindMixin"
   ],

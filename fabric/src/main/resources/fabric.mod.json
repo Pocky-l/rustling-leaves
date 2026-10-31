@@ -29,6 +29,7 @@
   "suggests": {
     "sereneseasons": "*",
     "immersive_weathering": "*",
+    "fallingleaves": "*",
     "whitecap": "*",
     "livingwind": "*"
   }
