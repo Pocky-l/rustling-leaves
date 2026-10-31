@@ -1,0 +1,39 @@
+// The code shared by the loaders, compiled against plain Minecraft. Nothing here may use a loader API: what the
+// loaders do differently goes through platform.Platform / platform.ClientPlatform.
+plugins {
+    id 'multiloader-common'
+    id 'net.neoforged.moddev'
+}
+
+neoForge {
+    neoFormVersion = neo_form_version
+}
+
+dependencies {
+    compileOnly 'org.spongepowered:mixin:0.8.5'
+    compileOnly 'org.ow2.asm:asm-tree:9.7.1'
+    // Both loaders ship MixinExtras.
+    compileOnly 'io.github.llamalad7:mixinextras-common:0.4.1'
+    // ModConfigSpec: NeoForge's own on NeoForge, Forge Config API Port's on Fabric.
+    compileOnly "fuzs.forgeconfigapiport:forgeconfigapiport-common-neoforgeapi:${forge_config_api_port_version}"
+    // Optional: leaf fall follows the seasons when Serene Seasons is installed. Only its own API and config are used,
+    // so the NeoForge jar serves every loader here.
+    compileOnly "com.github.glitchfiend:SereneSeasons-neoforge:${minecraft_version}-${serene_seasons_version}"
+    compileOnly "com.github.glitchfiend:GlitchCore-neoforge:${minecraft_version}-${glitchcore_version}"
+}
+
+configurations {
+    commonJava {
+        canBeResolved = false
+        canBeConsumed = true
+    }
+    commonResources {
+        canBeResolved = false
+        canBeConsumed = true
+    }
+}
+
+artifacts {
+    commonJava sourceSets.main.java.sourceDirectories.singleFile
+    commonResources sourceSets.main.resources.sourceDirectories.singleFile
+}
