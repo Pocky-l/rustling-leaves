@@ -4,6 +4,11 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.1+26.1.2] - 2026-10-31
+### Fixed
+- Leaves of trees whose texture carries their colour had red and blue swapped: falling cherry leaves were lilac
+  instead of pink, flowering azalea leaves teal instead of olive, and modded leaves were off the same way.
+
 ## [2.8.0+26.1.2] - 2026-10-30
 The first version for Minecraft 26.1.2: everything of Rustling Leaves 2.8.0, plus what the newer Minecraft brings.
 
