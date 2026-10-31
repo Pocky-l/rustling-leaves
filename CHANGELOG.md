@@ -4,9 +4,15 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.8.0+1.21.11-fabric] - 2026-10-31
-Rustling Leaves now runs on [Fabric](https://fabricmc.net) for Minecraft 1.21.11, with everything of 2.8.0+1.21.11 below.
+## [2.8.1+1.21.11] - 2026-10-31
+Rustling Leaves now runs on [Fabric](https://fabricmc.net) for Minecraft 1.21.11 too, with everything of 2.8.0+1.21.11
+below, next to the NeoForge version.
 
+### Fixed
+- Leaves of trees whose texture carries their colour had red and blue swapped: falling cherry leaves were lilac
+  instead of pink, flowering azalea leaves teal instead of olive, and modded leaves were off the same way.
+
+### Fabric
 - Needs [Fabric API](https://www.curseforge.com/minecraft/mc-mods/fabric-api) and
   [Forge Config API Port](https://www.curseforge.com/minecraft/mc-mods/forge-config-api-port) (the config file
   is the same as on NeoForge: `config/rustling_leaves-client.toml`). With [Mod Menu](https://modrinth.com/mod/modmenu)
