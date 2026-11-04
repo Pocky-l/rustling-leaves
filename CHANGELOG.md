@@ -4,6 +4,11 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.1] - 2026-11-04
+### Fixed
+- Leaves that tumbled on their way down no longer spin wildly for a moment when they land on water: they settle
+  flat on it right away.
+
 ## [2.8.0-fabric] - 2026-10-31
 Rustling Leaves now runs on [Fabric](https://fabricmc.net) for Minecraft 1.21.1, with everything of 2.8.0 below.
 
