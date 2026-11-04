@@ -241,6 +241,35 @@ public final class ModGameTests {
     }
 
     @GameTest(template = "box")
+    public static void tumbledLeafLiesStillOnWater(GameTestHelper helper) {
+        floor(helper);
+        fill(helper, 0, 0, 6, 6, 1, Blocks.STONE.defaultBlockState());
+        fill(helper, 1, 1, 5, 5, 1, Blocks.WATER.defaultBlockState());
+        LeafSimulation sim = simulation(helper, 64, LeafListener.NONE);
+        int leaf = spawn(sim, helper, 3.5, 4.5, 3.5);
+        LeafPool pool = sim.pool();
+        // Turns of pitch and roll, as a tumbler gathers them on its way down.
+        pool.pitch[leaf] = 40.3F;
+        pool.roll[leaf] = -25.1F;
+        float fastest = 0.0F;
+        boolean floated = false;
+        BlockPos center = helper.absolutePos(new BlockPos(3, 1, 3));
+        for (int t = 0; t < 300; t++) {
+            boolean floating = pool.state[leaf] == LeafPool.FLOATING;
+            float pitch = pool.pitch[leaf];
+            float roll = pool.roll[leaf];
+            sim.tick(helper.getLevel(), center.getX(), center.getY(), center.getZ());
+            if (floating && pool.state[leaf] == LeafPool.FLOATING) {
+                floated = true;
+                fastest = Math.max(fastest, Math.max(Math.abs(pool.pitch[leaf] - pitch), Math.abs(pool.roll[leaf] - roll)));
+            }
+        }
+        helper.assertTrue(floated, "leaf never floated, state " + pool.state[leaf]);
+        helper.assertTrue(fastest < 0.5F, "floating leaf turned " + fastest + " rad in one tick");
+        helper.succeed();
+    }
+
+    @GameTest(template = "box")
     public static void floatingLeafRidesTheWaves(GameTestHelper helper) {
         floor(helper);
         fill(helper, 0, 0, 6, 6, 1, Blocks.STONE.defaultBlockState());

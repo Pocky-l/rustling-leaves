@@ -953,6 +953,9 @@ public final class LeafSimulation {
         pool.vy[i] = 0.0F;
         pool.vz[i] *= 0.3F;
         pool.spinYaw[i] = (random.next() - 0.5F) * 0.03F;
+        // The water stops its tumbling: no spin left over for when it sinks.
+        pool.spinPitch[i] = 0.0F;
+        pool.spinRoll[i] = 0.0F;
         pool.auxA[i] = 0.0F;
         pool.auxB[i] = 0.0F;
         pool.age[i] = 0;
@@ -1144,8 +1147,10 @@ public final class LeafSimulation {
                 + (float) Math.atan(waveSlopeX * cos - waveSlopeZ * sin);
         float pitch = (float) -Math.atan(slopeX * sin + slopeZ * cos) * 1.5F
                 - (float) Math.atan(waveSlopeX * sin + waveSlopeZ * cos);
-        pool.roll[i] += (roll - pool.roll[i]) * 0.4F;
-        pool.pitch[i] += (pitch - pool.pitch[i]) * 0.4F;
+        // Wrapped to half turns: a leaf that tumbled all the way down carries turns of pitch and roll, and easing them
+        // away one by one would spin it wildly on the water.
+        pool.roll[i] += wrapHalfTurn(roll - pool.roll[i]) * 0.4F;
+        pool.pitch[i] += wrapHalfTurn(pitch - pool.pitch[i]) * 0.4F;
     }
 
     /** Whether a floating leaf can be at (x, z): the water reaches up to this surface block there and nothing solid. */
