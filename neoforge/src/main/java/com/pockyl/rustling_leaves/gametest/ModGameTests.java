@@ -99,6 +99,7 @@ public final class ModGameTests {
         test("leaf_rests_on_slab", ModGameTests::leafRestsOnSlab, BOX);
         test("leaf_floats_on_water", ModGameTests::leafFloatsOnWater, BOX);
         test("floating_leaf_rides_the_waves", ModGameTests::floatingLeafRidesTheWaves, BOX);
+        test("tumbled_leaf_lies_still_on_water", ModGameTests::tumbledLeafLiesStillOnWater, BOX);
         test("rain_wind_gives_only_the_heading", ModGameTests::rainWindGivesOnlyTheHeading, BOX);
         test("leaves_blow_with_another_mods_wind", ModGameTests::leavesBlowWithAnotherModsWind, BOX);
         test("soaked_leaf_sinks_to_the_bottom", ModGameTests::soakedLeafSinksToTheBottom, BOX);
@@ -432,6 +433,34 @@ public final class ModGameTests {
         helper.assertTrue(pool.state[leaf] == LeafPool.FLOATING, "leaf is not floating, state " + pool.state[leaf]);
         double y = relativeY(helper, pool.y[leaf]);
         helper.assertTrue(y > 1.8 && y < 2.0, "leaf floats at y " + y);
+        helper.succeed();
+    }
+
+    public static void tumbledLeafLiesStillOnWater(GameTestHelper helper) {
+        floor(helper);
+        fill(helper, 0, 0, 6, 6, 1, Blocks.STONE.defaultBlockState());
+        fill(helper, 1, 1, 5, 5, 1, Blocks.WATER.defaultBlockState());
+        LeafSimulation sim = simulation(helper, 64, LeafListener.NONE);
+        int leaf = spawn(sim, helper, 3.5, 4.5, 3.5);
+        LeafPool pool = sim.pool();
+        // Turns of pitch and roll, as a tumbler gathers them on its way down.
+        pool.pitch[leaf] = 40.3F;
+        pool.roll[leaf] = -25.1F;
+        float fastest = 0.0F;
+        boolean floated = false;
+        BlockPos center = helper.absolutePos(new BlockPos(3, 1, 3));
+        for (int t = 0; t < 300; t++) {
+            boolean floating = pool.state[leaf] == LeafPool.FLOATING;
+            float pitch = pool.pitch[leaf];
+            float roll = pool.roll[leaf];
+            sim.tick(helper.getLevel(), center.getX(), center.getY(), center.getZ());
+            if (floating && pool.state[leaf] == LeafPool.FLOATING) {
+                floated = true;
+                fastest = Math.max(fastest, Math.max(Math.abs(pool.pitch[leaf] - pitch), Math.abs(pool.roll[leaf] - roll)));
+            }
+        }
+        helper.assertTrue(floated, "leaf never floated, state " + pool.state[leaf]);
+        helper.assertTrue(fastest < 0.5F, "floating leaf turned " + fastest + " rad in one tick");
         helper.succeed();
     }
 
