@@ -45,7 +45,8 @@ import java.util.List;
  * </ul>
  * Both use the vanilla cutout terrain shader, so fog, lightmap and day/night match the world; with a shader pack Iris
  * swaps it for the pack's terrain program, so the leaves get the pack's lighting like the blocks around them. The
- * pixel shadows of leaves and piles are a second pass with the translucent terrain shader.
+ * pixel shadows of leaves and piles are a second pass with the translucent terrain shader, left out under a shader pack
+ * (see {@link #groundShadows}).
  * <p>
  * This class decides what is drawn and writes the quads, the same on every Minecraft version; the GPU side (meshes,
  * passes, the hook into the level render) is the {@link RenderBackend}, the part a port rewrites.
@@ -138,6 +139,13 @@ final class LeafRenderer implements AutoCloseable {
     private boolean shaderPack;
     /** Whether the meshes were built with shadows (option {@code shadows}). */
     private boolean shadows;
+    /**
+     * Whether the translucent shadow pass is drawn: shadows on and no shader pack. Packs that light the scene in a
+     * deferred pass (Bliss and others) take a translucent quad for tinted glass and tint everything behind it by its
+     * colour, so the black shadow quads came out as black holes under every leaf and pile. The pack draws its own
+     * shadows; the drop shadows and shading inside piles are opaque and stay.
+     */
+    private boolean groundShadows;
     private final float[] shadowU0 = new float[LeafShapes.SHADOW_SPRITES.length];
     private final float[] shadowV0 = new float[LeafShapes.SHADOW_SPRITES.length];
     private final float[] shadowU1 = new float[LeafShapes.SHADOW_SPRITES.length];
@@ -298,6 +306,7 @@ final class LeafRenderer implements AutoCloseable {
             shaderPack = ShaderPacks.inUse();
             oldTextures = old;
             shadows = shadowsOn;
+            groundShadows = shadowsOn && !shaderPack;
             for (ChunkView view : views.values()) {
                 view.close();
             }
@@ -336,7 +345,7 @@ final class LeafRenderer implements AutoCloseable {
             backend.draw(moving, cam.x, cam.y, cam.z);
         }
         backend.endPass();
-        if (shadows) {
+        if (groundShadows) {
             renderShadows(frustum, modelView, projection, cam);
         }
     }
@@ -655,8 +664,9 @@ final class LeafRenderer implements AutoCloseable {
         loadRing(tile);
         QuadSink sink = backend.begin(Pass.LEAVES);
         boolean detailShadows = shadows && tile.wantDetailed;
+        boolean detailGround = groundShadows && tile.wantDetailed;
         QuadSink shadowSink = backend.begin(Pass.SHADOWS);
-        if (detailShadows) {
+        if (detailGround) {
             Arrays.fill(footShadow, (byte) 0);
         }
         int quads = 0;
@@ -672,7 +682,7 @@ final class LeafRenderer implements AutoCloseable {
                 double base = chunk.base[i];
                 double top = base + n * LitterField.LAYER;
                 float occlusion = shadows ? occlusion(lx, lz, base, top) : 1.0F;
-                if (detailShadows && n >= FOOT_SHADOW_MIN) {
+                if (detailGround && n >= FOOT_SHADOW_MIN) {
                     markFootShadow(tile, lx, lz, base, top);
                 }
                 double lowest = Math.min(Math.min(neighborTop(cellX + 1, cellZ, base), neighborTop(cellX - 1, cellZ, base)),
@@ -712,7 +722,7 @@ final class LeafRenderer implements AutoCloseable {
                         emit(sink, px + step, py - 0.004F, pz + step, pose.yaw, pose.pitch, pose.roll, pose.size,
                                 shade(ringColor[self], DROP_SHADE * occlusion), light, sprite);
                         quads++;
-                    } else if (detailShadows && n < SURFACE_MIN) {
+                    } else if (detailGround && n < SURFACE_MIN) {
                         // A leaf lying on the ground: a faint contact shadow half a leaf pixel aside, so it does not
                         // look painted onto the grass.
                         int s = LeafShapes.shadow(pose.shape);
@@ -732,7 +742,7 @@ final class LeafRenderer implements AutoCloseable {
             return;
         }
         tile.empty = false;
-        buildFootShadows(tile, detailShadows, shadowSink);
+        buildFootShadows(tile, detailGround, shadowSink);
     }
 
     /**
@@ -794,8 +804,8 @@ final class LeafRenderer implements AutoCloseable {
         }
     }
 
-    private void buildFootShadows(Tile tile, boolean detailShadows, QuadSink sink) {
-        if (detailShadows) {
+    private void buildFootShadows(Tile tile, boolean detailGround, QuadSink sink) {
+        if (detailGround) {
             for (int f = 0; f < footShadow.length; f++) {
                 byte level = footShadow[f];
                 if (level == 0) {
@@ -998,7 +1008,7 @@ final class LeafRenderer implements AutoCloseable {
         if (level != null) {
             sunStrength *= 1.0F - 0.7F * level.getRainLevel(partialTick);
         }
-        QuadSink shadowSink = shadows && sunStrength > 0.0F ? backend.begin(Pass.SHADOWS) : null;
+        QuadSink shadowSink = groundShadows && sunStrength > 0.0F ? backend.begin(Pass.SHADOWS) : null;
         float sunSlope = (float) simulation.sunSlope();
         float sunSlopeZ = (float) simulation.sunSlopeZ();
         float beamPerHeight = Mth.sqrt(1.0F + sunSlope * sunSlope + sunSlopeZ * sunSlopeZ);

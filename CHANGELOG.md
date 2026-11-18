@@ -4,6 +4,11 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.3+1.21.11] - 2026-11-18
+### Fixed
+- No more black stains under leaves and around piles with shader packs such as Bliss: with a pack on, the pack casts
+  the shadows instead of the mod.
+
 ## [2.8.2+1.21.11] - 2026-11-04
 ### Fixed
 - Leaves that tumbled on their way down no longer spin wildly for a moment when they land on water: they settle
