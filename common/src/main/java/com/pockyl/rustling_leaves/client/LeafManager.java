@@ -186,6 +186,8 @@ public final class LeafManager {
         }
         ticks++;
         shaderWater = ShaderPacks.inUse();
+        // Shader packs draw no translucent shadow on the ground right (see LeafRenderer.groundShadows).
+        simulation.setGroundShadows(!shaderWater);
         simulation.setSunPathRotation(ShaderPacks.sunPathRotation());
         burstsThisTick = 0;
         soundsThisTick = 0;
