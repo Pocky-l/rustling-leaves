@@ -137,6 +137,8 @@ public final class LeafSimulation {
     private double sunZ;
     /** Tilt of the sun's path towards the south in degrees, as a shader pack sets it ({@code sunPathRotation}). */
     private float sunPathRotation;
+    /** False while the renderer leaves out the shadows on the ground (under a shader pack): no surface lookups then. */
+    private boolean groundShadows = true;
     private double slopeX;
     private double slopeZ;
     private Level level;
@@ -534,6 +536,10 @@ public final class LeafSimulation {
         }
     }
 
+    public void setGroundShadows(boolean on) {
+        groundShadows = on;
+    }
+
     /**
      * Tilts the sun's path towards the south by this many degrees, as the active shader pack does
      * ({@code sunPathRotation}; 0 without one), so the leaves' shadows fall the way the pack's shadows do.
@@ -576,7 +582,7 @@ public final class LeafSimulation {
     private float shadowBelow(int i, double x, double y, double z, float half) {
         double dx = x - cameraX;
         double dz = z - cameraZ;
-        if (!settings.shadows || sunY < SHADOW_MIN_SUN || dx * dx + dz * dz > SHADOW_RANGE * SHADOW_RANGE) {
+        if (!settings.shadows || !groundShadows || sunY < SHADOW_MIN_SUN || dx * dx + dz * dz > SHADOW_RANGE * SHADOW_RANGE) {
             return Float.NaN;
         }
         double below = surfaceBelow(x, y, z);
