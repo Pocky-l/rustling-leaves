@@ -64,8 +64,8 @@ public final class Config {
             .define("oldLeafTextures", false);
     private static final ForgeConfigSpec.BooleanValue SHADOWS = BUILDER
             .comment("Pixel shadows: falling leaves cast a crisp shadow on the ground under them, leaves on piles cast",
-                    "one on the leaves below, and piles shade the ground around their foot. Drawn like the leaves, so they",
-                    "work with shader packs.")
+                    "one on the leaves below, and piles shade the ground around their foot. With a shader pack only the",
+                    "shadows inside piles are drawn: the pack casts its own.")
             .translation("rustling_leaves.configuration.shadows")
             .define("shadows", true);
     private static final ForgeConfigSpec.DoubleValue AUTUMN_COLORS = BUILDER

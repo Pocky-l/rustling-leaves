@@ -54,7 +54,9 @@ import java.util.List;
  *   <li>moving leaves, written into one streaming buffer each frame and interpolated between ticks.</li>
  * </ul>
  * Both use the vanilla cutout terrain shader, so fog, lightmap and day/night match the world; with a shader pack Iris
- * swaps it for the pack's terrain program, so the leaves get the pack's lighting like the blocks around them.
+ * swaps it for the pack's terrain program, so the leaves get the pack's lighting like the blocks around them. The
+ * pixel shadows of leaves and piles are a second pass with the translucent terrain shader, left out under a shader pack
+ * (see {@link #groundShadows}).
  */
 final class LeafRenderer implements AutoCloseable {
     private static final RenderType LEAVES = LeafRenderType.LEAVES;
@@ -148,6 +150,13 @@ final class LeafRenderer implements AutoCloseable {
     private boolean movingShadowsEmpty = true;
     /** Whether the meshes were built with shadows (option {@code shadows}). */
     private boolean shadows;
+    /**
+     * Whether the translucent shadow pass is drawn: shadows on and no shader pack. Packs that light the scene in a
+     * deferred pass (Bliss and others) take a translucent quad for tinted glass and tint everything behind it by its
+     * colour, so the black shadow quads came out as black holes under every leaf and pile. The pack draws its own
+     * shadows; the drop shadows and shading inside piles are opaque and stay.
+     */
+    private boolean groundShadows;
     private final float[] shadowU0 = new float[LeafShapes.SHADOW_SPRITES.length];
     private final float[] shadowV0 = new float[LeafShapes.SHADOW_SPRITES.length];
     private final float[] shadowU1 = new float[LeafShapes.SHADOW_SPRITES.length];
@@ -353,6 +362,7 @@ final class LeafRenderer implements AutoCloseable {
             shaderPack = ShaderPacks.inUse();
             oldTextures = old;
             shadows = shadowsOn;
+            groundShadows = shadowsOn && !shaderPack;
             for (ChunkView view : views.values()) {
                 view.close();
             }
@@ -406,7 +416,7 @@ final class LeafRenderer implements AutoCloseable {
         VertexBuffer.unbind();
         shader.clear();
         LEAVES.clearRenderState();
-        if (shadows) {
+        if (groundShadows) {
             renderShadows(frustum, modelView, projection, cam);
         }
     }
@@ -806,9 +816,10 @@ final class LeafRenderer implements AutoCloseable {
         BufferBuilder builder = bytes;
         builder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
         boolean detailShadows = shadows && tile.wantDetailed;
+        boolean detailGround = groundShadows && tile.wantDetailed;
         BufferBuilder shadowBuilder = shadowBytes;
         shadowBuilder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
-        if (detailShadows) {
+        if (detailGround) {
             Arrays.fill(footShadow, (byte) 0);
         }
         int quads = 0;
@@ -824,7 +835,7 @@ final class LeafRenderer implements AutoCloseable {
                 double base = chunk.base[i];
                 double top = base + n * LitterField.LAYER;
                 float occlusion = shadows ? occlusion(lx, lz, base, top) : 1.0F;
-                if (detailShadows && n >= FOOT_SHADOW_MIN) {
+                if (detailGround && n >= FOOT_SHADOW_MIN) {
                     markFootShadow(tile, lx, lz, base, top);
                 }
                 double lowest = Math.min(Math.min(neighborTop(cellX + 1, cellZ, base), neighborTop(cellX - 1, cellZ, base)),
@@ -864,7 +875,7 @@ final class LeafRenderer implements AutoCloseable {
                         emit(builder, px + step, py - 0.004F, pz + step, pose.yaw, pose.pitch, pose.roll, pose.size,
                                 shade(ringColor[self], DROP_SHADE * occlusion), light, sprite);
                         quads++;
-                    } else if (detailShadows && n < SURFACE_MIN) {
+                    } else if (detailGround && n < SURFACE_MIN) {
                         // A leaf lying on the ground: a faint contact shadow half a leaf pixel aside, so it does not
                         // look painted onto the grass.
                         int s = LeafShapes.shadow(pose.shape);
@@ -894,7 +905,7 @@ final class LeafRenderer implements AutoCloseable {
         tile.buffer.bind();
         tile.buffer.upload(mesh);
         tile.empty = false;
-        buildFootShadows(tile, detailShadows, shadowBuilder);
+        buildFootShadows(tile, detailGround, shadowBuilder);
     }
 
     /**
@@ -956,8 +967,8 @@ final class LeafRenderer implements AutoCloseable {
         }
     }
 
-    private void buildFootShadows(Tile tile, boolean detailShadows, BufferBuilder builder) {
-        if (detailShadows) {
+    private void buildFootShadows(Tile tile, boolean detailGround, BufferBuilder builder) {
+        if (detailGround) {
             for (int f = 0; f < footShadow.length; f++) {
                 byte level = footShadow[f];
                 if (level == 0) {
@@ -1172,7 +1183,7 @@ final class LeafRenderer implements AutoCloseable {
         if (level != null) {
             sunStrength *= 1.0F - 0.7F * level.getRainLevel(partialTick);
         }
-        BufferBuilder shadowBuilder = shadows && sunStrength > 0.0F ? shadowBytes : null;
+        BufferBuilder shadowBuilder = groundShadows && sunStrength > 0.0F ? shadowBytes : null;
         if (shadowBuilder != null) {
             shadowBuilder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
         }
