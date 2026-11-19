@@ -8,12 +8,13 @@
     "LeafParticleAccessor"
   ],
   "client": [
-    "LeavesBlockMixin",
-    "LeavesBlockInvoker",
     "ClientLevelMixin",
     "ClientPacketListenerMixin",
     "FallingLeavesFabricMixin",
     "FallingLeavesMixin",
+    "LeavesBlockInvoker",
+    "LeavesBlockMixin",
+    "LevelRendererMixin",
     "LivingWindMixin"
   ],
   "injectors": {
