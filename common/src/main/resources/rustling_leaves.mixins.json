@@ -9,6 +9,7 @@
     "ClientLevelMixin",
     "ClientPacketListenerMixin",
     "FallingLeavesMixin",
+    "LevelRendererMixin",
     "LivingWindMixin"
   ],
   "injectors": {
