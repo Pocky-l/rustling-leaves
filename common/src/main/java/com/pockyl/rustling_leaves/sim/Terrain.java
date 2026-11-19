@@ -4,7 +4,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
@@ -29,6 +28,7 @@ final class Terrain {
     private final BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
     private final BlockPos.MutableBlockPos lightCursor = new BlockPos.MutableBlockPos();
     Level level;
+    LightReader light = LightReader.LEVEL;
     PileBlocks piles = PileBlocks.NONE;
     /** Pile blocks drawn as litter are not solid: their leaves are the litter on the ground under them. */
     boolean drawPiles;
@@ -142,26 +142,26 @@ final class Terrain {
     }
 
     /**
-     * Packed light coordinates (block light in bits 4..7, sky light in bits 20..23) at a position. Inside a block
-     * (a leaf touching a slab, a step or a wall) the stored light is 0 or too low, which would draw the leaf black,
-     * so where the position is not in open air the brighter of it and the block above counts.
+     * Packed light coordinates (see {@link LightReader}) at a position. Inside a block (a leaf touching a slab, a step
+     * or a wall) the stored light is 0 or too low, which would draw the leaf black, so where the position is not in
+     * open air the brighter of it and the block above counts.
      */
     int lightAt(double x, double y, double z) {
         lightCursor.set(Mth.floor(x), Mth.floor(y), Mth.floor(z));
-        int sky = level.getBrightness(LightLayer.SKY, lightCursor);
-        int block = level.getBrightness(LightLayer.BLOCK, lightCursor);
         BlockState state = level.getBlockState(lightCursor);
-        if (!state.isAir() && !state.is(BlockTags.LEAVES)) {
-            lightCursor.move(0, 1, 0);
-            if (state.isSolidRender()) {
-                sky = level.getBrightness(LightLayer.SKY, lightCursor);
-                block = level.getBrightness(LightLayer.BLOCK, lightCursor);
-            } else {
-                sky = Math.max(sky, level.getBrightness(LightLayer.SKY, lightCursor));
-                block = Math.max(block, level.getBrightness(LightLayer.BLOCK, lightCursor));
-            }
+        if (state.isAir() || state.is(BlockTags.LEAVES)) {
+            return light.light(level, state, lightCursor);
         }
-        return block << 4 | sky << 20;
+        boolean solid = state.isSolidRender();
+        int inside = solid ? 0 : light.light(level, state, lightCursor);
+        lightCursor.move(0, 1, 0);
+        int above = light.light(level, level.getBlockState(lightCursor), lightCursor);
+        return solid ? above : brighter(inside, above);
+    }
+
+    /** The brighter of two packed light values, block and sky light each on its own. */
+    private static int brighter(int a, int b) {
+        return Math.max(a & 0xFFFF, b & 0xFFFF) | Math.max(a >>> 16, b >>> 16) << 16;
     }
 
     /**

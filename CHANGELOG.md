@@ -4,6 +4,14 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.4+26.2] - Unreleased
+### Fixed
+- Leaves light up in the light of a torch in your hand with dynamic light mods such as
+  [LambDynamicLights](https://modrinth.com/mod/lambdynamiclights): they no longer stay black next to the lit ground,
+  and no patches of leaves stay bright after the light has moved on.
+- Leaves on the ground pick up the light of a torch placed or broken some blocks away right away: before, litter more
+  than a few blocks from it could keep its old light, staying dark around a new torch or glowing after it was gone.
+
 ## [2.8.3+26.2] - 2026-11-18
 ### Fixed
 - No more black stains under leaves and around piles with shader packs such as Bliss: with a pack on, the pack casts
