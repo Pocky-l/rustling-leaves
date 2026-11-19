@@ -22,6 +22,7 @@ import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.ItemTags;
+import net.minecraft.util.LightCoordsUtil;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
@@ -180,6 +181,9 @@ public final class LeafManager {
         if (simulation == null) {
             simulation = new LeafSimulation(SETTINGS, SETTINGS.maxLeaves, new Listener());
             simulation.setLevel(level);
+            // Lit like the blocks: mods with dynamic lights add their light there.
+            simulation.setLightReader((lit, state, pos) ->
+                    LightCoordsUtil.getLightCoords(LightCoordsUtil.BrightnessGetter.DEFAULT, lit, state, pos));
             simulation.setPiles(piles(), TREES, true);
             simulation.setWaves(waves());
             simulation.setWindSource(windSource());
@@ -419,6 +423,16 @@ public final class LeafManager {
                     chunk.tileRevision[LitterChunk.tile(LitterField.index((pos.getX() + dx * 4) * 4, (pos.getZ() + dz * 4) * 4))]++;
                 }
             }
+        }
+    }
+
+    /**
+     * The game re-renders a chunk section: its light changed (a torch placed or broken, light from the server), or a
+     * mod with dynamic lights moved a light through it. The litter there has its light baked in and is rebuilt too.
+     */
+    public static void onSectionDirty(int sectionX, int sectionY, int sectionZ) {
+        if (renderer != null && Minecraft.getInstance().isSameThread()) {
+            renderer.relight(sectionX, sectionY, sectionZ);
         }
     }
 
