@@ -268,6 +268,11 @@ public final class LeafSimulation {
         wind.setSource(source);
     }
 
+    /** Where the leaves take their light from ({@link LightReader#LEVEL}: the light stored in the level). */
+    public void setLightReader(LightReader reader) {
+        terrain.light = reader;
+    }
+
     /** Points the simulation at a level without ticking (for seeding before the first tick). */
     public void setLevel(Level level) {
         this.level = level;

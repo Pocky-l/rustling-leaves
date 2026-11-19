@@ -6,6 +6,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.core.SectionPos;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ChunkTrackingView;
 import net.minecraft.util.Mth;
@@ -203,6 +204,8 @@ final class LeafRenderer implements AutoCloseable {
         final RenderBackend.Mesh shadowBuffer = RenderBackend.staticMesh();
         boolean shadowEmpty = true;
         int builtRevision = Integer.MIN_VALUE;
+        /** The light around it changed since it was built: its light is baked into the vertices. */
+        boolean relight;
         double distanceSq;
         int quads;
 
@@ -459,7 +462,7 @@ final class LeafRenderer implements AutoCloseable {
                     view.far = new FarMesh(chunk);
                 }
                 view.far.distanceSq = distanceSq;
-                if (view.far.builtRevision != chunk.revision()) {
+                if (view.far.builtRevision != chunk.revision() || view.far.relight) {
                     dirty.add(view.far);
                 }
                 if (view.far.built()) {
@@ -479,7 +482,7 @@ final class LeafRenderer implements AutoCloseable {
                 double dz = tile.originZ + TILE_BLOCKS * 0.5 - cam.z;
                 tile.distanceSq = dx * dx + dz * dz;
                 tile.wantDetailed = tile.distanceSq < DETAIL_DISTANCE * DETAIL_DISTANCE;
-                if (tile.builtRevision != chunk.tileRevision[t] || tile.builtDetailed != tile.wantDetailed) {
+                if (tile.builtRevision != chunk.tileRevision[t] || tile.builtDetailed != tile.wantDetailed || tile.relight) {
                     dirty.add(tile);
                 }
                 ready &= tile.built();
@@ -497,6 +500,32 @@ final class LeafRenderer implements AutoCloseable {
                 it.remove();
             }
         }
+    }
+
+    /**
+     * Rebuilds the litter of a chunk section with the light it has now, when the game re-renders that section for a
+     * change of light. Only meshes reaching into the section count: a leaf takes its light from the block it lies in
+     * or from the one above.
+     */
+    void relight(int sectionX, int sectionY, int sectionZ) {
+        ChunkView view = views.get(ChunkPos.asLong(sectionX, sectionZ));
+        if (view == null) {
+            return;
+        }
+        double bottom = SectionPos.sectionToBlockCoord(sectionY) - 1.0;
+        double top = bottom + 1.0 + SectionPos.SECTION_SIZE;
+        for (Tile tile : view.tiles) {
+            if (tile != null && reaches(tile, bottom, top)) {
+                tile.relight = true;
+            }
+        }
+        if (view.far != null && reaches(view.far, bottom, top)) {
+            view.far.relight = true;
+        }
+    }
+
+    private static boolean reaches(Mesh mesh, double bottom, double top) {
+        return mesh.bounds != null && mesh.bounds.maxY > bottom && mesh.bounds.minY < top;
     }
 
     private void rebuildTiles() {
@@ -524,6 +553,7 @@ final class LeafRenderer implements AutoCloseable {
     private void buildFar(FarMesh mesh) {
         LitterChunk chunk = mesh.chunk;
         mesh.builtRevision = chunk.revision();
+        mesh.relight = false;
         float aged = Math.min(1.0F, simulation.settings().autumnColors + 0.3F);
         int patches = LitterChunk.SIZE / 2;
         float[] height = new float[patches * patches];
@@ -640,6 +670,7 @@ final class LeafRenderer implements AutoCloseable {
         LitterChunk chunk = tile.chunk;
         tile.builtRevision = chunk.tileRevision[tile.index];
         tile.builtDetailed = tile.wantDetailed;
+        tile.relight = false;
         int topLayers = tile.wantDetailed ? TOP_LAYERS : 1;
         double minY = Double.MAX_VALUE;
         double maxY = -Double.MAX_VALUE;
