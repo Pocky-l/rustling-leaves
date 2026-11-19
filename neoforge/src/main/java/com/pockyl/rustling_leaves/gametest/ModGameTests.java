@@ -27,6 +27,7 @@ import com.pockyl.rustling_leaves.sim.LeafSettings;
 import com.pockyl.rustling_leaves.sim.LeafShape;
 import com.pockyl.rustling_leaves.sim.LeafSimulation;
 import com.pockyl.rustling_leaves.sim.LeafSpawner;
+import com.pockyl.rustling_leaves.sim.LightReader;
 import com.pockyl.rustling_leaves.sim.LitterChunk;
 import com.pockyl.rustling_leaves.sim.LitterField;
 import com.pockyl.rustling_leaves.sim.PileBlocks;
@@ -209,6 +210,33 @@ public final class ModGameTests {
         helper.assertTrue(sim.field().total() == 1, "litter has " + sim.field().total() + " leaves");
         double base = baseOfOnlyCell(sim, helper);
         helper.assertTrue(Math.abs(base - 1.0) < EPSILON, "leaf lies at y " + base);
+        helper.succeed();
+    }
+
+    /**
+     * Leaves are lit the way the client lights the blocks: the light a dynamic light mod adds there (a torch in hand,
+     * not in the level) lights falling leaves and the litter too.
+     */
+    @GameTest(template = "box")
+    public static void leavesTakeTheLightOfDynamicLights(GameTestHelper helper) {
+        floor(helper);
+        LeafSimulation sim = simulation(helper, 64, LeafListener.NONE);
+        BlockPos torch = helper.absolutePos(new BlockPos(3, 2, 3));
+        int torchLight = 14 << 4;
+        sim.setLightReader((level, state, pos) -> {
+            int stored = LightReader.LEVEL.light(level, state, pos);
+            return pos.closerThan(torch, 5.0) ? stored & 0xFFFF0000 | Math.max(stored & 0xFFFF, torchLight) : stored;
+        });
+        BlockPos ground = helper.absolutePos(new BlockPos(3, 1, 3));
+        int stored = LightReader.LEVEL.light(helper.getLevel(), Blocks.AIR.defaultBlockState(), ground) & 0xFFFF;
+        helper.assertTrue(stored < torchLight, "the box is lit by itself: block light " + (stored >> 4));
+        int leaf = spawn(sim, helper, 3.5, 4.5, 3.5);
+        run(sim, helper, 8);
+        LeafPool pool = sim.pool();
+        helper.assertTrue(pool.state[leaf] == LeafPool.FALLING, "leaf is not falling, state " + pool.state[leaf]);
+        helper.assertTrue((pool.light[leaf] & 0xFFFF) == torchLight, "falling leaf block light " + ((pool.light[leaf] & 0xFFFF) >> 4));
+        int litter = sim.lightAt(ground.getX() + 0.5, ground.getY() + 0.05, ground.getZ() + 0.5) & 0xFFFF;
+        helper.assertTrue(litter == torchLight, "litter block light " + (litter >> 4));
         helper.succeed();
     }
 
