@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ground, and no patches of leaves stay bright after the light has moved on.
 - Leaves on the ground pick up the light of a torch placed or broken some blocks away right away: before, litter more
   than a few blocks from it could keep its old light, staying dark around a new torch or glowing after it was gone.
+- No more leaves of another world on a server: when a server address hosted a new world (a new map, another modpack,
+  the next server behind a proxy), the leaves on the ground of the old one showed up at the same spots, lying over
+  water, hanging over hills and blowing about in thick clouds. Each world on a server now keeps its own leaves; on
+  servers the leaves on the ground start fresh once after this update.
 
 ## [2.8.2+1.20.1] - 2026-11-18
 ### Fixed
