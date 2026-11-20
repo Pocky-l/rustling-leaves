@@ -45,6 +45,7 @@ import com.pockyl.rustling_leaves.client.compat.RealisticWaves;
 import com.pockyl.rustling_leaves.client.compat.SereneSeasons;
 import com.pockyl.rustling_leaves.client.compat.WeatherWind;
 import com.pockyl.rustling_leaves.client.compat.ShaderPacks;
+import com.pockyl.rustling_leaves.mixin.BiomeManagerAccessor;
 import com.pockyl.rustling_leaves.network.RakePayload;
 import com.pockyl.rustling_leaves.platform.ClientPlatform;
 import com.pockyl.rustling_leaves.platform.Platform;
@@ -641,8 +642,12 @@ public final class LeafManager {
         } else {
             ServerData data = minecraft.getCurrentServer();
             String name = data != null ? data.ip : "unknown";
+            // One address can serve another world later (a new map, another pack, the next server behind a proxy):
+            // each world keeps its own litter by the hashed seed the server sent, or the leaves of the old world
+            // would lie at the same coordinates over the new one's water and hills.
+            long seed = ((BiomeManagerAccessor) level.getBiomeManager()).rustling_leaves$seed();
             root = minecraft.gameDirectory.toPath().resolve(RustlingLeaves.MOD_ID).resolve("servers")
-                    .resolve(name.replaceAll("[^A-Za-z0-9._-]", "_"));
+                    .resolve(name.replaceAll("[^A-Za-z0-9._-]", "_")).resolve(Long.toHexString(seed));
         }
         ResourceLocation dimension = level.dimension().location();
         return root.resolve(dimension.getNamespace()).resolve(dimension.getPath());
