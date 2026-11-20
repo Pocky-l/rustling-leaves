@@ -8,6 +8,7 @@
     "LeafParticleAccessor"
   ],
   "client": [
+    "BiomeManagerAccessor",
     "LeavesBlockMixin",
     "ClientLevelMixin",
     "ClientPacketListenerMixin",
