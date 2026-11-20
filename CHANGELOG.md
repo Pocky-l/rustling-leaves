@@ -6,11 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.8.4+26.2] - Unreleased
 ### Fixed
-- Leaves light up in the light of a torch in your hand with dynamic light mods such as
-  [LambDynamicLights](https://modrinth.com/mod/lambdynamiclights): they no longer stay black next to the lit ground,
-  and no patches of leaves stay bright after the light has moved on.
-- Leaves on the ground pick up the light of a torch placed or broken some blocks away right away: before, litter more
-  than a few blocks from it could keep its old light, staying dark around a new torch or glowing after it was gone.
+- Leaves no longer stay black next to a torch in your hand with dynamic light mods such as
+  [LambDynamicLights](https://modrinth.com/mod/lambdynamiclights).
+- Leaves on the ground take the light of a torch placed or broken nearby right away, instead of staying dark or
+  glowing for a while.
+- Each world on a server now keeps its own leaves, so an old world's litter no longer shows up over the water and
+  hills of a new one; leaves on servers start fresh once after this update.
 
 ## [2.8.3+26.2] - 2026-11-18
 ### Fixed
