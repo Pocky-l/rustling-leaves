@@ -4,7 +4,7 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.8.4+26.1.2] - Unreleased
+## [2.8.4+26.1.2] - 2026-11-20
 ### Fixed
 - Leaves no longer stay black next to a torch in your hand with dynamic light mods such as
   [LambDynamicLights](https://modrinth.com/mod/lambdynamiclights).
