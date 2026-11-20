@@ -54,6 +54,6 @@ public final class LeafPipelines {
         game.accept(LEAVES);
         game.accept(SHADOWS);
         ShaderPacks.assignProgram(LEAVES, "TERRAIN_CUTOUT");
-        ShaderPacks.assignProgram(SHADOWS, "TRANSLUCENT");
+        ShaderPacks.assignProgram(SHADOWS, "PARTICLES_TRANSLUCENT"); // particles translucent to prevent black boxes with shaders as most shaders treat glColor.a as AO in gbuffers_water
     }
 }
