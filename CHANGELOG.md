@@ -4,6 +4,11 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.5+1.21.11] - 2026-11-20
+### Fixed
+- Leaf shadows use the shader pack's program for translucent particles, so packs no longer turn them into black
+  boxes. Thanks to [SpacEagle17](https://github.com/SpacEagle17) ([#3](https://github.com/Pocky-l/rustling-leaves/pull/3)).
+
 ## [2.8.4+1.21.11] - 2026-11-20
 ### Fixed
 - Leaves no longer stay black next to a torch in your hand with dynamic light mods such as
