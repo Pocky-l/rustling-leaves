@@ -17,26 +17,25 @@ import com.pockyl.rustling_leaves.client.LeafCommands;
 import com.pockyl.rustling_leaves.client.LeafManager;
 import com.pockyl.rustling_leaves.client.RustlingLeavesClient;
 import com.pockyl.rustling_leaves.client.compat.ImmersiveWeathering;
-import com.pockyl.rustling_leaves.client.compat.PackWeather;
 
 /**
- * Hooks the client part into Fabric. The use key and the debug screen have no Fabric events: see the mixins in
- * {@code fabric.mixin}.
+ * Hooks the client part into Fabric. The use key, the start of a frame and the debug screen have no Fabric events:
+ * see the mixins in {@code fabric.mixin}.
  */
 public final class RustlingLeavesFabricClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         RustlingLeavesClient.init();
-        ForgeConfigRegistry.INSTANCE.register(RustlingLeaves.MOD_ID, ModConfig.Type.CLIENT, Config.SPEC);
+        // Forge Config API Port loads a client config right when it is registered, so the listeners come first.
         ModConfigEvents.loading(RustlingLeaves.MOD_ID).register(RustlingLeavesFabricClient::onConfig);
         ModConfigEvents.reloading(RustlingLeaves.MOD_ID).register(RustlingLeavesFabricClient::onConfig);
+        ForgeConfigRegistry.INSTANCE.register(RustlingLeaves.MOD_ID, ModConfig.Type.CLIENT, Config.SPEC);
         FabricNetwork.registerClient();
         if (FabricLoader.getInstance().isModLoaded(ImmersiveWeathering.MOD_ID)) {
             ModelLoadingPlugin.register(PileModels::register);
         }
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> LeafManager.onClientTick());
-        WorldRenderEvents.START.register(context -> PackWeather.onFrameStart(context.tickDelta()));
         // Right after the solid and cutout terrain, like Forge's AFTER_CUTOUT_BLOCKS.
         WorldRenderEvents.BEFORE_ENTITIES.register(context -> {
             if (context.frustum() != null) {
