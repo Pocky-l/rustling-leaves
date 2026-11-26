@@ -15,6 +15,7 @@ import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import com.pockyl.rustling_leaves.Config;
 import com.pockyl.rustling_leaves.RustlingLeaves;
 import com.pockyl.rustling_leaves.client.LeafCommands;
+import com.pockyl.rustling_leaves.client.LeafSettingsScreen;
 import com.pockyl.rustling_leaves.client.LeafManager;
 import com.pockyl.rustling_leaves.client.render.backend.LevelRenderHook;
 
@@ -30,7 +31,9 @@ public final class RustlingLeavesFabricClient implements ClientModInitializer {
         ModConfigEvents.loading(RustlingLeaves.MOD_ID).register(RustlingLeavesFabricClient::onConfig);
         ModConfigEvents.reloading(RustlingLeaves.MOD_ID).register(RustlingLeavesFabricClient::onConfig);
         ConfigRegistry.INSTANCE.register(RustlingLeaves.MOD_ID, ModConfig.Type.CLIENT, Config.SPEC);
-        ConfigScreenFactoryRegistry.INSTANCE.register(RustlingLeaves.MOD_ID, ConfigurationScreen::new);
+        // The config button opens a choice: the options of the mod, or the settings of single trees.
+        ConfigScreenFactoryRegistry.INSTANCE.register(RustlingLeaves.MOD_ID,
+                (modId, parent) -> new LeafSettingsScreen(parent, screen -> new ConfigurationScreen(modId, screen)));
         FabricNetwork.registerClient();
         ModelLoadingPlugin.register(LitterModels::register);
         FabricPipelines.register();

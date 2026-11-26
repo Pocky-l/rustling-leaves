@@ -26,4 +26,9 @@ public interface TreeLeaves {
         return state.getBlock() instanceof UntintedParticleLeavesBlock leaves
                 && ((LeafParticleAccessor) leaves).rustling_leaves$leafParticle().getType() == ParticleTypes.CHERRY_LEAVES;
     }
+
+    /** The kind of tree of a leaves block ({@link TreeKinds}): the client gives every block its own, tests the bare shape. */
+    default int kind(BlockState state) {
+        return shape(state).ordinal();
+    }
 }
