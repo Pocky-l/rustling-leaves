@@ -83,7 +83,8 @@ public final class LeafPool {
     public final int[] life;
     public final byte[] state;
     public final byte[] sprite;
-    public final byte[] shape;
+    /** The tree each leaf came from ({@link TreeKinds}). */
+    public final short[] shape;
     public final byte[] flags;
 
     private final int[] free;
@@ -131,7 +132,7 @@ public final class LeafPool {
         life = new int[capacity];
         state = new byte[capacity];
         sprite = new byte[capacity];
-        shape = new byte[capacity];
+        shape = new short[capacity];
         flags = new byte[capacity];
         free = new int[capacity];
     }

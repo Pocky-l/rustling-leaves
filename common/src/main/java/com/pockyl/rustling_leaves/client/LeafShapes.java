@@ -7,6 +7,8 @@ import net.minecraft.world.level.block.Block;
 
 import com.pockyl.rustling_leaves.RustlingLeaves;
 import com.pockyl.rustling_leaves.sim.LeafShape;
+import com.pockyl.rustling_leaves.sim.TreeKinds;
+import com.pockyl.rustling_leaves.sim.TreeProfile;
 
 import java.util.IdentityHashMap;
 import java.util.Map;
@@ -68,41 +70,73 @@ final class LeafShapes {
     static final Identifier OLD_LITTER_SPARSE = RustlingLeaves.id("block/leaf/old_litter_sparse");
     static final Identifier OLD_LITTER_LAYER = RustlingLeaves.id("block/leaf/old_litter_layer");
 
-    private static final Map<Block, LeafShape> BY_BLOCK = new IdentityHashMap<>();
+    private static final Map<Block, Integer> KINDS = new IdentityHashMap<>();
 
     private LeafShapes() {
     }
 
-    /** The shadow sprite of a leaf of this shape. */
-    static int shadow(int shape) {
-        return shape == LeafShape.PETAL.ordinal() ? SHADOW_PETAL : shape == LeafShape.NEEDLE.ordinal() ? SHADOW_NEEDLE : SHADOW_LEAF;
+    /** The shadow sprite of a leaf of this kind of tree. */
+    static int shadow(int kind) {
+        return TreeKinds.profile(kind).shadow;
     }
 
-    /** Index into {@link #SPRITES} of a leaf drawn with sprite index {@code sprite} of its shape. */
-    static int slot(int shape, int sprite, boolean old) {
+    /** Index into the sprites ({@link LeafStyles#sprites}) of a leaf of a kind drawn with sprite index {@code sprite}. */
+    static int slot(int kind, int sprite, boolean old) {
+        sprite &= 0xFF;
         if (!old) {
             return sprite;
         }
-        LeafShape leafShape = LeafShape.byId(shape);
+        TreeProfile profile = TreeKinds.profile(kind);
+        LeafShape leafShape = profile.shape;
+        if (!profile.defaultTexture || sprite < leafShape.firstSprite || sprite >= leafShape.firstSprite + leafShape.variants) {
+            // A texture the player chose: the option of the old textures is only about the default ones.
+            return sprite;
+        }
         int s = leafShape.ordinal();
         return OLD_FIRST[s] + Mth.clamp(sprite - leafShape.firstSprite, 0, OLD_VARIANTS[s] - 1);
     }
 
+    /** The kind of tree of a leaves block ({@link TreeKinds}), keyed by its block id. */
+    static int kind(Block block) {
+        synchronized (KINDS) {
+            return KINDS.computeIfAbsent(block, b -> TreeKinds.id(BuiltInRegistries.BLOCK.getKey(b).toString()));
+        }
+    }
+
+    /** The settings of a leaves block's tree. */
+    static TreeProfile profile(Block block) {
+        return TreeKinds.profile(kind(block));
+    }
+
+    /** Whether new ground under this tree gets a natural carpet. */
+    static boolean carpets(Block block) {
+        TreeProfile profile = profile(block);
+        return profile.enabled && profile.carpet;
+    }
+
+    /** Lets every tree pick up its settings again. */
+    static void clearProfiles() {
+        TreeKinds.refresh();
+    }
+
     /** Guesses the shape from the block id, which also covers modded trees with conventional names. */
+    static LeafShape guess(String key) {
+        String path = key.substring(key.indexOf(':') + 1);
+        if (path.contains("cherry") || path.contains("sakura") || path.contains("blossom")) {
+            return LeafShape.PETAL;
+        }
+        if (path.contains("spruce") || path.contains("pine") || path.contains("fir") || path.contains("cedar")
+                || path.contains("larch") || path.contains("redwood")) {
+            return LeafShape.NEEDLE;
+        }
+        if (path.contains("birch") || path.contains("azalea") || path.contains("aspen")) {
+            return LeafShape.ROUND;
+        }
+        return LeafShape.BROAD;
+    }
+
+    /** The shape a leaves block drops, by its settings. */
     static LeafShape of(Block block) {
-        return BY_BLOCK.computeIfAbsent(block, b -> {
-            String path = BuiltInRegistries.BLOCK.getKey(b).getPath();
-            if (path.contains("cherry") || path.contains("sakura") || path.contains("blossom")) {
-                return LeafShape.PETAL;
-            }
-            if (path.contains("spruce") || path.contains("pine") || path.contains("fir") || path.contains("cedar")
-                    || path.contains("larch") || path.contains("redwood")) {
-                return LeafShape.NEEDLE;
-            }
-            if (path.contains("birch") || path.contains("azalea") || path.contains("aspen")) {
-                return LeafShape.ROUND;
-            }
-            return LeafShape.BROAD;
-        });
+        return profile(block).shape;
     }
 }
