@@ -25,6 +25,7 @@ import net.neoforged.neoforge.common.NeoForge;
 import com.pockyl.rustling_leaves.Config;
 import com.pockyl.rustling_leaves.RustlingLeaves;
 import com.pockyl.rustling_leaves.client.LeafCommands;
+import com.pockyl.rustling_leaves.client.LeafSettingsScreen;
 import com.pockyl.rustling_leaves.client.LeafManager;
 import com.pockyl.rustling_leaves.client.compat.PackWeather;
 import com.pockyl.rustling_leaves.client.render.backend.LeafPipelines;
@@ -35,7 +36,9 @@ import com.pockyl.rustling_leaves.client.render.backend.LevelRenderHook;
 public final class NeoForgeClient {
     public NeoForgeClient(IEventBus modBus, ModContainer container) {
         container.registerConfig(ModConfig.Type.CLIENT, Config.SPEC);
-        container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
+        // The config button opens a choice: the options of the mod, or the settings of single trees.
+        container.registerExtensionPoint(IConfigScreenFactory.class,
+                (modContainer, parent) -> new LeafSettingsScreen(parent, screen -> new ConfigurationScreen(modContainer, screen)));
         modBus.addListener(ModConfigEvent.Loading.class, event -> onConfig(event.getConfig()));
         modBus.addListener(ModConfigEvent.Reloading.class, event -> onConfig(event.getConfig()));
         modBus.addListener(RegisterClientPayloadHandlersEvent.class, NeoForgeNetwork::registerClient);

@@ -12,4 +12,8 @@ public interface LeafListener {
     /** A leaf fell into lava. */
     default void onBurn(double x, double y, double z) {
     }
+
+    /** A cell of litter caught fire at this spot (see {@link LeafSimulation#burn}). */
+    default void onFire(double x, double y, double z) {
+    }
 }
