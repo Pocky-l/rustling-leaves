@@ -1,6 +1,7 @@
 package com.pockyl.rustling_leaves.sim;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
@@ -55,14 +56,14 @@ public final class LeafSpawner {
             if (!sheds(state, settings)) {
                 continue;
             }
+            TreeProfile profile = TreeKinds.profile(trees.kind(state));
             // Stronger wind at this spot shakes more leaves off: gust waves, squall fronts, storms. Vanilla cherry trees
             // already shed at their own pace through dropBelow, so only the wind adds petals here.
             float windHere = wind.speed(x, top, z);
             float calm = state.getBlock() instanceof CherryLeavesBlock ? 0.0F : 1.0F;
             float local = chance * (calm + windHere * 12.0F + wind.squall(x, z) * 10.0F);
             // The sampling budget is set by the busiest season multiplier (leaves or petals); each tree gets its own share.
-            LeafShape shape = trees.shape(state);
-            if (random.nextFloat() >= local * settings.shedRate(shape) * settings.seasonRate(shape) / season) {
+            if (random.nextFloat() >= local * profile.shedRate(settings) * settings.seasonRate(profile.shape) / season) {
                 continue;
             }
             int bottom = top;
@@ -124,7 +125,8 @@ public final class LeafSpawner {
      */
     public void dropBelow(Level level, LeafSimulation simulation, BlockState state, BlockPos pos) {
         LeafSettings settings = simulation.settings();
-        float rate = settings.fallRate * settings.seasonRate(trees.shape(state));
+        TreeProfile profile = TreeKinds.profile(trees.kind(state));
+        float rate = profile.enabled ? settings.fallRate * settings.seasonRate(profile.shape) : 0.0F;
         int count = Mth.floor(rate) + (random.nextFloat() < Mth.frac(rate) ? 1 : 0);
         Wind wind = simulation.wind();
         float push = wind.speed(pos.getX(), pos.getY(), pos.getZ()) * 0.8F;
@@ -134,9 +136,44 @@ public final class LeafSpawner {
         }
     }
 
+    /**
+     * A player hit a leaves block (a punch, or every swing while mining it): a few leaves shake loose from the face that
+     * was hit, pushed the way the blow went, and from the underside when nothing is below.
+     *
+     * @param face  the face that was hit
+     * @param pushX horizontal direction of the blow (unit or zero)
+     * @param pushZ horizontal direction of the blow (unit or zero)
+     */
+    public void shake(Level level, LeafSimulation simulation, BlockPos pos, BlockState state, Direction face, float pushX, float pushZ,
+            int count) {
+        if (count <= 0 || !TreeKinds.profile(trees.kind(state)).enabled) {
+            return;
+        }
+        boolean openBelow = level.getBlockState(cursor.set(pos.getX(), pos.getY() - 1, pos.getZ())).getCollisionShape(level, cursor).isEmpty();
+        for (int n = 0; n < count && simulation.pool().free() > 0; n++) {
+            Direction from = openBelow && random.nextFloat() < 0.4F ? Direction.DOWN : face;
+            double x = pos.getX() + 0.1 + random.nextDouble() * 0.8;
+            double y = pos.getY() + 0.1 + random.nextDouble() * 0.8;
+            double z = pos.getZ() + 0.1 + random.nextDouble() * 0.8;
+            // Just outside the face, so the leaf is seen from the moment it comes off.
+            x = from.getStepX() == 0 ? x : pos.getX() + 0.5 + from.getStepX() * 0.55;
+            y = from.getStepY() == 0 ? y : pos.getY() + 0.5 + from.getStepY() * 0.55;
+            z = from.getStepZ() == 0 ? z : pos.getZ() + 0.5 + from.getStepZ() * 0.55;
+            float out = 0.02F + random.nextFloat() * 0.03F;
+            float vx = from.getStepX() * out + pushX * 0.04F + (random.nextFloat() - 0.5F) * 0.04F;
+            float vy = from.getStepY() * out + random.nextFloat() * 0.02F;
+            float vz = from.getStepZ() * out + pushZ * 0.04F + (random.nextFloat() - 0.5F) * 0.04F;
+            int i = spawn(level, simulation, state, pos, x, y, z, vx, vy, vz, false);
+            if (i >= 0) {
+                simulation.pool().spinPitch[i] += (random.nextFloat() - 0.5F) * 0.4F;
+                simulation.pool().spinRoll[i] += (random.nextFloat() - 0.5F) * 0.4F;
+            }
+        }
+    }
+
     /** A leaves block was broken or decayed: a burst of its leaves flies out of it. */
     public void burst(Level level, LeafSimulation simulation, BlockPos pos, BlockState state) {
-        int count = simulation.settings().leavesPerBreak;
+        int count = TreeKinds.profile(trees.kind(state)).enabled ? simulation.settings().leavesPerBreak : 0;
         for (int n = 0; n < count; n++) {
             float vx = (random.nextFloat() - 0.5F) * 0.24F;
             float vy = random.nextFloat() * 0.084F;
@@ -149,11 +186,12 @@ public final class LeafSpawner {
     private int spawn(Level level, LeafSimulation simulation, BlockState state, BlockPos colorPos, double x, double y, double z, float vx,
             float vy, float vz, boolean natural) {
         LeafSettings settings = simulation.settings();
-        LeafShape shape = trees.shape(state);
+        int kind = trees.kind(state);
+        TreeProfile profile = TreeKinds.profile(kind);
         int base = trees.color(state, level, colorPos);
-        int color = LeafPalette.vary(base, random.nextLong(), settings.autumnShare(), shape);
-        int sprite = shape.firstSprite + random.nextInt(shape.variants);
-        float size = LeafShape.BASE_SIZE * shape.size * settings.leafSize * (0.8F + random.nextFloat() * 0.45F);
-        return simulation.spawn(x, y, z, vx, vy, vz, color, base, shape, sprite, size, natural);
+        int color = profile.vary(base, random.nextLong(), profile.autumnShare(settings));
+        int sprite = profile.sprite(random.nextFloat());
+        float size = profile.leafSize(settings, random.nextFloat());
+        return simulation.spawn(x, y, z, vx, vy, vz, color, base, kind, sprite, size, natural);
     }
 }

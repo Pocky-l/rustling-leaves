@@ -35,6 +35,8 @@ import com.pockyl.rustling_leaves.platform.ClientPlatform;
 import com.pockyl.rustling_leaves.sim.LeafPalette;
 import com.pockyl.rustling_leaves.sim.LeafPool;
 import com.pockyl.rustling_leaves.sim.LeafShape;
+import com.pockyl.rustling_leaves.sim.TreeKinds;
+import com.pockyl.rustling_leaves.sim.TreeProfile;
 import com.pockyl.rustling_leaves.sim.LeafSimulation;
 import com.pockyl.rustling_leaves.sim.LitterChunk;
 import com.pockyl.rustling_leaves.sim.LitterField;
@@ -123,6 +125,10 @@ final class LeafRenderer implements AutoCloseable {
     /** The pile body sits below the loose leaves and is darker: it reads as the depth of the pile. */
     private static final float BODY_SINK = 0.02F;
     private static final float BODY_SHADE = 0.88F;
+    /** A body cell this much above the average of its corners gets a peak of its own (see {@link #emitSurface}). */
+    private static final float PEAK_MIN = 0.03F;
+    /** Edges of a pile body at most this much above the ground need no wall under them. */
+    private static final float SKIRT_MIN = 0.06F;
     /** Stacks this deep hide the ground completely: they get the solid body under their leaf layer. */
     private static final int BODY_MIN = 12;
     /** Stacks this deep get the denser leaf layer. */
@@ -132,8 +138,8 @@ final class LeafRenderer implements AutoCloseable {
     private static final int TEX_BODY = 0;
     private static final int TEX_SPARSE = 1;
     private static final int TEX_LAYER = 2;
-    /** Added to a layer texture index for litter of conifers: the same three layers made of needles. */
-    private static final int TEX_NEEDLES = 3;
+    /** Layer textures come in sets of three (body, sparse, dense), one set per leaf texture ({@link LeafStyles#layers}). */
+    private static final int TEX_SET = 3;
     private static final int RING = LitterChunk.TILE + 2;
     /** The tile and two cells around it, the reach of the shadow at the foot of a stack. */
     private static final int FOOT = LitterChunk.TILE + 4;
@@ -158,20 +164,23 @@ final class LeafRenderer implements AutoCloseable {
      * shadows; the drop shadows and shading inside piles are opaque and stay.
      */
     private boolean groundShadows;
-    private final float[] shadowU0 = new float[LeafShapes.SHADOW_SPRITES.length];
-    private final float[] shadowV0 = new float[LeafShapes.SHADOW_SPRITES.length];
-    private final float[] shadowU1 = new float[LeafShapes.SHADOW_SPRITES.length];
-    private final float[] shadowV1 = new float[LeafShapes.SHADOW_SPRITES.length];
+    private float[] shadowU0 = new float[0];
+    private float[] shadowV0 = new float[0];
+    private float[] shadowU1 = new float[0];
+    private float[] shadowV1 = new float[0];
     /** Shadow on the ground of the tile's cells and a margin of two cells: 0 none, 1 sparse, 2 dense. */
     private final byte[] footShadow = new byte[FOOT * FOOT];
     private final double[] footGround = new double[FOOT * FOOT];
     private boolean shaderPack;
     /** Whether the meshes were built with the mod's old leaf textures (option {@code oldLeafTextures}). */
     private boolean oldTextures;
-    private final float[] u0 = new float[LeafShapes.SPRITES.length];
-    private final float[] v0 = new float[LeafShapes.SPRITES.length];
-    private final float[] u1 = new float[LeafShapes.SPRITES.length];
-    private final float[] v1 = new float[LeafShapes.SPRITES.length];
+    /** The tree settings the meshes were built with ({@link TreeConfig#revision}). */
+    private int treeRevision;
+    /** Atlas coordinates of every leaf sprite ({@link LeafStyles#sprites}: built-in ones and those of the tree settings). */
+    private float[] u0 = new float[0];
+    private float[] v0 = new float[0];
+    private float[] u1 = new float[0];
+    private float[] v1 = new float[0];
     private final int[] ringCount = new int[RING * RING];
     private final double[] ringBase = new double[RING * RING];
     private final double[] ringTop = new double[RING * RING];
@@ -181,14 +190,16 @@ final class LeafRenderer implements AutoCloseable {
     private int ringCellX;
     private int ringCellZ;
     private final int[] ringColor = new int[RING * RING];
-    private final float[] layerU0 = new float[6];
-    private final float[] layerV0 = new float[6];
-    private final float[] layerU1 = new float[6];
-    private final float[] layerV1 = new float[6];
+    private float[] layerU0 = new float[0];
+    private float[] layerV0 = new float[0];
+    private float[] layerU1 = new float[0];
+    private float[] layerV1 = new float[0];
     private double currentOriginY;
     private float currentSink;
     /** Stack top of the cell whose surface is being built (see {@link #corner}). */
     private double currentTop;
+    /** Whether the surface being built is a pile body: stacks without a body of their own count as the ground. */
+    private boolean currentBody;
     private int frame;
     private int lastTileQuads;
     /** The terrain the level draws this frame, see {@link #drawnChunk}. */
@@ -361,7 +372,8 @@ final class LeafRenderer implements AutoCloseable {
         // Switching the leaf textures rebuilds them too.
         boolean old = simulation.settings().oldLeafTextures;
         boolean shadowsOn = simulation.settings().shadows;
-        if (ShaderPacks.inUse() != shaderPack || old != oldTextures || shadowsOn != shadows) {
+        if (ShaderPacks.inUse() != shaderPack || old != oldTextures || shadowsOn != shadows || TreeConfig.revision() != treeRevision) {
+            treeRevision = TreeConfig.revision();
             shaderPack = ShaderPacks.inUse();
             oldTextures = old;
             shadows = shadowsOn;
@@ -540,28 +552,43 @@ final class LeafRenderer implements AutoCloseable {
 
     private void updateSprites() {
         TextureAtlas atlas = Minecraft.getInstance().getModelManager().getAtlas(TextureAtlas.LOCATION_BLOCKS);
-        for (int s = 0; s < LeafShapes.SPRITES.length; s++) {
-            TextureAtlasSprite sprite = atlas.getSprite(LeafShapes.SPRITES[s]);
+        ResourceLocation[] sprites = LeafStyles.sprites();
+        if (u0.length != sprites.length) {
+            u0 = new float[sprites.length];
+            v0 = new float[sprites.length];
+            u1 = new float[sprites.length];
+            v1 = new float[sprites.length];
+        }
+        for (int s = 0; s < sprites.length; s++) {
+            TextureAtlasSprite sprite = atlas.getSprite(sprites[s]);
             u0[s] = sprite.getU0();
             v0[s] = sprite.getV0();
             u1[s] = sprite.getU1();
             v1[s] = sprite.getV1();
         }
-        for (int s = 0; s < LeafShapes.SHADOW_SPRITES.length; s++) {
-            TextureAtlasSprite sprite = atlas.getSprite(LeafShapes.SHADOW_SPRITES[s]);
+        ResourceLocation[] shadowSprites = LeafStyles.shadows();
+        if (shadowU0.length != shadowSprites.length) {
+            shadowU0 = new float[shadowSprites.length];
+            shadowV0 = new float[shadowSprites.length];
+            shadowU1 = new float[shadowSprites.length];
+            shadowV1 = new float[shadowSprites.length];
+        }
+        for (int s = 0; s < shadowSprites.length; s++) {
+            TextureAtlasSprite sprite = atlas.getSprite(shadowSprites[s]);
             shadowU0[s] = sprite.getU0();
             shadowV0[s] = sprite.getV0();
             shadowU1[s] = sprite.getU1();
             shadowV1[s] = sprite.getV1();
         }
-        // The old leaf textures bring back the old pile textures too, for conifers as well.
-        ResourceLocation[] layers = oldTextures
-                ? new ResourceLocation[] {LeafShapes.OLD_LITTER, LeafShapes.OLD_LITTER_SPARSE, LeafShapes.OLD_LITTER_LAYER,
-                        LeafShapes.OLD_LITTER, LeafShapes.OLD_LITTER_SPARSE, LeafShapes.OLD_LITTER_LAYER}
-                : new ResourceLocation[] {LeafShapes.LITTER, LeafShapes.LITTER_SPARSE, LeafShapes.LITTER_LAYER,
-                        LeafShapes.NEEDLE_LITTER, LeafShapes.NEEDLE_LITTER_SPARSE, LeafShapes.NEEDLE_LITTER_LAYER};
-        for (int t = 0; t < layers.length; t++) {
-            TextureAtlasSprite sprite = atlas.getSprite(layers[t]);
+        ResourceLocation[][] sets = LeafStyles.layers();
+        if (layerU0.length != sets.length * TEX_SET) {
+            layerU0 = new float[sets.length * TEX_SET];
+            layerV0 = new float[sets.length * TEX_SET];
+            layerU1 = new float[sets.length * TEX_SET];
+            layerV1 = new float[sets.length * TEX_SET];
+        }
+        for (int t = 0; t < layerU0.length; t++) {
+            TextureAtlasSprite sprite = atlas.getSprite(sets[t / TEX_SET][t % TEX_SET]);
             layerU0[t] = sprite.getU0();
             layerV0[t] = sprite.getV0();
             layerU1[t] = sprite.getU1();
@@ -693,11 +720,10 @@ final class LeafRenderer implements AutoCloseable {
         LitterChunk chunk = mesh.chunk;
         mesh.builtRevision = chunk.revision();
         mesh.relight = false;
-        float aged = Math.min(1.0F, simulation.settings().autumnColors + 0.3F);
         int patches = LitterChunk.SIZE / 2;
         float[] height = new float[patches * patches];
         int[] color = new int[patches * patches];
-        boolean[] farNeedles = new boolean[patches * patches];
+        int[] farLayers = new int[patches * patches];
         double minY = Double.MAX_VALUE;
         double maxY = -Double.MAX_VALUE;
         for (int pz = 0; pz < patches; pz++) {
@@ -707,7 +733,7 @@ final class LeafRenderer implements AutoCloseable {
                 double base = 0.0;
                 int filled = 0;
                 int rgb = 0;
-                int needles = 0;
+                int kind = 0;
                 for (int c = 0; c < 4; c++) {
                     int i = LitterField.index(chunk.x * LitterChunk.SIZE + px * 2 + (c & 1), chunk.z * LitterChunk.SIZE + pz * 2 + (c >> 1));
                     int n = chunk.count[i];
@@ -716,7 +742,7 @@ final class LeafRenderer implements AutoCloseable {
                         topSum += chunk.base[i] + n * LitterField.LAYER;
                         base = chunk.base[i];
                         rgb = chunk.color[i];
-                        needles += chunk.shape[i] == LeafShape.NEEDLE.ordinal() ? 1 : 0;
+                        kind = chunk.shape[i];
                         filled++;
                     }
                 }
@@ -729,9 +755,9 @@ final class LeafRenderer implements AutoCloseable {
                 height[p] = (float) y;
                 int cellX = chunk.x * LitterChunk.SIZE + px * 2;
                 int cellZ = chunk.z * LitterChunk.SIZE + pz * 2;
-                farNeedles[p] = needles * 2 > filled;
-                color[p] = LeafPalette.vary(rgb, LeafPalette.hash(cellX, cellZ, 0x7A), aged,
-                        farNeedles[p] ? LeafShape.NEEDLE : LeafShape.BROAD);
+                TreeProfile profile = TreeKinds.profile(kind);
+                farLayers[p] = layerSet(kind);
+                color[p] = profile.vary(rgb, LeafPalette.hash(cellX, cellZ, 0x7A), profile.agedShare(simulation.settings()));
                 minY = Math.min(minY, y);
                 maxY = Math.max(maxY, y);
             }
@@ -759,7 +785,7 @@ final class LeafRenderer implements AutoCloseable {
                 int light = simulation.lightAt(mesh.originX + x0 + half * 0.5, height[p] + 0.1, mesh.originZ + z0 + half * 0.5);
                 int cellX = chunk.x * LitterChunk.SIZE + px * 2;
                 int cellZ = chunk.z * LitterChunk.SIZE + pz * 2;
-                float[] uv = layerUv(TEX_BODY + (farNeedles[p] ? TEX_NEEDLES : 0), cellX, cellZ, 2);
+                float[] uv = layerUv(TEX_BODY + farLayers[p] * TEX_SET, cellX, cellZ, 2);
                 int argb = 0xFF000000 | color[p];
                 int overlay = OverlayTexture.NO_OVERLAY;
                 // Counter-clockwise seen from above (shader packs recompute the normal from the winding).
@@ -782,6 +808,12 @@ final class LeafRenderer implements AutoCloseable {
         mesh.buffer.bind();
         mesh.buffer.upload(data);
         mesh.empty = false;
+    }
+
+    /** The pile textures of a kind of tree; the option of the old textures brings back the old ones for the default textures. */
+    private int layerSet(int kind) {
+        TreeProfile profile = TreeKinds.profile(kind);
+        return oldTextures && profile.defaultTexture ? LeafStyles.LAYERS_OLD : profile.layers;
     }
 
     /**
@@ -876,11 +908,11 @@ final class LeafRenderer implements AutoCloseable {
                 int layers = topLayers;
                 if (n >= SURFACE_MIN) {
                     // Carpet: a leaf layer with gaps over the ground. Pile: a solid shadowed body under that layer.
-                    int textures = chunk.shape[i] == LeafShape.NEEDLE.ordinal() ? TEX_NEEDLES : 0;
+                    int textures = layerSet(chunk.shape[i]) * TEX_SET;
                     if (n >= BODY_MIN) {
-                        emitSurface(builder, tile, lx, lz, base, light, TEX_BODY + textures,
+                        quads += emitSurface(builder, tile, lx, lz, base, light, TEX_BODY + textures,
                                 tile.wantDetailed ? BODY_SINK : MID_BODY_SINK, BODY_SHADE * occlusion);
-                        quads++;
+                        quads += emitSkirts(builder, tile, lx, lz, base, light, TEX_BODY + textures, BODY_SHADE * occlusion);
                     }
                     emitSurface(builder, tile, lx, lz, base, light, (n >= DENSE_MIN ? TEX_LAYER : TEX_SPARSE) + textures,
                             LAYER_SINK, occlusion);
@@ -1043,6 +1075,9 @@ final class LeafRenderer implements AutoCloseable {
      */
     private void flatQuad(BufferBuilder builder, float y, float x0, float z0, float x1, float z1, float x2, float z2, float x3,
             float z3, int s, int color, int light) {
+        if (s >= shadowU0.length) {
+            s = LeafShapes.SHADOW_LEAF;
+        }
         float su0 = shadowU0[s];
         float sv0 = shadowV0[s];
         float su1 = shadowU1[s];
@@ -1077,7 +1112,6 @@ final class LeafRenderer implements AutoCloseable {
     private void loadRing(Tile tile) {
         ringCellX = tile.cellX;
         ringCellZ = tile.cellZ;
-        float aged = Math.min(1.0F, simulation.settings().autumnColors + 0.3F);
         for (int rz = 0; rz < RING; rz++) {
             for (int rx = 0; rx < RING; rx++) {
                 int cellX = tile.cellX + rx - 1;
@@ -1091,8 +1125,9 @@ final class LeafRenderer implements AutoCloseable {
                 if (n > 0) {
                     ringBase[r] = chunk.base[i];
                     ringTop[r] = chunk.base[i] + n * LitterField.LAYER;
-                    ringColor[r] = LeafPalette.vary(chunk.color[i], LeafPalette.hash(cellX, cellZ, 0x5F), aged,
-                            LeafShape.byId(chunk.shape[i]));
+                    TreeProfile profile = TreeKinds.profile(chunk.shape[i]);
+                    ringColor[r] = profile.vary(chunk.color[i], LeafPalette.hash(cellX, cellZ, 0x5F),
+                            profile.agedShare(simulation.settings()));
                 }
             }
         }
@@ -1101,12 +1136,17 @@ final class LeafRenderer implements AutoCloseable {
     /**
      * One quad per cell of the smooth litter surface: its corners are the average heights of the four cells around
      * them, so carpets and piles are smooth mounds that run down to the ground at their edges. Used for the solid
-     * pile body and for the leaf layers with gaps; {@code sink} puts it below the loose top leaves.
+     * pile body and for the leaf layers with gaps; {@code sink} puts it below the loose top leaves. A body cell that
+     * stands well above its corners (the steep edge of a raked pile) gets a peak at its own height instead: four
+     * triangles, so its loose leaves lie on the body and do not float over a gap one sees the ground through.
+     *
+     * @return the number of quads emitted
      */
-    private void emitSurface(BufferBuilder builder, Tile tile, int lx, int lz, double base, int light, int texture, float sink,
+    private int emitSurface(BufferBuilder builder, Tile tile, int lx, int lz, double base, int light, int texture, float sink,
             float shadeFactor) {
         currentSink = sink;
         currentTop = ringTop[(lz + 1) * RING + lx + 1];
+        currentBody = texture % TEX_SET == TEX_BODY;
         float h00 = corner(lx, lz, base);
         float h10 = corner(lx + 1, lz, base);
         float h11 = corner(lx + 1, lz + 1, base);
@@ -1123,10 +1163,102 @@ final class LeafRenderer implements AutoCloseable {
         float z0 = lz * LitterField.CELL;
         float x1 = x0 + LitterField.CELL;
         float z1 = z0 + LitterField.CELL;
+        float peak = (float) (currentTop - LitterField.SURFACE_DROP - sink - currentOriginY);
+        if (currentBody && peak > (h00 + h10 + h11 + h01) * 0.25F + PEAK_MIN) {
+            float xc = x0 + LitterField.CELL * 0.5F;
+            float zc = z0 + LitterField.CELL * 0.5F;
+            float uc = (uv[0] + uv[1]) * 0.5F;
+            float vc = (uv[2] + uv[3]) * 0.5F;
+            int center = opaque(ringColor[self], faceShade(0.0F, 1.0F, 0.0F) * shadeFactor);
+            // Counter-clockwise seen from above, like the quad; the last corner repeats the peak.
+            bodyVertex(builder, lx, lz, base, x0, h00, z0, c00, uv[0], uv[2], light, shadeFactor);
+            bodyVertex(builder, lx, lz + 1, base, x0, h01, z1, c01, uv[0], uv[3], light, shadeFactor);
+            vertex(builder, xc, peak, zc, center, uc, vc, OverlayTexture.NO_OVERLAY, light, 0.0F, 1.0F, 0.0F);
+            vertex(builder, xc, peak, zc, center, uc, vc, OverlayTexture.NO_OVERLAY, light, 0.0F, 1.0F, 0.0F);
+            bodyVertex(builder, lx, lz + 1, base, x0, h01, z1, c01, uv[0], uv[3], light, shadeFactor);
+            bodyVertex(builder, lx + 1, lz + 1, base, x1, h11, z1, c11, uv[1], uv[3], light, shadeFactor);
+            vertex(builder, xc, peak, zc, center, uc, vc, OverlayTexture.NO_OVERLAY, light, 0.0F, 1.0F, 0.0F);
+            vertex(builder, xc, peak, zc, center, uc, vc, OverlayTexture.NO_OVERLAY, light, 0.0F, 1.0F, 0.0F);
+            bodyVertex(builder, lx + 1, lz + 1, base, x1, h11, z1, c11, uv[1], uv[3], light, shadeFactor);
+            bodyVertex(builder, lx + 1, lz, base, x1, h10, z0, c10, uv[1], uv[2], light, shadeFactor);
+            vertex(builder, xc, peak, zc, center, uc, vc, OverlayTexture.NO_OVERLAY, light, 0.0F, 1.0F, 0.0F);
+            vertex(builder, xc, peak, zc, center, uc, vc, OverlayTexture.NO_OVERLAY, light, 0.0F, 1.0F, 0.0F);
+            bodyVertex(builder, lx + 1, lz, base, x1, h10, z0, c10, uv[1], uv[2], light, shadeFactor);
+            bodyVertex(builder, lx, lz, base, x0, h00, z0, c00, uv[0], uv[2], light, shadeFactor);
+            vertex(builder, xc, peak, zc, center, uc, vc, OverlayTexture.NO_OVERLAY, light, 0.0F, 1.0F, 0.0F);
+            vertex(builder, xc, peak, zc, center, uc, vc, OverlayTexture.NO_OVERLAY, light, 0.0F, 1.0F, 0.0F);
+            return 4;
+        }
         bodyVertex(builder, lx, lz, base, x0, h00, z0, c00, uv[0], uv[2], light, shadeFactor);
         bodyVertex(builder, lx, lz + 1, base, x0, h01, z1, c01, uv[0], uv[3], light, shadeFactor);
         bodyVertex(builder, lx + 1, lz + 1, base, x1, h11, z1, c11, uv[1], uv[3], light, shadeFactor);
         bodyVertex(builder, lx + 1, lz, base, x1, h10, z0, c10, uv[1], uv[2], light, shadeFactor);
+        return 1;
+    }
+
+    /**
+     * Walls under the edges of a pile body where the neighbouring cell has no body of its own (a thin carpet, bare
+     * ground or a step to another level): the body runs down towards the ground there, but its edge corners are still
+     * averages with the stack itself, a little above the ground, and a step keeps the body level. Each wall runs from
+     * the body edge (as last set up by {@link #emitSurface}) down into the ground.
+     *
+     * @return the number of quads emitted
+     */
+    private int emitSkirts(BufferBuilder builder, Tile tile, int lx, int lz, double base, int light, int texture, float shadeFactor) {
+        int self = (lz + 1) * RING + lx + 1;
+        float[] uv = layerUv(texture, tile.cellX + lx, tile.cellZ + lz, 1);
+        float dv = uv[3] - uv[2];
+        int emitted = 0;
+        for (int side = 0; side < 4; side++) {
+            int dx = side == 0 ? 1 : side == 1 ? -1 : 0;
+            int dz = side == 2 ? 1 : side == 3 ? -1 : 0;
+            int r = self + dz * RING + dx;
+            double ground;
+            if (ringCount[r] > 0 && Math.abs(ringBase[r] - base) <= LitterField.SAME_LEVEL) {
+                if (ringCount[r] >= BODY_MIN) {
+                    continue;
+                }
+                ground = ringBase[r];
+            } else {
+                ground = ringCount[r] > 0 ? ringBase[r] : emptyGround(r, base);
+                if (ground > base + LitterField.SAME_LEVEL) {
+                    // A wall or a higher block: it hides the edge itself.
+                    continue;
+                }
+            }
+            // The two corners of this edge, in the order that keeps the quad's corners going round.
+            int ax = dx > 0 ? lx + 1 : lx;
+            int az = dz > 0 ? lz + 1 : lz;
+            int bx = dx != 0 ? ax : lx + 1;
+            int bz = dx != 0 ? az + 1 : az;
+            float ha = corner(ax, az, base);
+            float hb = corner(bx, bz, base);
+            // Down to this cell's own ground: below it is the side of its block (a step down) or the lower ground.
+            float bottom = (float) (Math.min(base, ground < base - LitterField.SAME_LEVEL ? base : ground) - tile.originY) - 0.02F;
+            if (Math.max(ha, hb) <= bottom + SKIRT_MIN) {
+                continue;
+            }
+            int ca = cornerColor(ax, az, self);
+            int cb = cornerColor(bx, bz, self);
+            float shade = faceShade(dx, 0.0F, dz) * shadeFactor;
+            float xa = ax * LitterField.CELL;
+            float za = az * LitterField.CELL;
+            float xb = bx * LitterField.CELL;
+            float zb = bz * LitterField.CELL;
+            // In bands one cell high, each with the cell's texture, so the texture repeats instead of stretching.
+            for (float low = bottom; low < Math.max(ha, hb); low += LitterField.CELL) {
+                float topA = Math.max(low, Math.min(ha, low + LitterField.CELL));
+                float topB = Math.max(low, Math.min(hb, low + LitterField.CELL));
+                float va = uv[2] + dv * (1.0F - (topA - low) / LitterField.CELL);
+                float vb = uv[2] + dv * (1.0F - (topB - low) / LitterField.CELL);
+                vertex(builder, xa, topA, za, opaque(ca, shade), uv[0], va, OverlayTexture.NO_OVERLAY, light, dx, 0.0F, dz);
+                vertex(builder, xa, low, za, opaque(ca, shade), uv[0], uv[3], OverlayTexture.NO_OVERLAY, light, dx, 0.0F, dz);
+                vertex(builder, xb, low, zb, opaque(cb, shade), uv[1], uv[3], OverlayTexture.NO_OVERLAY, light, dx, 0.0F, dz);
+                vertex(builder, xb, topB, zb, opaque(cb, shade), uv[1], vb, OverlayTexture.NO_OVERLAY, light, dx, 0.0F, dz);
+                emitted++;
+            }
+        }
+        return emitted;
     }
 
     /** One corner of the pile body, shaded with a normal smoothed over the neighboring corners (no facets). */
@@ -1161,8 +1293,12 @@ final class LeafRenderer implements AutoCloseable {
                 if (Math.abs(ground - base) > LitterField.SAME_LEVEL) {
                     // A step to another level (slab, stairs): the surface stays level instead of bending over it.
                     sum += currentTop;
+                } else if (currentBody ? ringCount[r] >= BODY_MIN : ringCount[r] > 0) {
+                    sum += ringTop[r];
                 } else {
-                    sum += ringCount[r] > 0 ? ringTop[r] : base;
+                    // A pile body runs down to the ground under the thin carpet around it (that carpet is a leaf layer
+                    // with gaps: a body edge at the carpet's height left a gap under the pile one could see through).
+                    sum += base;
                 }
             }
         }
@@ -1247,7 +1383,7 @@ final class LeafRenderer implements AutoCloseable {
             float pitch = Mth.lerp(partialTick, pool.prevPitch[i], pool.pitch[i]);
             float roll = Mth.lerp(partialTick, pool.prevRoll[i], pool.roll[i]);
             if (blockIds != null) {
-                IrisBlocks.begin(builder, blockIds[pool.shape[i]], Mth.floor(x), Mth.floor(y), Mth.floor(z));
+                IrisBlocks.begin(builder, blockIds[TreeKinds.shape(pool.shape[i]).ordinal()], Mth.floor(x), Mth.floor(y), Mth.floor(z));
             }
             emit(builder, x, y, z, yaw, pitch, roll, size, color, pool.light[i], LeafShapes.slot(pool.shape[i], pool.sprite[i], oldTextures));
             float ground = pool.shadow[i];
@@ -1332,6 +1468,10 @@ final class LeafRenderer implements AutoCloseable {
      */
     private void emit(BufferBuilder builder, float x, float y, float z, float yaw, float pitch, float roll, float half, int rgb,
             int light, int sprite) {
+        if (sprite >= u0.length) {
+            // A sprite of tree settings that were just changed: drawn with the plain leaf until it is gone.
+            sprite = 0;
+        }
         float sa = Mth.sin(yaw);
         float ca = Mth.cos(yaw);
         float sb = Mth.sin(pitch);

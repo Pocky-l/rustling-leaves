@@ -15,7 +15,8 @@
   "environment": "*",
   "entrypoints": {
     "main": ["com.pockyl.rustling_leaves.fabric.RustlingLeavesFabric"],
-    "client": ["com.pockyl.rustling_leaves.fabric.RustlingLeavesFabricClient"]
+    "client": ["com.pockyl.rustling_leaves.fabric.RustlingLeavesFabricClient"],
+    "modmenu": ["com.pockyl.rustling_leaves.fabric.ModMenuEntry"]
   },
   "mixins": ["rustling_leaves.mixins.json", "rustling_leaves.fabric.mixins.json"],
   "accessWidener": "rustling_leaves.accesswidener",

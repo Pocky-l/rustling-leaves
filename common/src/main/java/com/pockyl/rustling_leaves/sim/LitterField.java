@@ -175,7 +175,7 @@ public final class LitterField {
         if (n == 0) {
             chunk.base[i] = (float) base;
             chunk.color[i] = baseColor;
-            chunk.shape[i] = (byte) shape;
+            chunk.shape[i] = (short) shape;
         } else {
             chunk.color[i] = LeafPalette.lerp(chunk.color[i], baseColor, 1.0F / (n + 1));
         }
@@ -257,7 +257,7 @@ public final class LitterField {
         if (n == 0) {
             chunk.base[i] = (float) base;
             chunk.color[i] = baseColor;
-            chunk.shape[i] = (byte) shape;
+            chunk.shape[i] = (short) shape;
             chunk.top[i] = 0L;
         } else {
             chunk.color[i] = LeafPalette.lerp(chunk.color[i], baseColor, added / (float) (n + added));
@@ -478,7 +478,7 @@ public final class LitterField {
         int i = index(cellX, cellZ);
         int n = chunk.count[i];
         long hash = LeafPalette.hash(cellX, cellZ, layer);
-        LeafShape shape = LeafShape.byId(chunk.shape[i]);
+        TreeProfile profile = TreeKinds.profile(chunk.shape[i]);
         float offX;
         float offZ;
         long top = chunk.top[i];
@@ -487,20 +487,20 @@ public final class LitterField {
             offZ = dequantize(top >>> 10, -0.2F, 1.2F);
             out.yaw = dequantize(top >>> 20, 0.0F, Mth.TWO_PI);
             out.size = dequantize(top >>> 30, 0.0F, 0.6F);
-            out.sprite = shape.ownSprite((int) (top >>> 40 & 15));
+            out.sprite = profile.spriteOf((int) (top >>> 40 & 15));
             out.color = chunk.topColor[i];
         } else {
             offX = -0.15F + unit(hash, 0) * 1.3F;
             offZ = -0.15F + unit(hash, 10) * 1.3F;
             out.yaw = unit(hash, 20) * Mth.TWO_PI;
-            out.size = LeafShape.BASE_SIZE * shape.size * settings.leafSize * (0.8F + unit(hash, 30) * 0.45F);
-            out.sprite = shape.firstSprite + Math.min(shape.variants - 1, (int) (unit(hash, 40) * shape.variants));
-            out.color = LeafPalette.vary(chunk.color[i], hash, Math.min(1.0F, settings.autumnColors + 0.3F), shape);
+            out.size = profile.leafSize(settings, unit(hash, 30));
+            out.sprite = profile.sprite(unit(hash, 40));
+            out.color = profile.vary(chunk.color[i], hash, profile.agedShare(settings));
         }
         out.x = (cellX + offX) * CELL;
         out.z = (cellZ + offZ) * CELL;
         out.baseColor = chunk.color[i];
-        out.shape = shape.ordinal();
+        out.shape = chunk.shape[i];
         if (n >= SURFACE_MIN) {
             onSurface(chunk, cellX, cellZ, n - 1 - layer, offX, offZ, hash, layer == n - 1 && top != 0L, out);
             keepClear(out);

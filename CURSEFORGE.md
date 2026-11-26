@@ -63,15 +63,22 @@ Physically simulated leaves: falling leaves, leaf piles you can wade through, ra
   without leaves popping in; only moving leaves are
   simulated in full, and everything that pushes leaves finds them through a spatial grid. The F3 screen shows the
   current numbers.
+- **Set up every tree in game**: its leaf texture (vanilla leaf, petal, needles, maple, oak, ginkgo, willow or a
+  resource pack's), its own colours, weight, glide, size and how long its leaves lie, or no leaves at all.
+- **Hits and fire**: hitting or mining leaves shakes a few loose, and flint and steel or a fire charge burns the fallen
+  leaves within about two blocks.
 - **Client-side**: the mod adds no items or blocks, so it works on any server, with or without the mod,
   even on vanilla servers. On the server it is optional and only passes on where players rake.
 
 ## Configuration
 
-Everything can be tuned in the in-game config screen: number of leaves, fall rate, radius, how long fallen leaves
+Everything can be tuned in `config/rustling_leaves-client.toml`: number of leaves, fall rate, radius, how long fallen leaves
 lie before they rot away, carpet thickness, leaf size, autumn colors, wind, squalls and whirlwinds, footstep and
 explosion strength, raking, rustle volume, how leaf fall and the rot of the litter follow the seasons, and whether
 Immersive Weathering's leaf piles are drawn as leaf litter.
+
+The settings of single trees open from the config button (on Fabric with [Mod Menu](https://modrinth.com/mod/modmenu))
+or with `/rustlingleaves trees` while looking at a tree, and live in `config/rustling_leaves-trees.json`.
 
 ## Compatibility
 

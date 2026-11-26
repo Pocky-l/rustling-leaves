@@ -55,6 +55,11 @@
   litter on the ground looks a bit more aged. Oak, birch, spruce and cherry trees drop different shapes.
 - **Every tree sheds its own way**: birches drop leaves more often, spruces and other conifers hardly ever lose a
   needle. Cherry trees drop simulated petals instead of the vanilla petal particles, exactly as many as vanilla does.
+- **Set up every tree in game**: its leaf texture (vanilla leaf, petal, needles, maple, oak, ginkgo, willow or a
+  resource pack's), its own colours, how many turn, how often it sheds, how heavy its leaves are, how well they glide,
+  their size and how long they lie. Or switch the leaves of one tree off entirely.
+- **Hits and fire**: hitting or mining leaves shakes a few loose, and flint and steel or a fire charge burns the fallen
+  leaves within about two blocks in a flash of flame and smoke.
 - **Seasons** (with [Serene Seasons](https://www.curseforge.com/minecraft/mc-mods/serene-seasons)): leaf fall is an autumn event - the first leaves come down in early autumn,
   most of them in mid and late autumn, more and more of them yellow, orange and red until by late autumn nearly every
   leaf is, and the last few brown ones in early winter. In winter, spring and summer the trees keep their leaves; only
@@ -88,9 +93,40 @@ No keys. Just play:
 | Sneak + hold right click with a hoe or shovel | Rake the leaves around that spot into a pile |
 | Throw a wind charge (1.21.1 only) | Blows leaves away in a swirl |
 | Explode TNT | Clears the ground and throws leaves high into the air |
+| Hit or mine a leaves block | Shakes leaves loose with every blow |
 | Break a leaves block | Releases a burst of leaves |
+| Flint and steel / fire charge on leaf litter | The leaves around (about 2 blocks) burn at once |
 
 ## Configuration
+
+### Trees
+
+Mods -> Rustling Leaves -> Config (on Fabric with [Mod Menu](https://modrinth.com/mod/modmenu)), or
+`/rustlingleaves trees` (looking at a tree opens that tree): every leaves block, and "every tree" on top, with a little
+window of its leaves falling as they would. The game keeps running behind the screen, so the trees around you show each
+change.
+
+| Setting | What it does |
+|---|---|
+| Leaves | Off: this mod leaves the tree alone (no falling leaves, carpet or burst) |
+| Carpet | A natural leaf carpet on new ground under the tree |
+| Texture | By tree, leaf, petal, needles, maple, oak, ginkgo, willow or the old textures |
+| Shedding | How often the tree drops leaves (1 like an oak, 1.5 birch, 0.15 spruce) |
+| Weight | Heavier leaves fall faster and drift less |
+| Glide | How much leaves sway and glide (0 drops them straight) |
+| Size | Leaf size |
+| Lies | In-game days until the fallen leaves rot (0 = until something moves them) |
+| Autumn | Share of leaves in autumn colours (dead needles for conifers) |
+| Autumn colours | The colours they turn to, e.g. `#C8552E, #E0A030` |
+| Own colours | Colours instead of the tree colour; each leaf takes one, one colour makes them all alike |
+
+The settings are saved in `config/rustling_leaves-trees.json`, which modpacks can ship: keys are a block id
+(`minecraft:oak_leaves`), every tree of a mod (`biomesoplenty:*`), a block tag (`#minecraft:leaves`) or every tree
+(`*`), all inside `"trees"`: `{"trees": {"minecraft:oak_leaves": {"texture": "maple", "colors": ["#C8352A"]}}}`. A
+texture can also be a list of sprites from a resource pack (`"texture": ["mypack:block/leaf/a",
+"mypack:block/leaf/b"]`, greyscale sprites are tinted). `/rustlingleaves trees reload` reads the file again.
+
+### Options
 
 `config/rustling_leaves-client.toml` (on 1.21.1 also in the in-game config screen: Mods -> Rustling Leaves -> Config):
 
@@ -173,10 +209,10 @@ The jars are written to `forge/build/libs/` and `fabric/build/libs/` (the shared
 ## Credits
 
 - Author: **Pocky**.
-- Falling leaf and petal textures: from newer Minecraft versions, adapted for tinting. Pile textures and logo:
-  original, made for this mod. Sounds: CC0 field recordings from [Freesound](https://freesound.org) by Shain_T,
-  SpliceSound, Magdaadga, lolamadeus, nickmaysoundmusic, audioninja001, Ryding, Garuda1982 and Stefan21100190, cut
-  for the mod.
+- Falling leaf and petal textures: from newer Minecraft versions, adapted for tinting. Needle, maple, oak, ginkgo and
+  willow sprites, pile textures and logo: original, made for this mod. Sounds: CC0 field recordings from
+  [Freesound](https://freesound.org) by Shain_T, SpliceSound, Magdaadga, lolamadeus, nickmaysoundmusic, audioninja001,
+  Ryding, Garuda1982 and Stefan21100190, cut for the mod.
 
 <!-- more-mods:start -->
 ## More mods by Pocky

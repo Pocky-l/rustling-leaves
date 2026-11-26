@@ -3,11 +3,13 @@ package com.pockyl.rustling_leaves.sim;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Leaf litter of one chunk column: a 64x64 grid of quarter-block cells, each holding a stack of leaves on one surface.
  * A cell stores how many leaves lie there, the height of the surface under them, the color of the tree they came
- * from and their shape; individual leaves are reconstructed from a hash of the cell and layer, except for the top
+ * from and the kind of tree ({@link TreeKinds}); individual leaves are reconstructed from a hash of the cell and layer, except for the top
  * leaf, which keeps the exact pose of the last leaf that landed there (so a landing leaf never jumps).
  */
 public final class LitterChunk {
@@ -16,8 +18,11 @@ public final class LitterChunk {
     /** Render tiles are 16x16 cells (4x4 blocks). */
     public static final int TILE = 16;
     public static final int TILES = SIZE / TILE;
-    /** 2: game times of the last decay and of the last seeding. Format 1 is still read. */
-    private static final int FORMAT = 2;
+    /**
+     * 3: the kinds of trees by key, the top leaf's sprite as a variant of its texture. 2: game times of the last decay
+     * and of the last seeding. Formats 1 and 2 are still read.
+     */
+    private static final int FORMAT = 3;
     /** Color of repaired stacks without any colored stack in their chunk: a plain leaf green. */
     private static final int FALLBACK_COLOR = 0x5A7F2E;
     /** A game time that was never set. */
@@ -28,7 +33,8 @@ public final class LitterChunk {
     public final short[] count = new short[AREA];
     public final float[] base = new float[AREA];
     public final int[] color = new int[AREA];
-    public final byte[] shape = new byte[AREA];
+    /** The kind of tree of every stack ({@link TreeKinds}; 0-3 a bare leaf shape). */
+    public final short[] shape = new short[AREA];
     /** Exact pose of the top leaf (see {@link LitterField#encodeTop}), 0 if the top leaf uses the hashed pose. */
     public final long[] top = new long[AREA];
     public final int[] topColor = new int[AREA];
@@ -127,7 +133,7 @@ public final class LitterChunk {
         count[index] = (short) n;
         base[index] = surface;
         color[index] = treeColor;
-        shape[index] = (byte) leafShape;
+        shape[index] = (short) leafShape;
         top[index] = 0L;
         total += n;
     }
@@ -188,6 +194,24 @@ public final class LitterChunk {
                 cells++;
             }
         }
+        // The kinds of trees by key: kind numbers only last for the session.
+        List<Integer> kinds = new ArrayList<>();
+        short[] slot = new short[AREA];
+        for (int i = 0; i < AREA; i++) {
+            if (loose(i) > 0) {
+                int index = kinds.indexOf((int) shape[i]);
+                if (index < 0) {
+                    index = kinds.size();
+                    kinds.add((int) shape[i]);
+                }
+                slot[i] = (short) index;
+            }
+        }
+        out.writeShort(kinds.size());
+        for (int kind : kinds) {
+            String key = TreeKinds.key(kind);
+            out.writeUTF(key != null ? key : "#" + Math.max(0, Math.min(TreeKinds.SHAPES - 1, kind)));
+        }
         out.writeShort(cells);
         for (int i = 0; i < AREA; i++) {
             if (loose(i) > 0) {
@@ -195,7 +219,7 @@ public final class LitterChunk {
                 out.writeShort(loose(i));
                 out.writeFloat(base[i]);
                 out.writeInt(color[i]);
-                out.writeByte(shape[i]);
+                out.writeShort(slot[i]);
                 out.writeLong(top[i]);
                 out.writeInt(topColor[i]);
             }
@@ -204,7 +228,7 @@ public final class LitterChunk {
 
     public static LitterChunk read(DataInput in) throws IOException {
         int format = in.readByte();
-        if (format != 1 && format != FORMAT) {
+        if (format < 1 || format > FORMAT) {
             throw new IOException("Unknown litter format " + format);
         }
         LitterChunk chunk = new LitterChunk(in.readInt(), in.readInt());
@@ -213,19 +237,46 @@ public final class LitterChunk {
             chunk.decayedAt = in.readLong();
             chunk.seededAt = in.readLong();
         }
+        int[] kinds = null;
+        if (format >= 3) {
+            kinds = new int[in.readUnsignedShort()];
+            for (int k = 0; k < kinds.length; k++) {
+                String key = in.readUTF();
+                kinds[k] = key.startsWith("#") ? bareShape(key) : TreeKinds.id(key);
+            }
+        }
         int cells = in.readUnsignedShort();
         for (int n = 0; n < cells; n++) {
             int i = in.readUnsignedShort() & (AREA - 1);
             chunk.count[i] = in.readShort();
             chunk.base[i] = in.readFloat();
             chunk.color[i] = in.readInt();
-            chunk.shape[i] = in.readByte();
+            if (kinds != null) {
+                int k = in.readUnsignedShort();
+                chunk.shape[i] = (short) (k < kinds.length ? kinds[k] : 0);
+            } else {
+                chunk.shape[i] = (short) Math.max(0, Math.min(TreeKinds.SHAPES - 1, in.readByte()));
+            }
             chunk.top[i] = in.readLong();
+            if (kinds == null && chunk.top[i] != 0L) {
+                // Older top leaves stored the sprite index of their shape; now it is the variant of the tree's texture.
+                LeafShape leafShape = LeafShape.byId(chunk.shape[i]);
+                long sprite = leafShape.ownSprite((int) (chunk.top[i] >>> 40 & 15)) - leafShape.firstSprite;
+                chunk.top[i] = chunk.top[i] & ~(15L << 40) | sprite << 40;
+            }
             chunk.topColor[i] = in.readInt();
             chunk.total += chunk.count[i];
         }
         chunk.repairBlackCells();
         return chunk;
+    }
+
+    private static int bareShape(String key) {
+        try {
+            return Math.max(0, Math.min(TreeKinds.SHAPES - 1, Integer.parseInt(key.substring(1))));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 
     /**

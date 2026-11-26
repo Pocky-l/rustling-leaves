@@ -3,6 +3,18 @@ plugins {
     id 'fabric-loom'
 }
 
+repositories {
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = 'Modrinth'
+                url = 'https://api.modrinth.com/maven'
+            }
+        }
+        filter { includeGroup('maven.modrinth') }
+    }
+}
+
 dependencies {
     minecraft "com.mojang:minecraft:${minecraft_version}"
     mappings loom.layered {
@@ -14,6 +26,7 @@ dependencies {
     // The config: Forge's ForgeConfigSpec and config files on Fabric, so both loaders share Config and its file.
     modApi "fuzs.forgeconfigapiport:forgeconfigapiport-fabric:${forge_config_api_port_version}"
     modCompileOnly "com.github.glitchfiend:SereneSeasons-fabric:${minecraft_version}-${serene_seasons_version}"
+    modCompileOnly "maven.modrinth:modmenu:${modmenu_version}"
     modCompileOnly "com.github.glitchfiend:GlitchCore-fabric:${minecraft_version}-${glitchcore_fabric_version}"
 }
 

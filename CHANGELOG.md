@@ -4,6 +4,24 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.0+1.20.1] - 2026-11-26
+Brings the Minecraft 1.20.1 version up to Rustling Leaves 2.9.0.
+
+### Added
+- Every tree can have its own leaves: texture, colours, weight, glide, size, how often it sheds and how long they lie.
+- A switch per tree turns its leaves off.
+- An in-game editor for it: the config button (on Fabric with Mod Menu), or `/rustlingleaves trees` while looking at a
+  tree.
+- Four new leaf textures in the vanilla style: maple, oak, ginkgo and willow.
+- Modpacks can ship the tree settings in `config/rustling_leaves-trees.json`, with leaf sprites from resource packs.
+- Hitting or mining leaves shakes a few of them loose.
+- Flint and steel or a fire charge burns the fallen leaves around in a flash of flame.
+- On 1.20.1 the config button opens the tree settings; the other options stay in `rustling_leaves-client.toml`.
+
+### Fixed
+- Raked piles no longer show a gap at the ground.
+- With autumn colours at 0, no autumn leaves show up on the ground any more.
+
 ## [2.8.3+1.20.1] - 2026-11-20
 ### Fixed
 - Leaves no longer stay black next to a torch in your hand with dynamic light mods such as

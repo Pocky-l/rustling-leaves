@@ -26,6 +26,8 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
@@ -57,6 +59,7 @@ import com.pockyl.rustling_leaves.sim.LitterChunk;
 import com.pockyl.rustling_leaves.sim.LitterField;
 import com.pockyl.rustling_leaves.sim.PileBlocks;
 import com.pockyl.rustling_leaves.sim.SeasonCurve;
+import com.pockyl.rustling_leaves.sim.TreeKinds;
 import com.pockyl.rustling_leaves.sim.TreeLeaves;
 import com.pockyl.rustling_leaves.sim.WaterWaves;
 import com.pockyl.rustling_leaves.sim.WindSource;
@@ -105,11 +108,19 @@ public final class LeafManager {
     private static final Trees TREES = new Trees();
     private static final LeafSpawner SPAWNER = new LeafSpawner(TREES);
     private static final LitterSeeder SEEDER = new LitterSeeder(COLORS);
+    /** Whether the tree settings file has been read. */
+    private static boolean treesLoaded;
+    /** The tree editor to open on the next tick (a client command runs while the chat screen is still open). */
+    private static Runnable pendingScreen;
     /** Vertical movement of each entity in the previous tick, to detect landings. */
     private static final Int2FloatOpenHashMap LAST_FALL = new Int2FloatOpenHashMap();
     private static final Int2IntOpenHashMap SOUND_READY = new Int2IntOpenHashMap();
+    /** Fire set to leaf litter burns it this far around, in blocks. */
+    private static final float BURN_RADIUS = 2.0F;
     /** Swing progress of the other players in the previous tick, to see a new swing start. */
     private static final Int2IntOpenHashMap LAST_SWING = new Int2IntOpenHashMap();
+    /** Swing of every player at the last tick, to spot new swings at leaves blocks (see {@link #shakeByHits}). */
+    private static final Int2IntOpenHashMap LAST_HIT_SWING = new Int2IntOpenHashMap();
 
     private static volatile boolean configChanged;
     /** How far above the still water floating leaves are drawn while a shader pack draws the water. */
@@ -156,6 +167,16 @@ public final class LeafManager {
     /** Called by the loaders at the end of every client tick. */
     public static void onClientTick() {
         Minecraft minecraft = Minecraft.getInstance();
+        if (!treesLoaded) {
+            treesLoaded = true;
+            TreeKinds.setResolver(TreeConfig::resolve);
+            TreeConfig.load();
+        }
+        if (pendingScreen != null) {
+            Runnable open = pendingScreen;
+            pendingScreen = null;
+            open.run();
+        }
         if (configChanged) {
             configChanged = false;
             int capacity = SETTINGS.maxLeaves;
@@ -173,6 +194,8 @@ public final class LeafManager {
         if (minecraft.level != level) {
             reset();
             level = minecraft.level;
+            // Tags (keys like #minecraft:leaves) come from the server: settings by tag are resolved again.
+            TreeKinds.refresh();
         }
         if (level == null || minecraft.isPaused() || SETTINGS.maxLeaves <= 0) {
             return;
@@ -206,6 +229,7 @@ public final class LeafManager {
         disturbByEntities(camera);
         simulation.finishTick();
         rakeByOtherPlayers(minecraft);
+        shakeByHits(minecraft);
         SPAWNER.tick(level, simulation, camera.x, camera.z);
         storeSome();
         if (ticks % SAVE_INTERVAL == 0) {
@@ -246,7 +270,20 @@ public final class LeafManager {
      */
     public static boolean onUseKey(InteractionHand hand) {
         Minecraft minecraft = Minecraft.getInstance();
-        if (hand != InteractionHand.MAIN_HAND || simulation == null || minecraft.player == null) {
+        if (simulation == null || minecraft.player == null) {
+            return false;
+        }
+        // Vanilla uses the off hand item only when the main hand has none (the loaders ask for the main hand first).
+        ItemStack main = minecraft.player.getMainHandItem();
+        boolean fireItem = hand == InteractionHand.MAIN_HAND
+                && (lights(main) || main.isEmpty() && lights(minecraft.player.getOffhandItem()));
+        if (fireItem && minecraft.hitResult instanceof BlockHitResult fire
+                && fire.getType() == HitResult.Type.BLOCK) {
+            // The item still lights its fire as in vanilla; the litter around goes up with it.
+            burnAt(fire.getLocation());
+            return false;
+        }
+        if (hand != InteractionHand.MAIN_HAND) {
             return false;
         }
         ItemStack stack = minecraft.player.getMainHandItem();
@@ -266,6 +303,19 @@ public final class LeafManager {
             ClientPlatform.INSTANCE.sendRakeToServer(new RakePayload(at.x, at.y, at.z));
         }
         return true;
+    }
+
+    /** Flint and steel and fire charges set the litter on fire. */
+    private static boolean lights(ItemStack stack) {
+        return stack.is(Items.FLINT_AND_STEEL) || stack.is(Items.FIRE_CHARGE);
+    }
+
+    /** Burns the litter around a point where fire was set (radius {@link #BURN_RADIUS}). */
+    private static void burnAt(Vec3 at) {
+        if (simulation.burn(at.x, at.y, at.z, BURN_RADIUS) > 0) {
+            level.playLocalSound(at.x, at.y, at.z, SoundEvents.FIRECHARGE_USE, SoundSource.BLOCKS, 0.35F,
+                    0.8F + level.random.nextFloat() * 0.2F, false);
+        }
     }
 
     /** A player nearby raked at a point (relayed by a server with the mod): the same stroke in our own litter. */
@@ -301,6 +351,64 @@ public final class LeafManager {
      * client sees anyway: a sneaking player with a hoe or shovel starts a main hand swing -> rake where they look.
      * Digging while sneaking with a shovel looks the same and rakes too; that is the price of needing no server part.
      */
+    /**
+     * Hitting leaves shakes a few loose: every new main hand swing of a player at a leaves block within reach, which is
+     * a punch and, while mining, every swing until the block breaks. Seen on every client without a server part; our
+     * own player counts only while attacking, so placing a block against leaves does not shake them.
+     */
+    private static void shakeByHits(Minecraft minecraft) {
+        int count = SETTINGS.leavesPerBreak;
+        double range = SETTINGS.spawnRadius + 8.0;
+        Vec3 camera = cameraPosition(minecraft);
+        for (Player player : level.players()) {
+            if (player.isSpectator() || player.distanceToSqr(camera) > range * range) {
+                continue;
+            }
+            int id = player.getId();
+            int last = LAST_HIT_SWING.getOrDefault(id, Integer.MAX_VALUE);
+            int now = player.swinging ? player.swingTime : Integer.MAX_VALUE;
+            LAST_HIT_SWING.put(id, now);
+            if (now >= last) {
+                continue;
+            }
+            if (player != minecraft.player && lights(player.getItemInHand(player.swingingArm))) {
+                // Another player set fire somewhere: our own player's fire goes through onUseKey.
+                if (player.pick(Platform.INSTANCE.blockReach(player), 1.0F, false) instanceof BlockHitResult fire
+                        && fire.getType() == HitResult.Type.BLOCK) {
+                    burnAt(fire.getLocation());
+                }
+                continue;
+            }
+            if (count <= 0 || player.swingingArm != InteractionHand.MAIN_HAND) {
+                continue;
+            }
+            HitResult target;
+            if (player == minecraft.player) {
+                if (!minecraft.options.keyAttack.isDown()) {
+                    continue;
+                }
+                target = minecraft.hitResult;
+            } else {
+                target = player.pick(Platform.INSTANCE.blockReach(player), 1.0F, false);
+            }
+            if (!(target instanceof BlockHitResult hit) || hit.getType() != HitResult.Type.BLOCK) {
+                continue;
+            }
+            BlockState state = level.getBlockState(hit.getBlockPos());
+            if (!state.is(BlockTags.LEAVES)) {
+                continue;
+            }
+            Vec3 look = player.getLookAngle();
+            double flat = Math.sqrt(look.x * look.x + look.z * look.z);
+            float pushX = flat > 1.0E-4 ? (float) (look.x / flat) : 0.0F;
+            float pushZ = flat > 1.0E-4 ? (float) (look.z / flat) : 0.0F;
+            // About a fifth of the burst of a broken block per blow: 3 with the default 14.
+            float share = count * 0.2F;
+            int leaves = Mth.floor(share) + (level.random.nextFloat() < Mth.frac(share) ? 1 : 0);
+            SPAWNER.shake(level, simulation, hit.getBlockPos(), state, hit.getDirection(), pushX, pushZ, leaves);
+        }
+    }
+
     private static void rakeByOtherPlayers(Minecraft minecraft) {
         ClientPacketListener connection = minecraft.getConnection();
         if (!SETTINGS.raking || connection == null || ClientPlatform.INSTANCE.serverHasRake()) {
@@ -393,8 +501,31 @@ public final class LeafManager {
         if (simulation == null || particleLevel != level) {
             return false;
         }
+        if (!LeafShapes.profile(state.getBlock()).enabled) {
+            // The player switched this tree off: vanilla's own petals fall instead.
+            return false;
+        }
         SPAWNER.dropBelow(level, simulation, state, pos);
         return true;
+    }
+
+    /** The settings the simulation runs with (the editor shows the defaults from them). */
+    static LeafSettings settings() {
+        return SETTINGS;
+    }
+
+    /** The colour of a tree where the player stands (the editor's preview), a plain green outside a world. */
+    static int treeColor(BlockState state) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.level == null || minecraft.player == null || state == null) {
+            return 0x6A9F3A;
+        }
+        return COLORS.base(state, minecraft.level, minecraft.player.blockPosition());
+    }
+
+    /** Opens a screen on the next client tick. */
+    static void openLater(Runnable open) {
+        pendingScreen = open;
     }
 
     public static void onBlockChanged(ClientLevel changed, BlockPos pos, BlockState oldState, BlockState newState) {
@@ -473,7 +604,7 @@ public final class LeafManager {
         double keepSq = (radius + 24.0) * (radius + 24.0);
         double loadSq = (radius + 8.0) * (radius + 8.0);
         long now = level.getGameTime();
-        boolean refresh = SETTINGS.decayRate() > 0.0F || SETTINGS.seasonLitter != 1.0F;
+        boolean refresh = SETTINGS.decayRate() > 0.0F || TreeConfig.ownLifetimes() || SETTINGS.seasonLitter != 1.0F;
         if (ticks % 10 == 0) {
             double shedding = SETTINGS.spawnRadius + 16.0;
             List<LitterChunk> far = new ArrayList<>();
@@ -718,6 +849,7 @@ public final class LeafManager {
         LAST_FALL.clear();
         SOUND_READY.clear();
         LAST_SWING.clear();
+        LAST_HIT_SWING.clear();
         COLORS.clear();
     }
 
@@ -730,7 +862,12 @@ public final class LeafManager {
 
         @Override
         public LeafShape shape(BlockState state) {
-            return LeafShapes.of(state.getBlock());
+            return LeafShapes.profile(state.getBlock()).shape;
+        }
+
+        @Override
+        public int kind(BlockState state) {
+            return LeafShapes.kind(state.getBlock());
         }
     }
 
@@ -753,6 +890,22 @@ public final class LeafManager {
         @Override
         public void onBurn(double x, double y, double z) {
             level.addParticle(ParticleTypes.SMOKE, x, y + 0.1, z, 0.0, 0.03, 0.0);
+        }
+
+        @Override
+        public void onFire(double x, double y, double z) {
+            // Every cell flares up: a tongue of flame, smoke, now and then a thicker puff.
+            double ox = (level.random.nextDouble() - 0.5) * 0.2;
+            double oz = (level.random.nextDouble() - 0.5) * 0.2;
+            if (level.random.nextFloat() < 0.6F) {
+                level.addParticle(ParticleTypes.FLAME, x + ox, y + 0.05, z + oz, 0.0, 0.02 + level.random.nextDouble() * 0.03, 0.0);
+            }
+            if (level.random.nextFloat() < 0.25F) {
+                level.addParticle(ParticleTypes.SMOKE, x - ox, y + 0.15, z - oz, 0.0, 0.04, 0.0);
+            }
+            if (level.random.nextFloat() < 0.06F) {
+                level.addParticle(ParticleTypes.LARGE_SMOKE, x, y + 0.2, z, 0.0, 0.05, 0.0);
+            }
         }
     }
 }

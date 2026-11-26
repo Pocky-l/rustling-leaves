@@ -1,5 +1,6 @@
 package com.pockyl.rustling_leaves.forge;
 
+import net.minecraftforge.client.ConfigScreenHandler;
 import net.minecraftforge.client.event.CustomizeGuiOverlayEvent;
 import net.minecraftforge.client.event.InputEvent;
 import net.minecraftforge.client.event.ModelEvent;
@@ -17,6 +18,7 @@ import com.pockyl.rustling_leaves.Config;
 import com.pockyl.rustling_leaves.client.LeafCommands;
 import com.pockyl.rustling_leaves.client.LeafManager;
 import com.pockyl.rustling_leaves.client.RustlingLeavesClient;
+import com.pockyl.rustling_leaves.client.TreeEditorScreen;
 import com.pockyl.rustling_leaves.client.compat.ImmersiveWeathering;
 import com.pockyl.rustling_leaves.client.compat.PackWeather;
 
@@ -28,6 +30,9 @@ final class ForgeClient {
     static void init(IEventBus modBus) {
         RustlingLeavesClient.init();
         ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, Config.SPEC);
+        // Forge 47 has no screen of config options, so the config button opens the settings of single trees.
+        ModLoadingContext.get().registerExtensionPoint(ConfigScreenHandler.ConfigScreenFactory.class,
+                () -> new ConfigScreenHandler.ConfigScreenFactory((minecraft, parent) -> new TreeEditorScreen(parent, null)));
         modBus.addListener((ModConfigEvent.Loading event) -> onConfig(event.getConfig()));
         modBus.addListener((ModConfigEvent.Reloading event) -> onConfig(event.getConfig()));
         if (ModList.get().isLoaded(ImmersiveWeathering.MOD_ID)) {
