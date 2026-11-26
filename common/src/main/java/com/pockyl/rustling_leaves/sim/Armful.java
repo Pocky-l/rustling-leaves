@@ -9,7 +9,8 @@ public final class Armful {
     private static final int SAMPLES = 64;
 
     private final int[] colors = new int[SAMPLES];
-    private final byte[] shapes = new byte[SAMPLES];
+    /** Kinds of trees ({@link TreeKinds}). */
+    private final short[] shapes = new short[SAMPLES];
     private int samples;
     private int count;
 
@@ -57,7 +58,7 @@ public final class Armful {
 
     void add(int baseColor, int shape) {
         colors[samples % SAMPLES] = baseColor;
-        shapes[samples % SAMPLES] = (byte) shape;
+        shapes[samples % SAMPLES] = (short) shape;
         samples++;
         count++;
     }

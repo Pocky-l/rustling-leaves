@@ -85,8 +85,10 @@ final class LitterDecay {
         if (chunk.total == 0) {
             return 0;
         }
-        double keep = Math.exp(-settings.decayRate() * LOG_CARPET * elapsed);
-        double snowKeep = Math.exp(-Math.max(settings.decayRate(), SNOW_RATE) * LOG_CARPET * elapsed);
+        // Every kind of tree may rot at its own pace (its lifetime setting); neighbouring cells mostly share one.
+        int lastKind = -1;
+        double keep = 1.0;
+        double snowKeep = 1.0;
         boolean checkSnow = terrain.level != null;
         int originX = chunk.x << 6;
         int originZ = chunk.z << 6;
@@ -95,6 +97,12 @@ final class LitterDecay {
             int loose = chunk.loose(i);
             if (loose <= 0) {
                 continue;
+            }
+            if (chunk.shape[i] != lastKind) {
+                lastKind = chunk.shape[i];
+                float rate = TreeKinds.profile(lastKind).decayRate(settings);
+                keep = Math.exp(-rate * LOG_CARPET * elapsed);
+                snowKeep = Math.exp(-Math.max(rate, SNOW_RATE) * LOG_CARPET * elapsed);
             }
             int cellX = originX + (i & 63);
             int cellZ = originZ + (i >> 6);
