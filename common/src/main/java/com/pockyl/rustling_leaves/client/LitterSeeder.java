@@ -14,6 +14,7 @@ import com.pockyl.rustling_leaves.sim.LeafSpawner;
 import com.pockyl.rustling_leaves.sim.LitterChunk;
 import com.pockyl.rustling_leaves.sim.LitterField;
 import com.pockyl.rustling_leaves.sim.LeafSimulation;
+import com.pockyl.rustling_leaves.sim.TreeKinds;
 
 /**
  * Gives ground that is seen for the first time the litter a forest floor would have: a carpet under and around tree
@@ -98,7 +99,8 @@ final class LitterSeeder {
                 int z = originZ + gz - MARGIN;
                 int top = level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z) - 1;
                 BlockState state = level.getBlockState(cursor.set(x, top, z));
-                boolean leaves = LeafSpawner.sheds(state, settings);
+                // Trees the player switched off (or without a carpet) leave the ground under them bare.
+                boolean leaves = LeafSpawner.sheds(state, settings) && LeafShapes.carpets(state.getBlock());
                 canopy[gz * GRID + gx] = leaves ? state : null;
                 anyCanopy |= leaves;
             }
@@ -157,7 +159,7 @@ final class LitterSeeder {
                 int x = originX + bx;
                 int z = originZ + bz;
                 int color = colors.base(treeState, level, cursor.set(x, Mth.floor(here), z));
-                int shape = LeafShapes.of(treeState.getBlock()).ordinal();
+                int shape = LeafShapes.kind(treeState.getBlock());
                 blockColor[b] = color;
                 blockShape[b] = shape;
                 // Hollows collect leaves, humps and ledges shed them.
@@ -165,7 +167,7 @@ final class LitterSeeder {
                 float terrain = Mth.clamp(1.0F + relief * 1.5F, 0.3F, 2.0F);
                 int walls = settings.naturalPiles && d >= 0.3F ? walls(simulation, x, z, here + 0.1) : 0;
                 // Under conifers the needles lie as an almost unbroken mat; broadleaf litter gathers in patches.
-                float patchiness = shape == LeafShape.NEEDLE.ordinal() ? NEEDLE_PATCHINESS : PATCHINESS;
+                float patchiness = TreeKinds.shape(shape) == LeafShape.NEEDLE ? NEEDLE_PATCHINESS : PATCHINESS;
                 for (int c = 0; c < 16; c++) {
                     int cellX = x * 4 + (c & 3);
                     int cellZ = z * 4 + (c >> 2);

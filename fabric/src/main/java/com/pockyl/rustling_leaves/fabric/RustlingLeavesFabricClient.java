@@ -16,6 +16,7 @@ import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import com.pockyl.rustling_leaves.Config;
 import com.pockyl.rustling_leaves.RustlingLeaves;
 import com.pockyl.rustling_leaves.client.LeafCommands;
+import com.pockyl.rustling_leaves.client.LeafSettingsScreen;
 import com.pockyl.rustling_leaves.client.LeafManager;
 import com.pockyl.rustling_leaves.client.RustlingLeavesClient;
 import com.pockyl.rustling_leaves.client.compat.ImmersiveWeathering;
@@ -34,7 +35,9 @@ public final class RustlingLeavesFabricClient implements ClientModInitializer {
         NeoForgeModConfigEvents.loading(RustlingLeaves.MOD_ID).register(RustlingLeavesFabricClient::onConfig);
         NeoForgeModConfigEvents.reloading(RustlingLeaves.MOD_ID).register(RustlingLeavesFabricClient::onConfig);
         NeoForgeConfigRegistry.INSTANCE.register(RustlingLeaves.MOD_ID, ModConfig.Type.CLIENT, Config.SPEC);
-        ConfigScreenFactoryRegistry.INSTANCE.register(RustlingLeaves.MOD_ID, ConfigurationScreen::new);
+        // The config button opens a choice: the options of the mod, or the settings of single trees.
+        ConfigScreenFactoryRegistry.INSTANCE.register(RustlingLeaves.MOD_ID,
+                (modId, parent) -> new LeafSettingsScreen(parent, screen -> new ConfigurationScreen(modId, screen)));
         FabricNetwork.registerClient();
         if (FabricLoader.getInstance().isModLoaded(ImmersiveWeathering.MOD_ID)) {
             ModelLoadingPlugin.register(PileModels::register);

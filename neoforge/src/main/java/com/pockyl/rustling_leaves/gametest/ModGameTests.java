@@ -1,6 +1,7 @@
 package com.pockyl.rustling_leaves.gametest;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.util.Mth;
@@ -23,6 +24,7 @@ import com.pockyl.rustling_leaves.network.RakePayload;
 import com.pockyl.rustling_leaves.sim.Armful;
 import com.pockyl.rustling_leaves.sim.LeafListener;
 import com.pockyl.rustling_leaves.sim.LeafPool;
+import com.pockyl.rustling_leaves.sim.LeafPalette;
 import com.pockyl.rustling_leaves.sim.LeafSettings;
 import com.pockyl.rustling_leaves.sim.LeafShape;
 import com.pockyl.rustling_leaves.sim.LeafSimulation;
@@ -32,7 +34,9 @@ import com.pockyl.rustling_leaves.sim.LitterChunk;
 import com.pockyl.rustling_leaves.sim.LitterField;
 import com.pockyl.rustling_leaves.sim.PileBlocks;
 import com.pockyl.rustling_leaves.sim.SeasonCurve;
+import com.pockyl.rustling_leaves.sim.TreeKinds;
 import com.pockyl.rustling_leaves.sim.TreeLeaves;
+import com.pockyl.rustling_leaves.sim.TreeProfile;
 import com.pockyl.rustling_leaves.sim.WaterWaves;
 import com.pockyl.rustling_leaves.sim.Wind;
 import com.pockyl.rustling_leaves.sim.WindSource;
@@ -1102,6 +1106,135 @@ public final class ModGameTests {
         helper.assertTrue(Arrays.equals(read.count, chunk.count) && Arrays.equals(read.base, chunk.base)
                 && Arrays.equals(read.color, chunk.color) && Arrays.equals(read.shape, chunk.shape)
                 && Arrays.equals(read.top, chunk.top) && Arrays.equals(read.topColor, chunk.topColor), "cells differ");
+        helper.succeed();
+    }
+
+    /** Litter keeps the tree it came from by its key (kind numbers last a session only), and the shapes of old saves. */
+    @GameTest(template = "empty")
+    public static void litterKeepsItsTreeWhenSaved(GameTestHelper helper) throws IOException {
+        int maple = TreeKinds.id("test:maple_leaves");
+        LitterChunk chunk = new LitterChunk(1, 1);
+        chunk.seedCell(5, 7, 64.0F, 0x7A9A3A, maple);
+        chunk.seedCell(6, 3, 64.0F, 0x7A9A3A, LeafShape.NEEDLE.ordinal());
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        chunk.write(new DataOutputStream(bytes));
+        LitterChunk read = LitterChunk.read(new DataInputStream(new ByteArrayInputStream(bytes.toByteArray())));
+        helper.assertTrue(read.shape[5] == maple && "test:maple_leaves".equals(TreeKinds.key(read.shape[5])), "tree lost: " + read.shape[5]);
+        helper.assertTrue(read.shape[6] == LeafShape.NEEDLE.ordinal(), "bare shape lost: " + read.shape[6]);
+        helper.succeed();
+    }
+
+    /** A top leaf saved before 2.9.0 held a sprite index of its shape; now it holds the variant and draws the same sprite. */
+    @GameTest(template = "empty")
+    public static void oldTopLeafKeepsItsSprite(GameTestHelper helper) throws IOException {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        DataOutputStream out = new DataOutputStream(bytes);
+        out.writeByte(2);
+        out.writeInt(0);
+        out.writeInt(0);
+        out.writeBoolean(true);
+        out.writeLong(0L);
+        out.writeLong(0L);
+        out.writeShort(1);
+        out.writeShort(9);
+        out.writeShort(1);
+        out.writeFloat(64.0F);
+        out.writeInt(0x6A8F3A);
+        out.writeByte(LeafShape.NEEDLE.ordinal());
+        int sprite = LeafShape.NEEDLE.firstSprite + 2;
+        out.writeLong(LitterField.encodeTop(0.5F, 0.5F, 1.0F, 0.1F, sprite));
+        out.writeInt(0x6A8F3A);
+        LitterChunk read = LitterChunk.read(new DataInputStream(new ByteArrayInputStream(bytes.toByteArray())));
+        int variant = (int) (read.top[9] >>> 40 & 15);
+        helper.assertTrue(TreeKinds.profile(read.shape[9]).spriteOf(variant) == sprite, "sprite became " + variant);
+        helper.succeed();
+    }
+
+    /** A tree's own colours replace the tree colour; without autumn share none of the leaves turns. */
+    @GameTest(template = "empty")
+    public static void treeColorsReplaceTheTreeColor(GameTestHelper helper) {
+        TreeProfile profile = new TreeProfile.Builder(LeafShape.BROAD).colors(new int[] {0xFF0000, 0x0000FF}).autumn(0.0F).build();
+        boolean red = false;
+        boolean blue = false;
+        for (int n = 0; n < 200; n++) {
+            int color = profile.vary(0x00FF00, LeafPalette.hash(n, 3, 7), profile.autumnShare(new LeafSettings()));
+            helper.assertTrue((color & 0x00FF00) == 0, "the tree colour shows: " + Integer.toHexString(color));
+            red |= (color >> 16 & 0xFF) > 0;
+            blue |= (color & 0xFF) > 0;
+        }
+        helper.assertTrue(red && blue, "not both colours: red " + red + ", blue " + blue);
+        helper.succeed();
+    }
+
+    /** Fire set to the litter burns every leaf around the point at once; the top leaves burn away as particles. */
+    @GameTest(template = "box")
+    public static void fireBurnsTheLitterAround(GameTestHelper helper) {
+        floor(helper);
+        LeafSimulation sim = simulation(helper, 512, LeafListener.NONE);
+        carpet(sim, helper, 3.0, 5);
+        int[] center = cellAt(helper, 3.5, 3.5);
+        double ground = absoluteY(helper, 1.0);
+        BlockPos origin = helper.absolutePos(BlockPos.ZERO);
+        int burnt = sim.burn(origin.getX() + 3.5, ground, origin.getZ() + 3.5, 1.0F);
+        helper.assertTrue(burnt > 0, "nothing burnt");
+        helper.assertTrue(sim.field().count(center[0], center[1]) == 0, "the centre still has leaves");
+        helper.assertTrue(sim.field().count(center[0] + 2, center[1]) == 0, "half a block away still has leaves");
+        helper.assertTrue(sim.field().count(center[0] + 8, center[1]) == 5, "two blocks away burnt too");
+        helper.assertTrue(sim.pool().count() > 0, "no burning leaves to see");
+        run(sim, helper, LeafSimulation.DYING_TICKS + 2);
+        helper.assertTrue(sim.pool().count() == 0, sim.pool().count() + " burning leaves are left");
+        helper.succeed();
+    }
+
+    /** A blow at a leaves block shakes leaves loose outside it, on the face that was hit or under it. */
+    @GameTest(template = "box")
+    public static void hitLeavesShakeLooseOutsideTheBlock(GameTestHelper helper) {
+        floor(helper);
+        BlockPos leaves = new BlockPos(3, 4, 3);
+        helper.setBlock(leaves, Blocks.OAK_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true));
+        LeafSimulation sim = simulation(helper, 64, LeafListener.NONE);
+        LeafSpawner spawner = new LeafSpawner(new TreeLeaves() {
+            @Override
+            public int color(BlockState state, Level level, BlockPos pos) {
+                return 0x00FF00;
+            }
+
+            @Override
+            public LeafShape shape(BlockState state) {
+                return LeafShape.BROAD;
+            }
+        });
+        BlockPos pos = helper.absolutePos(leaves);
+        spawner.shake(helper.getLevel(), sim, pos, helper.getLevel().getBlockState(pos), Direction.NORTH, 0.0F, 1.0F, 6);
+        LeafPool pool = sim.pool();
+        helper.assertTrue(pool.count() == 6, "shook " + pool.count() + " leaves");
+        for (int i = 0; i < pool.highWater(); i++) {
+            if (pool.state[i] != LeafPool.FREE) {
+                boolean north = pool.z[i] < pos.getZ();
+                boolean under = pool.y[i] < pos.getY();
+                helper.assertTrue(north || under, "a leaf starts inside the block at " + pool.x[i] + " " + pool.y[i] + " " + pool.z[i]);
+            }
+        }
+        helper.succeed();
+    }
+
+    /** Heavy leaves that do not glide fall much faster than ordinary ones. */
+    @GameTest(template = "box")
+    public static void heavyLeavesFallFaster(GameTestHelper helper) {
+        TreeProfile heavy = new TreeProfile.Builder(LeafShape.BROAD).weight(5.0F).glide(0.0F).build();
+        TreeKinds.setResolver(key -> "test:heavy_leaves".equals(key) ? heavy : null);
+        int kind = TreeKinds.id("test:heavy_leaves");
+        floor(helper);
+        LeafSimulation sim = simulation(helper, 64, LeafListener.NONE);
+        BlockPos origin = helper.absolutePos(BlockPos.ZERO);
+        int light = spawn(sim, helper, 2.5, 4.5, 3.5);
+        int dense = sim.spawn(origin.getX() + 4.5, origin.getY() + 4.5, origin.getZ() + 3.5, 0.0F, 0.0F, 0.0F, 0x6A8F3A, 0x6A8F3A,
+                kind, 0, 0.1F, false);
+        // Gravity is weak: both start from rest and only the heavy one keeps speeding up.
+        run(sim, helper, 35);
+        double lightY = sim.pool().y[light];
+        double denseY = sim.pool().y[dense];
+        helper.assertTrue(denseY < lightY - 0.6, "heavy leaf at " + denseY + ", ordinary leaf at " + lightY);
         helper.succeed();
     }
 

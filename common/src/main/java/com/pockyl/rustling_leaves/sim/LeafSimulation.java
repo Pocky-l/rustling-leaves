@@ -79,6 +79,13 @@ public final class LeafSimulation {
     private static final int SHADOW_DEPTH = 6;
     /** Share of leaves that tumble instead of fluttering (in nature: long, stiff leaves). */
     private static final float TUMBLER_SHARE = 0.25F;
+    /** Fire reaches litter this far above or below the point it was set at. */
+    private static final double BURN_HEIGHT = 1.2;
+    /** Leaves of a burning cell that stay a moment as burning particles. */
+    private static final int BURNING_PER_CELL = 2;
+    /** Colours of burning leaves: glowing embers and charred leaves. */
+    private static final int EMBER = 0xF07A28;
+    private static final int CHAR = 0x2A1C14;
     private static final float GROUND_FRICTION = 0.86F;
     private static final float LIFT_THRESHOLD = 0.045F;
     private static final float LIFT_SCALE = 8.0F;
@@ -296,11 +303,21 @@ public final class LeafSimulation {
      */
     public int spawn(double x, double y, double z, float vx, float vy, float vz, int color, int baseColor, LeafShape shape, int sprite,
             float size, boolean natural) {
+        return spawn(x, y, z, vx, vy, vz, color, baseColor, shape.ordinal(), sprite, size, natural);
+    }
+
+    /**
+     * Adds a falling leaf of a kind of tree ({@link TreeKinds}).
+     *
+     * @return the leaf index, or -1 if the pool is full
+     */
+    public int spawn(double x, double y, double z, float vx, float vy, float vz, int color, int baseColor, int kind, int sprite,
+            float size, boolean natural) {
         int i = pool.allocate();
         if (i < 0) {
             return -1;
         }
-        initLeaf(i, x, y, z, color, baseColor, shape.ordinal(), sprite, size);
+        initLeaf(i, x, y, z, color, baseColor, kind, sprite, size);
         pool.yaw[i] = random.next() * Mth.TWO_PI;
         pool.pitch[i] = (random.next() - 0.5F) * 1.2F;
         pool.roll[i] = (random.next() - 0.5F) * 1.2F;
@@ -310,7 +327,8 @@ public final class LeafSimulation {
         pool.vy[i] = vy;
         pool.vz[i] = vz;
         pool.flags[i] = natural ? LeafPool.FLAG_NATURAL : 0;
-        if (random.next() < TUMBLER_SHARE) {
+        // Leaves that do not glide drop without autorotating.
+        if (random.next() < TUMBLER_SHARE * Math.min(1.0F, TreeKinds.profile(kind).glide)) {
             pool.flags[i] |= LeafPool.FLAG_TUMBLER;
             pool.spinPitch[i] = (random.next() < 0.5F ? -1.0F : 1.0F) * (0.25F + random.next() * 0.2F);
         }
@@ -354,7 +372,7 @@ public final class LeafSimulation {
         pool.phase[i] = random.next() * Mth.TWO_PI;
         float glide = random.next();
         pool.freq[i] = 0.2F - glide * 0.12F + random.next() * 0.03F;
-        pool.sway[i] = 0.025F + glide * glide * 0.075F;
+        pool.sway[i] = (0.025F + glide * glide * 0.075F) * TreeKinds.profile(shape).glide;
         pool.swayDir[i] = random.next() * Mth.TWO_PI;
         pool.size[i] = size;
         pool.auxA[i] = 0.0F;
@@ -362,7 +380,7 @@ public final class LeafSimulation {
         pool.ground[i] = y;
         pool.color[i] = color;
         pool.baseColor[i] = baseColor;
-        pool.shape[i] = (byte) shape;
+        pool.shape[i] = (short) shape;
         pool.sprite[i] = (byte) sprite;
         pool.light[i] = level != null ? terrain.lightAt(x, y + 0.1, z) : 0xF000F0;
         pool.shadow[i] = Float.NaN;
@@ -459,11 +477,12 @@ public final class LeafSimulation {
         float sin = Mth.sin(phase);
         float swayDir = pool.swayDir[i] += (random.next() - 0.5F) * 0.06F;
         boolean tumbler = (pool.flags[i] & LeafPool.FLAG_TUMBLER) != 0;
+        TreeProfile profile = TreeKinds.profile(pool.shape[i]);
         float ownX;
         float ownZ;
         if (tumbler) {
             // Autorotation: a leaf spinning about its long axis gets lift across that axis and glides sideways.
-            float glide = 0.03F * Math.signum(pool.spinPitch[i]);
+            float glide = 0.03F * profile.glide * Math.signum(pool.spinPitch[i]);
             ownX = Mth.sin(pool.yaw[i]) * glide;
             ownZ = Mth.cos(pool.yaw[i]) * glide;
             // Edge-on most of the time: no broadside stall, a steadier and faster descent.
@@ -478,8 +497,10 @@ public final class LeafSimulation {
         float relZ = air[2] + ownZ - pool.vz[i];
         float rel = Mth.sqrt(relX * relX + relY * relY + relZ * relZ);
         float quadratic = (1.0F + QUADRATIC_DRAG * rel) * (foliage ? FOLIAGE_DRAG : 1.0F);
-        float dragH = Math.min(0.6F, DRAG_HORIZONTAL * quadratic);
-        float dragV = Math.min(0.6F, DRAG_VERTICAL * (0.55F + 0.9F * sin * sin) * quadratic);
+        // Heavier leaves take longer to follow the air: they fall faster and drift less. Gliding leaves stall more.
+        float dragH = Math.min(0.6F, DRAG_HORIZONTAL * quadratic / profile.weight);
+        float dragV = Math.min(0.6F, DRAG_VERTICAL * (0.55F + 0.9F * sin * sin) * quadratic * (0.75F + 0.25F * profile.glide)
+                / profile.weight);
         pool.vx[i] += relX * dragH;
         pool.vz[i] += relZ * dragH;
         pool.vy[i] += relY * dragV - GRAVITY - wind.rain() * RAIN_PUSH;
@@ -777,7 +798,7 @@ public final class LeafSimulation {
         }
         float scale = 1.0F / CELL;
         long top = LitterField.encodeTop((float) (pool.x[i] * scale - cx), (float) (pool.z[i] * scale - cz), pool.yaw[i], pool.size[i],
-                pool.sprite[i]);
+                TreeKinds.profile(pool.shape[i]).variant(pool.sprite[i] & 0xFF));
         if ((pool.flags[i] & LeafPool.FLAG_WET) != 0) {
             pool.color[i] = LeafPalette.scale(pool.color[i], WET_SHADE);
         }
@@ -1555,6 +1576,59 @@ public final class LeafSimulation {
     }
 
     /**
+     * Fire set to the litter (flint and steel, a fire charge): every loose leaf within {@code radius} of the point that
+     * lies about its height burns at once. The top leaves of each cell stay a moment as burning particles, charred or
+     * glowing, drifting up in the heat while they shrink away; the rest is gone. Leaves of pile blocks stay with them.
+     *
+     * @return how many leaves burnt
+     */
+    public int burn(double x, double y, double z, float radius) {
+        int reach = Mth.ceil(radius / CELL);
+        int centerX = LitterField.cell(x);
+        int centerZ = LitterField.cell(z);
+        int burnt = 0;
+        for (int dz = -reach; dz <= reach; dz++) {
+            for (int dx = -reach; dx <= reach; dx++) {
+                float distance = Mth.sqrt(dx * dx + dz * dz) * CELL;
+                // A ragged edge, not a perfect disc.
+                if (distance > radius * (0.85F + 0.15F * random.next())) {
+                    continue;
+                }
+                int cellX = centerX + dx;
+                int cellZ = centerZ + dz;
+                int loose = field.loose(cellX, cellZ);
+                if (loose <= 0 || Math.abs(field.top(cellX, cellZ) - y) > BURN_HEIGHT) {
+                    continue;
+                }
+                double top = field.top(cellX, cellZ);
+                listener.onFire((cellX + 0.5) * CELL, top, (cellZ + 0.5) * CELL);
+                int shown = Math.min(loose, pool.free() > 64 ? BURNING_PER_CELL : 0);
+                for (int n = 0; n < shown; n++) {
+                    int i = release(cellX, cellZ, LeafPool.DYING, (random.next() - 0.5F) * 0.01F, 0.008F + random.next() * 0.02F,
+                            (random.next() - 0.5F) * 0.01F);
+                    if (i < 0) {
+                        break;
+                    }
+                    boolean ember = random.next() < 0.4F;
+                    pool.color[i] = ember ? LeafPalette.lerp(pool.color[i], EMBER, 0.85F) : LeafPalette.lerp(pool.color[i], CHAR, 0.7F);
+                    if (ember) {
+                        // Glowing: lit as if by its own fire.
+                        pool.light[i] = 0xF000F0;
+                    }
+                    pool.life[i] = DYING_TICKS / 2 + (int) (random.next() * (DYING_TICKS / 2));
+                    pool.spinYaw[i] = (random.next() - 0.5F) * 0.2F;
+                    burnt++;
+                }
+                for (int n = shown; n < loose && field.take(cellX, cellZ, null); n++) {
+                    burnt++;
+                }
+                field.queueRelax(cellX, cellZ);
+            }
+        }
+        return burnt;
+    }
+
+    /**
      * Rakes the litter around a point into a pile at that point: leaves in a ring around it are pulled a bit closer,
      * a few of them skid over the ground visibly. Repeated strokes heap them up until the pile is as steep as leaves
      * allow.
@@ -1681,17 +1755,18 @@ public final class LeafSimulation {
         int poured = 0;
         while (poured < count && armful.count() > 0 && pool.free() > 0) {
             int sample = armful.take(random.next());
-            LeafShape shape = LeafShape.byId(armful.shape(sample));
+            int kind = armful.shape(sample);
+            TreeProfile profile = TreeKinds.profile(kind);
             int base = armful.color(sample);
             long hash = (long) (random.next() * Integer.MAX_VALUE) << 20 ^ (long) (random.next() * Integer.MAX_VALUE);
-            int color = LeafPalette.vary(base, hash, Math.min(1.0F, settings.autumnColors + 0.3F), shape);
-            int sprite = shape.firstSprite + Math.min(shape.variants - 1, (int) (random.next() * shape.variants));
-            float size = LeafShape.BASE_SIZE * shape.size * settings.leafSize * (0.8F + random.next() * 0.45F);
+            int color = profile.vary(base, hash, profile.agedShare(settings));
+            int sprite = profile.sprite(random.next());
+            float size = profile.leafSize(settings, random.next());
             float speed = 0.16F + random.next() * 0.08F;
             float jitter = 0.05F;
             spawn(x + (random.next() - 0.5F) * 0.2, y + (random.next() - 0.5F) * 0.1, z + (random.next() - 0.5F) * 0.2,
                     dirX * speed + (random.next() - 0.5F) * jitter, dirY * speed + (random.next() - 0.5F) * jitter,
-                    dirZ * speed + (random.next() - 0.5F) * jitter, color, base, shape, sprite, size, false);
+                    dirZ * speed + (random.next() - 0.5F) * jitter, color, base, kind, sprite, size, false);
             poured++;
         }
         return poured;
@@ -2239,7 +2314,7 @@ public final class LeafSimulation {
             north = neighborPileHeight(x, y, z - 1);
             BlockState state = level.getBlockState(pileProbe.set(x, y, z));
             color = pileLook.color(state, level, pileProbe);
-            shape = pileLook.shape(state).ordinal();
+            shape = pileLook.kind(state);
         }
         int missing = 0;
         for (int a = 0; a < 4; a++) {
@@ -2339,11 +2414,11 @@ public final class LeafSimulation {
                     break;
                 }
             }
-            LeafShape shape = LeafShape.byId(pile.shape);
+            TreeProfile profile = TreeKinds.profile(pile.shape);
             long hash = (long) (random.next() * Integer.MAX_VALUE) << 20 ^ (long) (random.next() * Integer.MAX_VALUE);
-            int sprite = shape.firstSprite + Math.min(shape.variants - 1, (int) (random.next() * shape.variants));
-            float size = LeafShape.BASE_SIZE * shape.size * settings.leafSize * (0.8F + random.next() * 0.45F);
-            spawn(x, y, z, 0.0F, 0.0F, 0.0F, LeafPalette.vary(pile.color, hash, settings.autumnShare(), shape), pile.color, shape, sprite,
+            int sprite = profile.sprite(random.next());
+            float size = profile.leafSize(settings, random.next());
+            spawn(x, y, z, 0.0F, 0.0F, 0.0F, profile.vary(pile.color, hash, profile.autumnShare(settings)), pile.color, pile.shape, sprite,
                     size, false);
             budget--;
             if (--pile.remaining == 0) {

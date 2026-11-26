@@ -45,6 +45,9 @@ More in detail:
 - Steps push leaves aside and leave a trail, mobs and arrows stir them, sneaking leaves a carpet untouched. Every step
   rustles with real field recordings: dry crunch, soggy wet leaves, the scrape of a rake.
 - Leaves take the colour of their tree in every biome, modded trees included, with a share of autumn colours.
+- Every tree can be set up on its own in game: its leaf texture (vanilla leaf, petal, needles, maple, oak, ginkgo,
+  willow or a resource pack's), its own colours, how many turn, how often it sheds, how heavy its leaves are, how well
+  they glide, their size and how long they lie. Or switch the leaves of one tree off entirely.
 - Cached GPU meshes and a simplified far layer keep thousands of leaves cheap out to the render distance.
 
 ## Controls
@@ -59,12 +62,42 @@ No keys. Just play:
 | Sneak + hold right click with a hoe or shovel | Rake the leaves around that spot into a pile |
 | Throw a wind charge | Blows leaves away in a swirl |
 | Explode TNT | Clears the ground and throws leaves high into the air |
+| Hit or mine a leaves block | Shakes leaves loose with every blow |
 | Break a leaves block | Releases a burst of leaves |
+| Flint and steel / fire charge on leaf litter | The leaves around (about 2 blocks) burn at once |
 
 ## Configuration
 
 `/rustlingleaves fallrate <value>` (client command, works on any server) sets `leaves.fallRate` in game, e.g. `3` for a
 thick leaf fall; without a value it shows the current one.
+
+### Trees
+
+Mods -> Rustling Leaves -> Config -> **Trees**, or `/rustlingleaves trees` (looking at a tree opens that tree): every
+leaves block, and "every tree" on top, with a little window of its leaves falling as they would. The game keeps running
+behind the screen, so the trees around you show each change.
+
+| Setting | What it does |
+|---|---|
+| Leaves | Off: this mod leaves the tree alone (no falling leaves, carpet or burst) |
+| Carpet | A natural leaf carpet on new ground under the tree |
+| Texture | By tree, leaf, petal, needles, maple, oak, ginkgo, willow or the old textures |
+| Shedding | How often the tree drops leaves (1 like an oak, 1.5 birch, 0.15 spruce) |
+| Weight | Heavier leaves fall faster and drift less |
+| Glide | How much leaves sway and glide (0 drops them straight) |
+| Size | Leaf size |
+| Lies | In-game days until the fallen leaves rot (0 = until something moves them) |
+| Autumn | Share of leaves in autumn colours (dead needles for conifers) |
+| Autumn colours | The colours they turn to, e.g. `#C8552E, #E0A030` |
+| Own colours | Colours instead of the tree colour; each leaf takes one, one colour makes them all alike |
+
+The settings are saved in `config/rustling_leaves-trees.json`, which modpacks can ship: keys are a block id
+(`minecraft:oak_leaves`), every tree of a mod (`biomesoplenty:*`), a block tag (`#minecraft:leaves`) or every tree
+(`*`), all inside `"trees"`: `{"trees": {"minecraft:oak_leaves": {"texture": "maple", "colors": ["#C8352A"]}}}`. A
+texture can also be a list of sprites from a resource pack (`"texture": ["mypack:block/leaf/a",
+"mypack:block/leaf/b"]`, greyscale sprites are tinted). `/rustlingleaves trees reload` reads the file again.
+
+### Options
 
 `config/rustling_leaves-client.toml` (also in the in-game config screen: Mods -> Rustling Leaves -> Config):
 
@@ -148,10 +181,10 @@ The jar is written to `build/libs/`.
 ## Credits
 
 - Author: **Pocky**.
-- Falling leaf and petal textures: from newer Minecraft versions, adapted for tinting. Needle sprites, pile textures
-  and logo: original, made for this mod. Sounds: CC0 field recordings from [Freesound](https://freesound.org) by
-  Shain_T, SpliceSound, Magdaadga, lolamadeus, nickmaysoundmusic, audioninja001, Ryding, Garuda1982 and
-  Stefan21100190, cut for the mod. Title font: [Fraunces](https://fonts.google.com/specimen/Fraunces) (OFL).
+- Falling leaf and petal textures: from newer Minecraft versions, adapted for tinting. Needle, maple, oak, ginkgo and
+  willow sprites, pile textures and logo: original, made for this mod. Sounds: CC0 field recordings from
+  [Freesound](https://freesound.org) by Shain_T, SpliceSound, Magdaadga, lolamadeus, nickmaysoundmusic, audioninja001,
+  Ryding, Garuda1982 and Stefan21100190, cut for the mod. Title font: [Fraunces](https://fonts.google.com/specimen/Fraunces) (OFL).
 
 <!-- more-mods:start -->
 ## More mods by Pocky
